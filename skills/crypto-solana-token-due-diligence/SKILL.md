@@ -41,7 +41,8 @@ new process/session. The configured ceiling is not permission for paid services.
 At cutoff preserve a partial/blocked checkpoint with actual facts and missing work.
 Timeouts, missing evidence, unsupported decoding and budget exhaustion never become
 passing checks or completed standard work. Seek at most one feasible source alternate
-for a blocked fact within the existing budget. Do not retry until results look favorable.
+for a blocked fact within the existing budget; a read that failed is never repeated in
+the hope of a different answer.
 
 ## Resolve target and provider context
 
@@ -84,9 +85,11 @@ presets; raw evidence remains available for material disputes.
    dependencies with consistency rechecks; builds facts, pipeline findings, an honest
    draft and three note scaffolds; prints a compact facts summary, `diagnostics` and
    two pointer prompts. Typical wall clock is one to two minutes.
-2. **Lanes:** dispatch two generic subagents with the two printed pointer prompts,
-   verbatim, before reading facts yourself. Do not retype the briefs or create
-   persistent agent definitions. Liquidity and project agents own only their notes,
+2. **Lanes:** dispatch two general-purpose subagents (the default subagent type) with the two printed pointer prompts,
+   verbatim, in the same turn that `start` returns and before reading facts yourself;
+   the lane cutoff is receipt + 240 s whenever they are dispatched, so every minute
+   spent first is taken from them. Do not retype the briefs or create persistent
+   agent definitions. Liquidity and project agents own only their notes,
    grants, checklists and cutoff. They cannot run RPC, source credentials, create
    scripts, spawn agents, compose or change another owner's data.
 3. **Facts/presets:** judge from the printed summary; run `solana_facts.py --category`
@@ -167,7 +170,8 @@ Markdown source link on **every finding**: the report's own citation or `answer_
 otherwise the absolute frozen report path as Evidence report. No emoji on source links,
 no icon fetches, no extra calls or turns for presentation.
 
-Keep exact quantities and units, spending owner versus beneficial owner, sample
+Keep exact quantities and units (showing an atomic figure also in decimal display is
+presentation, not analyst arithmetic; keep the atomic figure), spending owner versus beneficial owner, sample
 account/receipt counts, custody exclusions, LP principal versus fees, named
 controllers and bypass paths, quote versus execution, economics/rights, assurance
 levels and the original focus. Describe receipt counts as the verification sample,

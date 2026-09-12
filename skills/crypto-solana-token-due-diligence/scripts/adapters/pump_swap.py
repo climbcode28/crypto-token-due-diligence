@@ -10,11 +10,12 @@ PROGRAM=SWAP_PROGRAM
 GLOBAL=pda(PROGRAM,b'global_config')
 CAPABILITY=capability('pumpswap',PROGRAM,REVISION,model='fungible_token2022_lp_actual_vaults_with_separate_virtual_quote',
     dependencies=['pool','global_config','mints','vaults','lp_mint','fee_config','program_control'])
-CAPABILITY.update(version='1.2.0',allocation_bytes=[261,301],reserved_tail_policy='evidenced allocation lengths only; an all-zero trailing allocation is accepted, any nonzero tail is refused',quote=False,historical_execution='pinned create/swap/withdraw/fee roles; exact transfer reconciliation separate')
+CAPABILITY.update(version='1.3.0',allocation_bytes=[261,271,301],reserved_tail_policy='known fields, the creator-fee/holder-reward tail group when the allocation holds it, then an all-zero trailing allocation of any length; a truncated account or any nonzero tail is refused',quote=False,historical_execution='pinned create/swap/withdraw/fee roles; exact transfer reconciliation separate')
 
 
 def decode_pool(account):
-    v=fixed(account,PROGRAM,'Pool',sizes=(261,301))
+    v=fixed(account,PROGRAM,'Pool')  # allocations observed: 261, 271, 301 bytes
+    need(v['creator_fee_bps']<=10000,'invalid Pump creator fee rate')
     need(v['base_mint']!=v['quote_mint'] and v['pool_base_token_account']!=v['pool_quote_token_account'],'PumpSwap asset/vault overlap')
     v.update(mints=[v['base_mint'],v['quote_mint']],vaults=[v['pool_base_token_account'],v['pool_quote_token_account']],config=GLOBAL,
         canonical_creator=v['creator']==pool_authority(v['base_mint']))
@@ -33,6 +34,7 @@ def analyze(target,pool,observations,*,lp_accounts=None):
         config=fixed(sample.account(GLOBAL),PROGRAM,'GlobalConfig');sample.result['global']=config
         need(config['disable_flags']<32,'unknown PumpSwap disable flags')
         need(sum(config[k] for k in ('lp_fee_basis_points','protocol_fee_basis_points','coin_creator_fee_basis_points','buyback_basis_points'))<10000,'invalid PumpSwap global rates')
+        need(config['max_configurable_creator_fee_bps']==0 or state['creator_fee_bps']<=config['max_configurable_creator_fee_bps'],'creator fee exceeds the configurable maximum')
         required=[pool,GLOBAL,*state['mints'],*state['vaults']]
         mints=[]
         for mint,vault in zip(state['mints'],state['vaults']):

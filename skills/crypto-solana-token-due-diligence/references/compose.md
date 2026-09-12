@@ -49,9 +49,22 @@ Support may instead be `{ "alias": "ID", "role": "execution", "effect_id": "ID",
 "subject": { "genesis_hash": "...", "kind": "mint", "address": "..." } }`.
 The actual role, subject and effect must pass the strict profile. A missing support
 subject defaults to that observation's typed subject, not a fee payer or implied
-human. Current sample IDs are expanded from dependency closure. Counterevidence
-uses the same aliases. Explicit stability assertions still require unchanged fresh
-critical rechecks.
+human. A support whose typed subject differs from the finding's subject (a program,
+pool or assurance fact cited from a mint-subject finding) must be declared: set the
+finding's `subject` to it or list it under the finding's `participants`, otherwise
+composition reports `support subject not declared by finding`. Roles are `state`,
+`derivation`, `execution`, `publication`, `attempt` and `context`. Only `attempt` and
+`context` may cite unusable evidence (a refused method, a failed header recheck), and a
+`coverage_gap` needs at least one `attempt`, `context`, `publication` or `derivation`
+support, so cite a failed read as `{ "alias": "baseline_largest_0", "role": "attempt" }`,
+never as a resolved-fact support. A `state_observation` needs a `state` or
+`derivation` support that is RPC-derived state; an indexer or project page supports
+only `source_analysis` (`document-as-runtime/state promotion forbidden`). Claims are
+`state_observation`, `source_analysis`, `historical_execution`, `inference` and
+`coverage_gap`; strengths `direct`, `corroborated`, `bounded` and `unresolved`.
+Current sample IDs are expanded from dependency closure. Counterevidence uses the
+same aliases. Explicit stability assertions still require unchanged fresh critical
+rechecks.
 
 Assign a pipeline finding without rewriting its text. The scaffold pre-fills each
 assignment with `"signal": null` and the current `input_digests` of the facts the
@@ -78,8 +91,35 @@ observation. Signals are `good`, `potential_risk`, `bad`, `unverified` or null w
 unjudged. Strength is `direct`, `corroborated`, `bounded` or `unresolved`. Claims are
 `state_observation`, `historical_execution`, `source_analysis`, `inference` or
 `coverage_gap`. Pure gaps cannot become adverse allegations. Every completed finding
-needs a signal. Ratings derive from signals and actual coverage; unknowns never
-become passing ratings merely to finish.
+needs a signal: `good` when the fact affirms a checked property, `potential_risk` or
+`bad` when it shows a concern, `unverified` when it is informational (an indexer
+discovery, a publication) or leaves the property open. Ratings derive from signals and
+actual coverage; unknowns never become passing ratings merely to finish.
+
+Coverage rows carry `status` `not_checked`, `partial`, `checked`, `unavailable` or
+`not_applicable`. `checked` and `not_applicable` need affirmative evidence and no
+unresolved gap; `unavailable` pairs with an `evidenced_external_limit` closure whose
+`attempt_ids` are the failed attempts among the ids the scaffold lists in that row's
+`attempt_ids` (never invented); a `resolved` boundary needs `checked` or
+`not_applicable` status, so a `partial` row can only close as an evidenced external
+limit or stay `pending`; a completed report allows only `resolved` or
+`evidenced_external_limit` boundaries and no `pending_work`. Finding and support
+subjects are `{genesis_hash, kind, address}` with `kind` one of `mint`, `holding`,
+`program`, `controller`, `pool`, `position`, `wallet` or `document` (a document
+subject's address is the target mint).
+
+The coordinator copies the scaffold's `decision_template` into `decision` and completes
+it: `verdict_kind` (`insufficient_evidence`, `conditional`, `favorable`, `adverse`),
+`text`, `finding_ids`, `counterevidence_ids`, the four `axes` each with `text`,
+`finding_ids` and `coverage_dimensions` (at least one of the two), `requirements` rows
+whose `quote` is a verbatim substring of the request with `status` `met` (the evidence
+satisfies that requirement), `not_met` (the evidence contradicts it) or `unverified`
+(not established either way), `mitigations` rows `{"finding_id", "status" (unmitigated, partial,
+mitigated), "text", "evidence_ids"}` and `actions` rows `{"kind" (user_choice,
+risk_response), "text"}`. A `mitigated` row needs usable `evidence_ids`; a `met` or
+`not_met` requirement needs a non-gap finding; every high or critical adverse finding
+must appear in `summary_ids`, `decision.finding_ids`, its axis and the mitigations. When
+all evidence is gaps the verdict must be `insufficient_evidence`.
 
 An override has `finding_id`, `reason`, `evidence_ids`, `input_digests` (each ID maps
 to its current digest in facts), and `changes`. Only text, signal, impact, confidence,

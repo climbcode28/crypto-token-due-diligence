@@ -5,7 +5,7 @@ from solana_profile import AXES,DIMENSIONS,check,regular
 from solana_web_capture import clean_url
 from solana_facts import describe,scan,LIMIT_KEYS,ATTENTION_KEYS
 
-VERSION='1.2.0'
+VERSION='1.2.1'
 LABELS={'good':'✅ Good','potential_risk':'🟡 Potential Risk','bad':'🔴 Bad','unverified':'⚪ Unverified'}
 PUBLICATION_OPS={'discovery_pools','repository_metadata','repository_revision','repository_tree','public_quote'}
 PUBLICATION_DETAIL_LINES=40
@@ -31,6 +31,14 @@ def citation(observation,root=None):
     return {'evidence_id':observation['id'],'url':url or quote(name,safe='/._-'),
         'kind':'source' if url else 'frozen_evidence','label':observation['id'],
         'captured_at':observation['captured_at'],'sha256':observation['sha256']}
+
+
+def verdict_line(decision,*,label=None):
+    """`<kind>: <text>` without repeating a kind label the analyst already wrote at the start of the text."""
+    kind=decision['verdict_kind'];label=kind.replace('_',' ').capitalize() if label is None else label;text=decision['text'].strip()
+    for spoken in (kind.replace('_',' '),kind):
+        if text[:len(spoken)+1].lower()==spoken.lower()+':':text=text[len(spoken)+1:].strip();break
+    return safe_text(label)+': '+safe_text(text)
 
 
 def links(ids,citations):
@@ -345,7 +353,7 @@ def facts_compact(manifest,report):
 def summary(report,citations):
     """Labeled findings with adjacent citations and exactly four conclusion bullets, mirroring the EVM chat shape."""
     decision=report['decision'];lines=['## Summary','']
-    if decision:lines+=[safe_text(decision['verdict_kind'].replace('_',' ').capitalize())+': '+safe_text(decision['text']),'']
+    if decision:lines+=[verdict_line(decision),'']
     else:lines+=['Unjudged '+('checkpoint' if report['delivery_status']=='checkpoint' else 'draft')+'. Standard research and analyst decisions are incomplete.','']
     lines+=['✅ Good = supported positive finding · 🟡 Potential Risk = observed concern or adverse inference · 🔴 Bad = supported material problem.',
         '⚪ Unverified = a research gap, not an observed defect or a passing check. Labels apply to the stated findings and time basis; Good is not a safety verdict.']
@@ -378,7 +386,7 @@ def render(manifest,report):
     lines+=summary(report,citations)
     lines+=['## Assessment','']
     if decision:
-        lines += [safe_text(decision['verdict_kind'])+': '+safe_text(decision['text']),'']
+        lines += [verdict_line(decision,label=decision['verdict_kind']),'']
         lines+=['User requirements:','']
         for r in decision['requirements']:lines+=['- '+safe_text(r['quote'])+' — '+safe_text(r['status'])+': '+safe_text(r['text'])]
         for kind in ('mitigations','actions'):

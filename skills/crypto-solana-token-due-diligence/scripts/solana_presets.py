@@ -213,13 +213,14 @@ def pump_sample(adapter_id,target,observations):
     if adapter_id=='pumpswap':
         pool=observations['pool'];packet=observations['packets'][pool]
         plan=pool_sample(adapter_id,pool,packet,lp_accounts=observations.get('lp_accounts',[]))
-        addresses=plan[0]['params'][0]+[fee_address(pump_swap.PROGRAM)]
+        addresses=plan[0]['params'][0]+[fee_address(pump_swap.PROGRAM),pump_swap.PROGRAM]  # fee tables and program control
         return account_batches(addresses,prefix='pump_swap_dependencies',floor=plan[0]['params'][1].get('minContextSlot'),critical=True)
     pool=curve_address(target['mint']);packets=observations['packets']
     account,meta=observed_account(pool,packets[pool]);state=pump_curve.decode_pool(account)
     need(not meta['sliced'],'full curve lead required')
     mint,mmeta=observed_account(target['mint'],packets[target['mint']]);need(mint and not mmeta['sliced'],'full mint lead required')
-    addresses=[pool,pump_curve.GLOBAL,target['mint'],associated_token_address(pool,target['mint'],mint['owner'])[0],fee_address(pump_curve.PROGRAM)]
+    # The curve program account itself is a dependency (program control), like every other adapter's program.
+    addresses=[pool,pump_curve.GLOBAL,target['mint'],associated_token_address(pool,target['mint'],mint['owner'])[0],fee_address(pump_curve.PROGRAM),pump_curve.PROGRAM]
     if state['quote_mint']!=pump_curve.WSOL:
         quote=state['quote_mint'];qa,qmeta=observed_account(quote,packets[quote]);need(qa and not qmeta['sliced'],'quote mint lead required')
         addresses += [quote,associated_token_address(pool,quote,qa['owner'])[0]]

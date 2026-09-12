@@ -30,9 +30,11 @@ used; exact scope and substantive evidence matter.
 hashes from the frozen, partial third live acceptance case. These are offline
 layout regressions, not current-state evidence for another investigation. The
 owning programs' pinned IDL fields at revision
-`9c82f61cb711b044a17f770ab8ce9f9bdf78f333` consume 115 bytes for BondingCurve and
-261 bytes for Pool. The observed allocations are 124 and 301 bytes, respectively,
-with all additional 9/40 bytes zero. Nonzero padding remains rejected.
+`e0687ae9b7e064a0f54efc7297c65eecfbba3a8f` consume 125 bytes for BondingCurve (115
+before its creator-fee/holder-reward tail group) and 271 bytes for Pool (261 before
+its tail group). The observed allocations are 124 and 301 bytes: the 124-byte curve
+predates the tail group (9 zero bytes, tail absent) and the 301-byte pool holds a
+zeroed tail group plus 30 zero bytes. Nonzero padding remains rejected.
 
 At the documented fixed offsets, the completed curve has all four reserve fields
 zero and token_total_supply 1,000,000,000,000,000. This cannot prove migration.

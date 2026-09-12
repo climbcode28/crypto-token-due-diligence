@@ -16,7 +16,9 @@ The wire semantics follow [Solana transaction structures](https://solana.com/doc
 and [getTransaction](https://solana.com/docs/rpc/http/gettransaction); immutable
 instruction source revisions/hashes are in `assets/layout-sources.json`.
 
-`verify_sales` accepts at most two distinct historical receipts. A verified sample
+`verify_sales` and `verify_rebuys` accept at most ten distinct historical receipts
+(start's two plus the `pool_activity` presets'); a repeated signature is one execution
+plus a row gap. A verified sample
 requires one supported direct outer swap at the exact pool, two matching SPL inner
 transfers, actual source/output ownership by the same observed key, matching token
 balance deltas and instruction amount/thresholds. Fee payer and signer alone never
@@ -32,6 +34,11 @@ to reconcile. Existing balances and rent refunds are not sale proceeds. An
 unexplained native movement leaves net proceeds unknown without erasing a matched
 swap. Cost basis is absent, so profit always remains unknown.
 
-Receipt sample count and indexed market activity are independent. Two receipts
-are neither the market's entire sell count nor proof that everyone can exit.
+In an aggregated route, a hop into the leg's input account before the leg (bought
+elsewhere, then sold at this pool) is tolerated and the sale at the exact pool still
+verifies; a hop back into the input account after the leg is a round trip and is
+rejected. Receipt sample count and indexed market activity are independent. The sale and rebuy
+facts verify every sampled receipt at a known pool, start's two and up to four per
+`pool_activity` preset, at most ten; a handful of receipts are neither the market's
+entire sell count nor proof that everyone can exit.
 Observed freeze, fee and other restrictions remain visible alongside activity.

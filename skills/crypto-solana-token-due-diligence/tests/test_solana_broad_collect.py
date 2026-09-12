@@ -2,6 +2,7 @@ from pathlib import Path
 import sys,tempfile,unittest,unittest.mock,time,json,copy
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'scripts'))
 from broad_fixture import RichRpc,Web
+import solana_session
 from solana_broad_collect import start,collect,status,STAGES
 from solana_profile import validate
 
@@ -9,6 +10,8 @@ from solana_profile import validate
 class BroadTests(unittest.TestCase):
     def setup_run(self,scope='broad',urls=None):
         tmp=tempfile.TemporaryDirectory();self.addCleanup(tmp.cleanup);root=Path(tmp.name)/'run';target=RichRpc.reset();Web.calls=[];Web.blocked=False
+        # The public connection-rate window (40 sends per 10 s) is provider pacing, not behaviour under test here; unpatched it adds ~10 s waits.
+        patcher=unittest.mock.patch.object(solana_session,'CONNECTION_WINDOW',10000);patcher.start();self.addCleanup(patcher.stop)
         opts={'question':'Assess exact token, project claims and exit depth.','received_at':time.time()-10,'deadline_at':time.time()+590,'scope':scope,'focus':['exit depth'],
           'urls':urls or [],'synthetic':True,'config':{'url':'https://synthetic.invalid','headers':{}},'factory':RichRpc,'opener_factory':Web}
         return root,target,opts
@@ -139,10 +142,14 @@ class BroadTests(unittest.TestCase):
             return result
         with patch.object(RichRpc,'__call__',changed):
             collect(root,{'id':'changed','kind':'programs','parameters':{'addresses':[target['mint']]}},opts['config'],factory=RichRpc)
-        f=json.loads((root/'draft/facts.json').read_text())['facts'];latest=next(r for r in f if r['evidence_id']=='auto-controls');prior=next(r for r in f if r['evidence_id']=='prior-controls')
-        self.assertFalse(latest['usable']);self.assertEqual(latest['data']['mint']['mint_authority'],key(90))
-        self.assertTrue(prior['usable']);self.assertEqual(prior['data']['selection_scope'],'earlier_pinned_snapshot_newer_unpinned')
-        self.assertNotEqual(prior['data']['mint']['supply_atomic'],latest['data']['mint']['supply_atomic'])
+        f=json.loads((root/'draft/facts.json').read_text())['facts'];controls=next(r for r in f if r['evidence_id']=='auto-controls')
+        # The controls fact comes from the latest pinned snapshot; the newer unpinned read is a limit that says its authorities differ.
+        self.assertTrue(controls['usable']);self.assertEqual(controls['data']['selection_scope'],'earlier_pinned_snapshot_newer_unpinned')
+        self.assertNotEqual(controls['data']['mint']['mint_authority'],key(90));self.assertNotEqual(controls['data']['mint']['supply_atomic'],'2000000')
+        self.assertEqual((controls['data']['newer_unpinned']['authorities_match'],controls['data']['newer_unpinned']['reason']),(False,None));self.assertFalse(any(r['evidence_id']=='prior-controls' for r in f))
+        self.assertIn('newer_unpinned',{l['path'] for l in controls['limits']});self.assertIn('its controllers differ',controls['summary'])
+        m=json.loads((root/'draft/manifest.json').read_text());d=next(x for x in m['derivations'] if x['id']=='auto-controls')
+        self.assertNotIn(controls['data']['newer_unpinned']['observation'],[i['id'] for i in d['inputs']])  # a note, never an input
         # Aggregates take the latest usable snapshot and the authority graph is built from usable roots only.
         sizes=next(r for r in f if r['evidence_id']=='auto-sizes');self.assertTrue(sizes['usable'])
         graph=next(r for r in f if r['evidence_id']=='auto-controllers');self.assertTrue(graph['usable'])
@@ -324,12 +331,135 @@ class ImporterBoundaryTests(unittest.TestCase):
         late=[s for s in m['samples'] if s['observation_id'].startswith('late_')];self.assertTrue(late)
         self.assertTrue(all(s['status']=='partial' for s in late))
         after=json.loads((root/'draft/facts.json').read_text())
-        # The newest snapshot sits outside the verified interval and stays unusable; the earlier usable one is retained.
-        self.assertFalse(next(x for x in after['facts'] if x['evidence_id']=='auto-controls')['usable'])
-        self.assertTrue(next(x for x in after['facts'] if x['evidence_id']=='prior-controls')['usable'])
+        # The newest snapshot sits outside the verified interval and stays unusable; the controls fact keeps the earlier pinned one.
+        controls=next(x for x in after['facts'] if x['evidence_id']=='auto-controls');self.assertTrue(controls['usable'])
+        self.assertEqual(controls['data']['selection_scope'],'earlier_pinned_snapshot_newer_unpinned');self.assertEqual(controls['data']['newer_unpinned']['authorities_match'],True)
+        self.assertFalse(any(x['evidence_id']=='prior-controls' for x in after['facts']));self.assertIn('its controllers are unchanged',controls['summary'])
         self.assertTrue(next(x for x in after['facts'] if x['evidence_id']=='auto-sizes')['usable'])
         again=refresh(root);self.assertEqual(again['research_status'],'partial')  # A second import never raises.
         validate(root/'draft',True)
+
+    def test_later_unpinned_pool_read_keeps_the_earlier_usable_pool_fact(self):
+        from solana_common import sha
+        root,target,opts=self.setup_run();start(root,target,**opts);pid='pool-'+sha(RichRpc.pool['pool'].encode())[:16]
+        before=json.loads((root/'draft/facts.json').read_text());self.assertTrue(next(x for x in before['facts'] if x['evidence_id']==pid)['usable'])
+        original=RichRpc.__call__;seen={'genesis':0}
+        def flaky(rpc,request):
+            if request['method']=='getGenesisHash':
+                seen['genesis']+=1
+                if seen['genesis']>=2:raise TimeoutError('fixture: provider stalled on the final network recheck')
+            return original(rpc,request)
+        with unittest.mock.patch.object(RichRpc,'__call__',flaky):
+            result=collect(root,{'id':'late','kind':'pool','parameters':{'adapter':'raydium_cpmm','pool':RichRpc.pool['pool']}},opts['config'],factory=RichRpc)
+        self.assertEqual(result['research_status'],'partial')
+        # The newest pool read is unpinned; the pool fact keeps the earlier pinned read instead of becoming a coverage gap.
+        after=json.loads((root/'draft/facts.json').read_text());self.assertTrue(next(x for x in after['facts'] if x['evidence_id']==pid)['usable'])
+        m=json.loads((root/'draft/manifest.json').read_text());self.assertTrue([s for s in m['samples'] if s['observation_id'].startswith('late_') and s['status']=='partial'])
+
+    def test_leads_follow_discovery_liquidity_order(self):
+        from solana_broad_collect import ordered_leads
+        self.assertEqual(ordered_leads([('B','pumpswap'),('A','meteora_damm_v2'),('C','raydium_cpmm')],['A','B']),[('A','meteora_damm_v2'),('B','pumpswap'),('C','raydium_cpmm')])
+        root,target,opts=self.setup_run();start(root,target,**opts);leads=json.loads((root/'automatic-leads.json').read_text())
+        self.assertEqual([l['pool'] for l in leads],[RichRpc.pool['pool']])
+
+    def second_pool(self,target,a,n=45):
+        """Another decodable CPMM pool for the same mints at key(n), with its own PDA vaults and LP mint."""
+        import struct
+        from pool_fixture import key,mint,holding
+        from solana_fixture import account
+        from solana_addresses import find_program_address
+        from adapters import raydium_cpmm as cp
+        from adapters.binary import discriminator
+        from solana_common import base58_bytes,TOKEN_PROGRAM
+        pool=key(n);program=cp.PROGRAM;mints=a['mints'];authority,bump=find_program_address([b'vault_and_lp_mint_auth_seed'],program)
+        vaults=[find_program_address([b'pool_vault',base58_bytes(pool,32),base58_bytes(m,32)],program)[0] for m in mints];lp=find_program_address([b'pool_lp_mint',base58_bytes(pool,32)],program)[0]
+        keys=[a['config'],key(31),*vaults,lp,*mints,TOKEN_PROGRAM,TOKEN_PROGRAM,key(37)]
+        raw=discriminator('PoolState')+b''.join(base58_bytes(k,32) for k in keys)+bytes([bump,0,9,6,6])+struct.pack('<7Q',1000,100,200,30,40,1,5)+bytes([0,1])+bytes(6)+struct.pack('<2Q',10,20)+bytes(224)
+        RichRpc.values.update({pool:{**account(raw),'owner':program},vaults[0]:holding(mints[0],authority,40000),vaults[1]:holding(mints[1],authority,80000),lp:mint(900,authority,9)})
+        return pool
+
+    def test_two_pools_are_sampled_in_discovery_liquidity_order_not_observation_order(self):
+        import solana_broad_collect as module
+        root,target,opts=self.setup_run();a=RichRpc.pool;pool2=self.second_pool(target,a,45);pool3=self.second_pool(target,a,46)
+        pair=lambda pool,liq:{'chainId':'solana','pairAddress':pool,'baseToken':{'address':target['mint']},'quoteToken':{'address':a['mints'][1]},'dexId':'raydium','liquidity':{'usd':liq},'priceUsd':'2','volume':{'h24':'500000'},'info':{'websites':[{'url':'https://project.example/token'}]}}
+        Web.pairs=[pair(a['pool'],'1000000'),pair(pool2,'5000000'),pair(pool3,'3000000')]  # liquidity order: pool2, pool3, pool1
+        real=module.candidates;calls=[]
+        def skewed(root_,target_):
+            rows=real(root_,target_);calls.append(len(rows))  # discovery keeps the top two by liquidity: pool2, pool3
+            # The related stage reads all three pools in an order that is neither the liquidity order nor its reverse.
+            return [{**rows[0],'pool':pool3},{**rows[0],'pool':a['pool']},{**rows[0],'pool':pool2}] if len(calls)==1 else rows
+        with unittest.mock.patch.object(module,'candidates',skewed):result=start(root,target,**opts)
+        self.assertGreaterEqual(len(calls),2);self.assertEqual([r['pool'] for r in real(root,target)],[pool2,pool3])
+        leads=json.loads((root/'automatic-leads.json').read_text())
+        self.assertEqual([l['pool'] for l in leads],[pool2,pool3])  # liquidity order, whatever the observation order (pool3, pool1, pool2)
+        facts=json.loads((root/'draft/facts.json').read_text())['facts'];self.assertTrue({pool2,pool3}<={f['subject']['address'] for f in facts if f['operation']=='pool'})
+        rows=json.loads((root/'receipt-classification.json').read_text());self.assertEqual(rows['listings'][0]['pool'],pool2)
+
+    def test_pool_whose_listed_signatures_all_failed_is_a_stated_diagnostic(self):
+        from transaction_fixture import fixture
+        root,target,opts=self.setup_run();_,a,packet,_=fixture();tx=packet['response']['result']
+        tx['transaction']['message']['accountKeys']=[RichRpc.pool['pool'] if k==a['pool'] else k for k in tx['transaction']['message']['accountKeys']]
+        tx['blockTime']=RichRpc.stamp;RichRpc.receipt=tx;original=RichRpc.__call__
+        def failing(rpc,request):
+            res=original(rpc,request)
+            if request['method']=='getSignaturesForAddress':
+                for row in res['result']:row['err']={'InstructionError':[0,'Custom']}
+            return res
+        with unittest.mock.patch.object(RichRpc,'__call__',failing):result=start(root,target,**opts)
+        rows=[r for r in result['diagnostics'] if r.get('category')=='activity_signatures_all_failed'];self.assertEqual(rows and rows[0]['pools'],[RichRpc.pool['pool']])
+        record=json.loads((root/'receipt-classification.json').read_text());self.assertEqual((record['probed'],record['listings'][0]['failed'],record['listings'][0]['listed']),(0,1,1))
+        self.assertFalse(any(f['operation'] in ('sales','rebuys') for f in json.loads((root/'draft/facts.json').read_text())['facts']))
+
+    def test_unresolved_reads_reach_the_coordinator_diagnostics(self):
+        root,target,opts=self.setup_run();RichRpc.mode='largest_refused';original=RichRpc.__call__
+        def broken(rpc,request):
+            if request['method']=='getProgramAccounts':raise ValueError('fixture: provider answered with an unusable body')
+            return original(rpc,request)
+        with unittest.mock.patch.object(RichRpc,'__call__',broken):result=start(root,target,**opts)
+        rows=[r for r in result['diagnostics'] if r.get('category')=='unresolved_reads'];self.assertEqual(len(rows),1)
+        self.assertEqual([(r['read'],r['status']) for r in rows[0]['reads']],[('baseline_holderscan','invalid'),('lpleads0_scan','invalid')])  # the holder census and the LP-holder scan
+        self.assertFalse(any(f['operation']=='holders' for f in json.loads((root/'draft/facts.json').read_text())['facts']))
+
+    def test_derivation_errors_reach_the_coordinator_diagnostics(self):
+        from solana_broad_collect import provider_diagnostics
+        root,target,opts=self.setup_run();start(root,target,**opts);path=root/'import-diagnostics.json';d=json.loads(path.read_text());self.assertEqual(d['errors'],[])
+        d['errors']=[{'operation':'controls','id':'auto-controls','reason':'fixture: derivation failed'}];path.write_text(json.dumps(d))
+        rows=[r for r in provider_diagnostics(root) if r.get('category')=='derivation_errors'];self.assertEqual((rows[0]['count'],rows[0]['errors'][0]['id']),(1,'auto-controls'))
+
+    def test_sales_and_rebuys_include_preset_receipts_beyond_the_start_sample(self):
+        from transaction_fixture import fixture
+        from solana_common import b58encode
+        root,target,opts=self.setup_run();_,a,packet,_=fixture();tx=packet['response']['result']
+        tx['transaction']['message']['accountKeys']=[RichRpc.pool['pool'] if k==a['pool'] else k for k in tx['transaction']['message']['accountKeys']]
+        tx['blockTime']=RichRpc.stamp;RichRpc.receipt=tx
+        # Start samples two swap receipts; a pool_activity preset adds a third, which the sale and rebuy facts must include.
+        second=copy.deepcopy(tx);two=b58encode(bytes([81])*64);second['transaction']['signatures'][0]=two;RichRpc.receipts={two:second}
+        start(root,target,**opts);facts=json.loads((root/'draft/facts.json').read_text())
+        sales=next(f['data'] for f in facts['facts'] if f['operation']=='sales');self.assertEqual((sales['requested_receipts'],sales['verified_receipts'],sales['maximum_receipts']),(2,2,10))
+        third=copy.deepcopy(tx);three=b58encode(bytes([82])*64);third['transaction']['signatures'][0]=three;RichRpc.receipts={three:third,two:second}
+        result=collect(root,{'id':'act','kind':'pool_activity','parameters':{'pool':RichRpc.pool['pool'],'receipts':1}},opts['config'],factory=RichRpc)
+        self.assertIsNone(result['preset_error']);facts=json.loads((root/'draft/facts.json').read_text())
+        sales=next(f['data'] for f in facts['facts'] if f['operation']=='sales');rebuys=next(f['data'] for f in facts['facts'] if f['operation']=='rebuys')
+        self.assertEqual((sales['requested_receipts'],sales['verified_receipts']),(3,3));self.assertEqual((rebuys['requested_receipts'],rebuys['verified_receipts']),(3,0))
+        self.assertEqual([r['signature'] for r in sales['receipts']][-1],three);self.assertEqual(json.loads((root/'import-diagnostics.json').read_text())['errors'],[])
+
+    def test_capture_routes_mark_the_first_host_per_dimension_primary_and_later_hosts_alternate(self):
+        from solana_broad_collect import capture
+        from solana_import import refresh
+        root,target,opts=self.setup_run();start(root,target,**opts);Web.blocked=True
+        # The lane registers a docs host first, then the project host twice: per surface and owner, its first host is primary and
+        # the later, different host alternate, whatever the pipeline registered. Both hosts fail, so the surface can close as an external limit.
+        capture(root,['https://docs.project.example/terms'],'project',dimension='development_disclosure',opener_factory=Web)
+        capture(root,['https://project.example/docs','https://project.example/team'],'project',dimension='development_disclosure',opener_factory=Web)
+        refresh(root);m=json.loads((root/'draft/manifest.json').read_text());url={o['id']:o['source']['capture']['url'] for o in m['observations'] if o['kind']=='document'}
+        rows={url[a['evidence_id']]:(a['route'],a['source'],a['status']) for a in m['attempts'] if a['dimension']=='development_disclosure' and a['owner']=='project'}
+        self.assertEqual(rows,{'https://docs.project.example/terms':('primary','docs.project.example','permission_denied'),'https://project.example/docs':('alternate','project.example','permission_denied'),
+            'https://project.example/team':('alternate','project.example','permission_denied')})
+        pipeline={url[a['evidence_id']].split('/')[2]+('/info' if url[a['evidence_id']].endswith('/info') else ''):(a['dimension'],a['route']) for a in m['attempts'] if a['owner']=='pipeline' and a['evidence_id'] in url}
+        self.assertEqual(pipeline.get('project.example'),('development_disclosure','primary'))  # the pipeline's own project link keeps its primary
+        self.assertEqual(pipeline.get('api.geckoterminal.com/info'),('development_disclosure','primary'))  # the token-info plan primary, filed with project disclosure
+        market={a['source']:a['route'] for a in m['attempts'] if a['dimension']=='canonical_lp_principal_custody' and a['evidence_id'] in url}
+        self.assertEqual(market,{'api.dexscreener.com':'primary','api.geckoterminal.com':'alternate'})  # the discovery plan's routes stay fixed
 
     def test_capture_dimension_and_sample_dimensions_reach_the_attempt_ledger(self):
         from solana_broad_collect import capture

@@ -3,7 +3,7 @@ from adapters.binary import Reader,raw_account,discriminator
 from solana_common import need,base58_bytes
 from solana_addresses import find_program_address,create_program_address
 
-REVISION='9c82f61cb711b044a17f770ab8ce9f9bdf78f333'
+REVISION='e0687ae9b7e064a0f54efc7297c65eecfbba3a8f'
 CURVE_PROGRAM='6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P'
 SWAP_PROGRAM='pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA'
 FEE_PROGRAM='pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ'
@@ -22,7 +22,8 @@ def fee_address(program):return pda(FEE_PROGRAM,b'fee_config',base58_bytes(progr
 
 def decode_fees(address,account,program):
     raw=raw_account(account,FEE_PROGRAM)
-    need(not account['executable'] and 73<=len(raw)<=4096 and raw[:8]==discriminator('FeeConfig'),'Pump fee configuration layout mismatch')
+    # extend_fee_config grows the allocation (4,097 bytes live on 2026-09-12); the tables inside stay bounded below.
+    need(not account['executable'] and 73<=len(raw)<=16384 and raw[:8]==discriminator('FeeConfig'),'Pump fee configuration layout mismatch')
     r=Reader(raw);r.take(8);bump=r.integer(1);admin=r.key()
     need(create_program_address([b'fee_config',base58_bytes(program,32),bytes([bump])],FEE_PROGRAM)==address,'Pump fee config PDA mismatch')
     def fees(r):
@@ -31,12 +32,15 @@ def decode_fees(address,account,program):
         return dict(zip(('lp_fee_bps','protocol_fee_bps','creator_fee_bps'),map(str,values)))
     flat=fees(r)
     def tier(r):return {'market_cap_quote_atomic_threshold':str(r.integer(16)),'fees':fees(r)}
-    tiers=r.vector(tier,maximum=32);stable=r.vector(tier,maximum=32)
+    tiers=r.vector(tier,maximum=128);stable=r.vector(tier,maximum=128)  # 25 tiers each observed live on 2026-09-12
+    exotic_zero=None
+    if len(raw)-r.offset>=24:exotic_zero=not any(raw[r.offset:r.offset+24]);exotic=fees(r)  # exotic_flat_fees, appended by the 2026-09 fee-program upgrade
+    else:exotic=None
     need(not any(r.take(len(raw)-r.offset)),'unknown fee configuration extension')
     for rows in (tiers,stable):
         thresholds=[int(v['market_cap_quote_atomic_threshold']) for v in rows]
         need(thresholds==sorted(set(thresholds)),'fee tiers duplicate or unsorted')
-    return {'admin':admin,'flat_fees':flat,'fee_tiers':tiers,'stable_fee_tiers':stable,'evidence_scope':'stored tables; routing and deployment correspondence separate'}
+    return {'admin':admin,'flat_fees':flat,'fee_tiers':tiers,'stable_fee_tiers':stable,'exotic_flat_fees':exotic,'exotic_flat_fees_zero':exotic_zero,'evidence_scope':'stored tables; routing and deployment correspondence separate'}
 
 
 def selected_fees(config,*,canonical,quote,mint_supply,base_reserve,quote_reserve,mode_restricted=False):

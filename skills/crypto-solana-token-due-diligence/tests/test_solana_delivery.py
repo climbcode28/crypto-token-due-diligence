@@ -131,6 +131,14 @@ class DeliveryTests(unittest.TestCase):
                 else:self.assertIn(s,text,(d['id'],path,value))
         self.assertGreater(checked,300)
 
+    def test_summary_verdict_label_is_not_repeated_when_the_analyst_text_starts_with_it(self):
+        from solana_render import render
+        t=tempfile.TemporaryDirectory();self.addCleanup(t.cleanup);b=Bundle(Path(t.name),completed=True)
+        b.r['decision']['verdict_kind']='conditional';b.r['decision']['text']='Conditional: '+b.r['decision']['text']
+        text=render(b.m,b.r);self.assertNotIn('Conditional: Conditional:',text);self.assertNotIn('conditional: Conditional:',text);self.assertIn('\nConditional: ',text)
+        b.r['decision']['verdict_kind']='insufficient_evidence';b.r['decision']['text']='insufficient_evidence: the same text'
+        text=render(b.m,b.r);self.assertIn('\nInsufficient evidence: the same text',text);self.assertNotIn('evidence: insufficient',text)
+
     def test_old_bundle_without_facts_document_still_reads_and_verifies(self):
         """A bundle frozen before the facts document (details inline, no facts_document key) keeps reading and verifying."""
         from solana_replay import file_inventory

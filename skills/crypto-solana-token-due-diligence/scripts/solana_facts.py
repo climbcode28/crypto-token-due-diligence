@@ -4,13 +4,13 @@ from pathlib import Path
 from solana_common import sha,need
 from solana_profile import Evidence,strict_json,regular,PROFILE
 
-VERSION='1.2.0'
+VERSION='1.2.1'
 CATEGORIES={'mint':'controls','controls':'controls','holders':'holders','program':'programs','controllers':'programs',
  'pool':'pools','local_quote':'quotes','public_quote':'quotes','quote_sizes':'quotes','transaction':'transactions',
  'sales':'transactions','rebuys':'transactions','history':'launch','launch':'launch','creator_activity':'creator',
  'inventory':'creator','prior_launches':'creator','source_assurance':'source_assurance',
  'discovery_pools':'maturity','repository_metadata':'maturity','repository_revision':'maturity','repository_tree':'maturity'}
-LIMIT_KEYS={'gaps','missing','remaining','limitations','scope','coverage','enumeration','unsupported_lock_paths','selection_scope',
+LIMIT_KEYS={'gaps','missing','remaining','limitations','scope','coverage','enumeration','unsupported_lock_paths','selection_scope','newer_unpinned',
  'reserve_quantity_scope','unknown_extensions','extension_errors','additional_withheld_or_confidential_unknown'}
 ATTENTION_KEYS={'mint_authority','freeze_authority','controller','delegate','close_authority','upgrade_authority','authority',
  'config_authority','withdraw_authority','permanent_delegate','paused','locked_share','all_principal_locked','exit_executable'}
@@ -45,7 +45,8 @@ def describe(operation,data):
     """Exact calculations are supplied by typed operations, never redone by an analyst."""
     if operation=='controls':
         m=data['mint'];powers='; '.join(p['role']+'='+('absent in sample' if p['controller'] is None else p['controller']) for p in data['powers'])
-        prefix='Earlier pinned snapshot; newer retained snapshot remains unpinned. ' if data.get('selection_scope')=='earlier_pinned_snapshot_newer_unpinned' else ''
+        note=data.get('newer_unpinned') or {};newer=note.get('authorities_match')
+        prefix=('Earlier pinned snapshot; newer retained snapshot remains unpinned'+(' (its controllers are unchanged)' if newer is True else ' (its controllers differ)' if newer is False else ' (its controllers could not be compared)' if note else '')+'. ') if data.get('selection_scope')=='earlier_pinned_snapshot_newer_unpinned' else ''
         return prefix+'Mint supply '+m['supply_atomic']+' atomic units, decimals '+str(m['decimals'])+'. '+powers+'. Extension and controller coverage remains explicit.'
     if operation=='holders':
         share=data['coverage_share'];ratio='undefined (zero supply)' if share is None else share['percent_display']+'%'

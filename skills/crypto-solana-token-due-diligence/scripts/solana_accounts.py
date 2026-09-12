@@ -258,6 +258,28 @@ def controls(mint_packet, target, *, epoch_packet=None):
             "coverage": "partial", "remaining": ["controller and upgrade paths", "relevant frozen holdings", "hook behavior and dependencies", "ordinary-holder execution"]}
 
 
+CONTROLLER_FIELDS = ("program",)  # the transfer-hook program; extension authorities are already powers
+
+
+def controllers_of(result):
+    """Every controller a controls fact names: its powers plus the decoded extensions' hook programs."""
+    rows = [(p["role"], p["controller"]) for p in result["powers"]]
+    for extension in result["mint"]["extensions"]:
+        if extension.get("decoded"):
+            rows += [(extension["name"]+"_"+field, extension[field]) for field in CONTROLLER_FIELDS if field in extension]
+    return sorted(rows, key=str)
+
+
+def newer_unpinned_note(newer_packet, pinned_packet, target):
+    """Whether a newer, unpinned mint read still names every controller of the pinned snapshot it supersedes.
+    Deterministic from the two retained packets, so a validator recomputes it without making the newer read an input."""
+    try:
+        match = controllers_of(controls(newer_packet, target)) == controllers_of(controls(pinned_packet, target))
+        return {"authorities_match": match, "reason": None}
+    except (ValueError, KeyError, TypeError) as exc:
+        return {"authorities_match": None, "reason": "comparison failed: "+(str(exc) if isinstance(exc, ValueError) else type(exc).__name__)}
+
+
 def aggregate_holders(discovery, sample, target, *, custody_exclusions=None):
     """Largest ranks are discovery leads; balances/denominator share one later batch context."""
     target = target_identity(target)

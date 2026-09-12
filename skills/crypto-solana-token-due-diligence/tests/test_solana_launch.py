@@ -86,12 +86,15 @@ class LaunchTests(unittest.TestCase):
     def test_pumpswap_sell_buy_and_exact_quote_layouts(self):
         from solana_swaps import decode as swap_decode
         for name,n,raw,mode in (('sell',21,struct.pack('<QQ',1000,1),'exact_in'),('buy',23,struct.pack('<QQB',1000,2000,1),'exact_out'),
-                              ('buy_exact_quote_in',23,struct.pack('<QQB',1000,1,0),'exact_in')):
+                              ('buy_exact_quote_in',23,struct.pack('<QQB',1000,1,0),'exact_in_fee_inclusive')):
             accounts=[key(100+i) for i in range(n)];accounts[11]=accounts[12]=TOKEN_PROGRAM
             result=swap_decode(swap.PROGRAM,tag(name)+raw,accounts)
             self.assertEqual(result['mode'],mode)
             self.assertEqual(result['input_account'],accounts[5 if name=='sell' else 6])
-            with self.assertRaises(ValueError):swap_decode(swap.PROGRAM,tag(name)+raw[:-1],accounts)
+            # A buy without the trailing track_volume flag is the wire form routers emit; anything shorter is refused.
+            short=raw[:-1] if name=='sell' else raw[:-2]
+            with self.assertRaises(ValueError):swap_decode(swap.PROGRAM,tag(name)+short,accounts)
+            with self.assertRaises(ValueError):swap_decode(swap.PROGRAM,tag(name)+raw,accounts[:-1])  # a missing named role
 
 
 if __name__=='__main__':unittest.main()

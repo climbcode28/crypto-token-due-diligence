@@ -16,10 +16,11 @@ a flag does not bypass a denial.
 ## 1. Start once with original timing
 
 Record the actual original request receipt time, the complete question, focus, every
-supplied URL and an absolute deadline. Ordinary target is receipt + 420 seconds,
-maximum receipt + 600. Collection cutoff is min(receipt + 480, deadline − 120); lanes
-stop at min(receipt + 240, deadline − 120). Routing delay counts. Respect a shorter
-explicit user deadline. A new request creates a new run; continuation of an active
+supplied URL and an absolute deadline. `--deadline-at` is receipt + 600 seconds (the
+maximum) unless the user set a shorter explicit deadline; aim to deliver by receipt +
+420 seconds (the ordinary target). Collection cutoff is min(receipt + 480, deadline −
+120); lanes stop at min(receipt + 240, deadline − 120), counted from receipt, not from
+their dispatch. Routing delay counts. A new request creates a new run; continuation of an active
 request keeps the existing run.
 
 ```sh
@@ -48,8 +49,10 @@ per-method rate windows itself. A curve PDA is only a candidate. All eight adapt
 `meteora_damm_v2`, `pump_curve`, `pumpswap`) remain distinct; unsupported layouts or
 missing positions/locks stay explicit. Typical wall clock is one to two minutes.
 
-Output: `research_status`, `facts_summary` (the compact facts), `diagnostics` (refused
-methods, unsent reads, unresolved stages), `lane_pointers` and session totals. Read
+Output, in this order: `lane_pointers` (dispatch these two lines first, before reading
+anything else), `next`, `research_status`, `diagnostics` (refused methods, unsent or
+unresolved reads, failed activity listings, unresolved stages), session totals,
+`collection` and last the `facts_summary` (the compact facts, often 20 KB). Read
 `diagnostics` before judging: a refused method or an unsent read is a coverage limit,
 not a token finding. A later failure retains earlier usable evidence. Identity failure
 stops on-chain expansion and cannot create a completed report. Public source failures
@@ -75,7 +78,12 @@ python3 "$S/scripts/solana_broad_collect.py" lane-check "$RUN" --owner liquidity
 
 Add `--dimension SURFACE` (one of the eleven surface names) to a capture made for one
 coverage surface, for example `utility_redemption_rights` for a terms page, so that
-surface records an attempt and can close as an evidenced external limit. `lane-check`
+surface records an attempt and can close as an evidenced external limit. Planned
+discovery routes keep their plan label; for any other capture, per surface and owner,
+the first host the owner registered is `primary` and a later, different host is
+`alternate`, so a lane's two failed captures at distinct hosts within one surface are
+the failed primary and alternate attempts that limit needs (every cited attempt must
+have failed). `lane-check`
 imports the lane's own new captures into the draft, validates the note and reports
 whether the checklist is complete. Existing URLs keep their owner and are cited
 by capture ID, never re-fetched. Lanes cannot run RPC, read credentials, write helper
@@ -84,6 +92,10 @@ execute the feasible owned checklist locally with the same grants, or retain pen
 items. A missing lane or expired budget is never completed broad work.
 
 ## 3. Judge from facts, at most two presets
+
+Presets spend the ordinary request grant that `start` left (`session.remaining_requests`
+in its output and in `status`); a preset that needs more is refused, so read that number
+before choosing the second preset.
 
 Judge from `facts_summary`. For an omitted material detail:
 
@@ -104,7 +116,7 @@ script) with a stable `id` of at most 12 characters, `kind` and `parameters`:
 | `positions` | `adapter`, `pool`, `positions` (at most six discovered supported leads) |
 | `transactions` | `signatures` (at most two) |
 | `pool_activity` | `pool` (captured), optional `limit` (1–25 signatures, default 10), `receipts` (0–4 sampled swap receipts, default 2) and `probes` (receipts–8 signatures classified, default 4) |
-| `holders` | none: holder discovery (largest accounts or the bounded scan) plus the same-batch balance sample |
+| `holders` | none: holder discovery (largest accounts or the bounded scan) plus the same-batch balance sample; it repeats what `start` already attempted, so use it only when `diagnostics` shows neither the largest-accounts read nor the bounded scan ran |
 | `creator_history` | `keys` (at most two attributed keys), optional `before` cursors |
 | `programs` | `addresses` (known program/controller dependencies) |
 | `quote` | `adapter` = `raydium_cpmm`, exact `pool` |
@@ -180,6 +192,6 @@ classifies its probes the same way (skipping signatures already sampled or class
 a probe with any receipt status other than `ok`, such as a budget refusal, timeout,
 provider error or empty result, keeps that status in `receipt-classification.json` and a
 later, differently named preset may probe it again) and can add up to four more
-receipts. Only
+receipts, which the sale and rebuy facts verify alongside start's (at most ten). Only
 supported historical swap effects with exact pool/mint/owner and balance reconciliation
 become sample sales. Empty/short history is not archive coverage or proof of no selling.

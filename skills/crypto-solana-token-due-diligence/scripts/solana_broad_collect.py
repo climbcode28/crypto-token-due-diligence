@@ -198,6 +198,23 @@ def provider_diagnostics(root):
     if path.exists():
         d=strict_json(path.read_bytes(),path.name)
         if d.get('unsent_intents'):rows.append({'stage':'collection','category':'unsent_reads','count':len(d['unsent_intents']),'reads':d['unsent_intents'][:12],'reason':d.get('unsent_meaning')})
+        if d.get('errors'):rows.append({'stage':'import','category':'derivation_errors','count':len(d['errors']),'errors':d['errors'][:12],'reason':'These typed facts could not be derived from the retained evidence; their surfaces keep explicit gaps.'})
+    # A read family whose every attempt failed (an invalid or empty provider answer, a persistent error) is a coverage
+    # limit the coordinator must see without opening the ledger; refused methods are listed above already.
+    session=Session(root);families={}
+    try:
+        for a in session.observations():
+            if a['transport_kind']=='rpc':families.setdefault(a['request_id'].rsplit('_',1)[0],[]).append(a['status'])  # web captures report their own status
+    finally:session.close()
+    unresolved={fam:st for fam,st in families.items() if 'ok' not in st and not all(x=='method_unavailable' for x in st)}
+    if unresolved:rows.append({'stage':'collection','category':'unresolved_reads','count':len(unresolved),'reads':[{'read':f,'status':st[-1]} for f,st in list(unresolved.items())[:12]],'reason':'No usable response from the provider (a definitive refusal is not retried); dependent facts keep explicit gaps.'})
+    if any(f.endswith('_holderscan') for f in unresolved):
+        rows.append({'stage':'collection','category':'holder_scan_failed','reason':'The bounded holder census already ran and failed, so a holders preset would repeat it; holder concentration stays an explicit gap for this run.'})
+    # A pool whose every listed recent signature failed on chain yields no receipt although its history read succeeded.
+    classification=root/'receipt-classification.json'
+    if classification.exists():
+        dead=[l for l in strict_json(classification.read_bytes(),classification.name).get('listings',[]) if l.get('listed') and l.get('failed')==l.get('listed')]
+        if dead:rows.append({'stage':'collection','category':'activity_signatures_all_failed','pools':[l['pool'] for l in dead][:6],'reason':'Every listed recent signature at these pools failed on chain, so no receipt could be sampled there; this is not evidence of no trading.'})
     for mark in s['phases']:
         try:details=json.loads(mark['details'])
         except ValueError:continue
@@ -229,21 +246,28 @@ def classify_probes(root,config,sample,pool,signatures,*,probes,receipts,factory
     return rows,selected
 
 
-def record_probes(root,sample,rows,selected,*,probes,receipts):
+def record_probes(root,sample,rows,selected,*,probes,receipts,listings=None):
     receipts_path=Path(root)/'automatic-receipts.json';known=json.loads(receipts_path.read_text()) if receipts_path.exists() else []
     probes_path=Path(root)/'receipt-classification.json'
     record=json.loads(probes_path.read_text()) if probes_path.exists() else {'probed':0,'selected':0,'maximum_probes':0,'rows':[],
         'scope':'recent-signature classification only; a probe without a supported pool swap is not evidence of no trading'}
     record['rows']+=rows;record['probed']+=len(rows);record['selected']+=len(selected);record['maximum_probes']+=probes
     record.setdefault('samples',[]).append({'sample':sample,'probed':len(rows),'selected':len(selected),'maximum_probes':probes,'maximum_receipts':receipts})
+    record.setdefault('listings',[]).extend(listings or [])  # per pool: recent signatures listed, failed on chain, and unseen
     atomic(probes_path,encoded(record))
     atomic(receipts_path,encoded(known+[{'pool':r['pool'],'signature':r['signature'],'direction':r['direction'],'route':r['route'],'sample':sample} for r in selected]))
+
+
+def ordered_leads(selected,ranked):
+    """Decodable pools in exact-mint discovery liquidity order; pools absent from discovery keep their observation order, last."""
+    rank={pool:i for i,pool in enumerate(ranked)};return sorted(selected,key=lambda item:rank.get(item[0],len(rank)))
 
 
 def automatic_dependencies(root,config,factory):
     from adapters import pool_adapter
     from solana_programs import observed_account,decode_program
     accounts,objects,checked=importer_view(root);by_program={pool_adapter(k).PROGRAM:k for k in ADAPTERS};selected=[]
+    s=Session(root);target=s.meta['target'];s.close()
     for address,eid in accounts.items():
         value,_=observed_account(address,objects[eid])
         if value and value['owner'] in by_program:
@@ -253,6 +277,8 @@ def automatic_dependencies(root,config,factory):
                 else:module.decode_pool(value)
                 selected.append((address,kind))
             except ValueError:continue
+    # The principal pool (highest indexed liquidity) is sampled first, so a dust side pool never takes the activity budget.
+    selected=ordered_leads(selected,[r['pool'] for r in candidates(root,target)])
     results=[];automatic=[]
     for n,(pool,kind) in enumerate(selected[:2]):
         try:
@@ -268,18 +294,18 @@ def automatic_dependencies(root,config,factory):
     # Recent pool signatures are probed one at a time and classified before the receipt budget
     # is spent on headers: only receipts carrying a supported swap at the exact pool are sampled
     # (at most two, from at most four probes). Historical effects still verify the actual flow.
-    s=Session(root);target=s.meta['target'];s.close()
-    receipts=[];classified=[];probed=set()
+    receipts=[];classified=[];probed=set();listings=[]
     for n,lead in enumerate(automatic):
         if len(receipts)==2 or len(probed)==4:break
         packet=execute(root,config,'activity'+str(n),read('history','getSignaturesForAddress',
             [lead['pool'],{'commitment':'finalized','limit':10}]),factory=factory)
         if packet.get('status')!='ok':continue
-        signatures=[r['signature'] for r in packet['response']['result'] if r['err'] is None and r['signature'] not in probed]
+        listed=packet['response']['result'];signatures=[r['signature'] for r in listed if r['err'] is None and r['signature'] not in probed]
+        listings.append({'pool':lead['pool'],'sample':'activity'+str(n),'listed':len(listed),'failed':sum(1 for r in listed if r['err'] is not None),'unseen':len(signatures)})
         # The probe shares the receipts sample's read name, so the later sample resumes it without a second send.
         rows,selected=classify_probes(root,config,'receipts',lead['pool'],signatures,probes=4-len(probed),receipts=2-len(receipts),factory=factory)
         probed.update(r['signature'] for r in rows);classified+=rows;receipts+=selected
-    record_probes(root,'receipts',classified,receipts,probes=4,receipts=2)
+    record_probes(root,'receipts',classified,receipts,probes=4,receipts=2,listings=listings)
     if automatic:
         collect_sample(root,root,config,'receipts',mint_baseline(target['mint'],largest=False)+[receipt_read(r['signature']) for r in receipts],factory=factory)
     # Capture known ProgramData authority metadata without pretending the slice is a
@@ -410,9 +436,11 @@ def start(root,target,*,question,received_at,deadline_at,focus=None,urls=None,sc
     if (root/'draft/facts.json').exists():
         try:summary=compact(strict_json((root/'draft/facts.json').read_bytes(),'facts.json'),['controls','pools','holders','quotes','transactions','programs','launch','maturity','source_assurance'],limit=6000)
         except (ValueError,KeyError,TypeError):summary=None
-    output={'run':str(root),'draft':str(root/'draft'),'profile':PROFILE,'investigation_id':meta['investigation_id'],'research_status':'partial','facts_summary':summary,
-      'collection':result or first,'diagnostics':diagnostics,'lane_pointers':pointers,'next':'Dispatch both pointers before a separate facts-reading step; then complete notes and compose.' if scope=='broad' else 'Answer the focused request with its dependencies and limits; no final broad delivery.',
-      'session':status(root)}
+    # The two lane pointers lead the output so a coordinator dispatches them before reading the long facts summary,
+    # which comes last; a truncated display still shows what must happen first.
+    output={'lane_pointers':pointers,'next':'Dispatch both pointers before a separate facts-reading step; then complete notes and compose.' if scope=='broad' else 'Answer the focused request with its dependencies and limits; no final broad delivery.',
+      'run':str(root),'draft':str(root/'draft'),'profile':PROFILE,'investigation_id':meta['investigation_id'],'research_status':'partial',
+      'diagnostics':diagnostics,'session':status(root),'collection':result or first,'facts_summary':summary}
     atomic(root/'start-result.json',encoded(output));return output
 
 
@@ -490,9 +518,9 @@ def _collect(root,spec,config,*,factory=HttpTransport):
                 # A signature already sampled or classified is never fetched twice: it would duplicate the receipt and waste
                 # the window. A probe with any status other than ok (budget, timeout, provider error, empty result) keeps that
                 # status and may be probed again here under this preset's own read family.
-                signatures=[r['signature'] for r in packet['response']['result'] if r['err'] is None and r['signature'] not in seen]
+                listed=packet['response']['result'];signatures=[r['signature'] for r in listed if r['err'] is None and r['signature'] not in seen]
                 classified,selected=classify_probes(root,config,ident,pool,signatures,probes=probes,receipts=receipts,factory=factory)
-                record_probes(root,ident,classified,selected,probes=probes,receipts=receipts)
+                record_probes(root,ident,classified,selected,probes=probes,receipts=receipts,listings=[{'pool':pool,'sample':ident,'listed':len(listed),'failed':sum(1 for r in listed if r['err'] is not None),'unseen':len(signatures)}])
             if not selected:return None
             planned=mint_baseline(target['mint'],largest=False)+[receipt_read(r['signature']) for r in selected]
         return collect_sample(root,root,config,ident,planned,factory=factory,expand_largest=kind=='holders')

@@ -130,21 +130,52 @@ class Importer:
                 if chosen['status']!='pinned':s['status']='partial'
             else:s['status']='partial'
 
+    @staticmethod
+    def planned_route(record):
+        """The discovery plan fixes these: DEX Screener pools and GeckoTerminal token info are primary; GeckoTerminal
+        pool pages and Solana Explorer are the alternates. None for every other capture."""
+        parts=urlsplit(record['url']);host=parts.hostname or '';gecko=host=='geckoterminal.com' or host.endswith('.geckoterminal.com')
+        if host=='api.dexscreener.com' or (gecko and parts.path.endswith('/info')):return 'primary'
+        if gecko or host=='explorer.solana.com':return 'alternate'
+        return None
+
+    @staticmethod
+    def dimension_of(record):
+        if record.get('dimension'):return record['dimension']
+        parts=urlsplit(record['url']);host=parts.hostname or ''
+        if host in ('api.dexscreener.com','api.geckoterminal.com') and not parts.path.endswith('/info'):return 'canonical_lp_principal_custody'
+        if host in ('lite-api.jup.ag','api.jup.ag'):return 'sellability_exit_depth'
+        return 'development_disclosure'  # project pages and the token-info publication that names them
+
+    def routes(self,records):
+        """Planned discovery routes keep their plan label. For any other capture, per coverage surface and owner, the
+        first host that owner registered is primary and a later, different host is alternate, so two failed lane
+        captures at distinct hosts within one surface are the failed primary and alternate an external limit needs."""
+        table=self.session.db.execute("SELECT count(*) FROM sqlite_master WHERE name='web_sources'").fetchone()[0]
+        order={row[0]:n for n,row in enumerate(self.session.db.execute('SELECT id FROM web_sources ORDER BY rowid'))} if table else {}
+        first={};routes={}
+        for record in sorted(records,key=lambda r:(order.get(r.get('source_id'),len(order)),r['captured_at'],r['id'])):
+            planned=self.planned_route(record)
+            if planned:routes[record['id']]=planned;continue
+            key=(self.dimension_of(record),record['owner']);host=urlsplit(record['url']).hostname or ''
+            first.setdefault(key,host);routes[record['id']]='primary' if first[key]==host else 'alternate'
+        return routes
+
     def web(self):
+        records=[]
         for path in sorted((self.session.root/'web-captures').glob('*.json')):
             record=json.loads(path.read_text())
-            if not record.get('captured_at') or not record.get('sha256'):continue
+            if record.get('captured_at') and record.get('sha256'):records.append(record)
+        routes=self.routes(records)
+        for record in records:
             raw=(self.session.root/record['raw']).read_bytes() if record.get('raw') else b''
             need(sha(raw)==record['sha256'] and len(raw)==record['bytes'],'web capture changed')
             eid=record['id'];artifact=self.artifact(eid+'.raw',raw);o={'id':eid,'kind':'document','subject':self.subject('document'),
                 'status':normalized_status(record),'artifact':artifact,'sha256':sha(raw),'captured_at':utc(record['captured_at']),'synthetic':self.m['synthetic'],
                 'source':{'capture':record,'owner':'shared' if record['owner']=='ordinary' else record['owner']},'sample_id':None}
             self.obs[eid]=o;self.objects[eid]={'record':record,'raw':raw};self.m['observations'].append(o)
-            host=urlsplit(record['url']).hostname
-            dim=record.get('dimension') or ('canonical_lp_principal_custody' if host in ('api.dexscreener.com','api.geckoterminal.com') else 'sellability_exit_depth' if host in ('lite-api.jup.ag','api.jup.ag') else 'development_disclosure')
-            route='alternate' if 'geckoterminal.com' in record['url'] else 'primary'
-            self.m['attempts'].append({'id':'capture-'+sha(eid.encode())[:24],'evidence_id':eid,'dimension':dim,'owner':'pipeline' if record['owner']=='ordinary' else record['owner'],
-                'status':o['status'],'route':route,'source':urlsplit(record['url']).hostname})
+            self.m['attempts'].append({'id':'capture-'+sha(eid.encode())[:24],'evidence_id':eid,'dimension':self.dimension_of(record),'owner':'pipeline' if record['owner']=='ordinary' else record['owner'],
+                'status':o['status'],'route':routes[eid],'source':urlsplit(record['url']).hostname})
 
     def derive(self,eid,operation,params,sub=None):
         used=set()
@@ -162,16 +193,24 @@ class Importer:
         o={'id':eid,'kind':'derived','status':'ok','subject':sub,'artifact':path,'sha256':sha(raw),'captured_at':captured,'synthetic':self.m['synthetic'],'source':{'operation':operation},'sample_id':None}
         self.m['derivations'].append(d);self.m['observations'].append(o);self.objects[eid]=value;self.obs[eid]=o;return value
 
-    def latest_accounts(self):
+    def newer_unpinned(self,newer,pinned):
+        """The note a controls fact carries about a newer unpinned mint read: every controller compared, a decode failure explained."""
+        from solana_accounts import newer_unpinned_note
+        return {'observation':newer,**newer_unpinned_note(self.objects[newer],self.objects[pinned],self.m['target'])}
+
+    def latest_accounts(self,usable=None):
+        """The latest successful read per address; with `usable`, only reads whose sample stayed pinned."""
         result={}
         for eid,c in sorted(self.checked.items(),key=lambda item:self.objects[item[0]]['completed_at']):
-            if c['status']=='ok' and self.objects[eid]['request']['method'] in ('getAccountInfo','getMultipleAccounts'):
+            if c['status']=='ok' and (usable is None or eid in usable) and self.objects[eid]['request']['method'] in ('getAccountInfo','getMultipleAccounts'):
                 for a in c.get('addresses',[]):result[a]=eid
         return result
 
     def facts(self):
-        accounts=self.latest_accounts();target=self.m['target'];mint=accounts.get(target['mint'])
-        raw_evidence=Evidence(self.root,self.m,self.m['synthetic'])
+        target=self.m['target'];raw_evidence=Evidence(self.root,self.m,self.m['synthetic'])
+        # Pool and program facts prefer the latest pinned read per address; the newest read decides only whether the
+        # mint's controls fact must fall back to an earlier pinned snapshot.
+        latest=self.latest_accounts();accounts={**latest,**self.latest_accounts(raw_evidence.usable)};mint=latest.get(target['mint'])
         prices=[]
         for eid,o in list(self.obs.items()):
             if o['kind']!='document' or o['status']!='ok':continue
@@ -191,11 +230,15 @@ class Importer:
         usable_mint=mint
         if mint:
             optional_epoch={'epoch':epochs[-1]} if epochs else {}
-            self.derive('auto-controls','controls',{'mint':mint,**optional_epoch,'selection_scope':'latest_retained_account_snapshot'})
+            params={'mint':mint,**optional_epoch,'selection_scope':'latest_retained_account_snapshot'}
             if mint not in raw_evidence.usable:
                 prior=[eid for eid,c in self.checked.items() if eid in raw_evidence.usable and target['mint'] in c.get('addresses',[]) and self.objects[eid]['request']['method'] in ('getAccountInfo','getMultipleAccounts')]
                 usable_mint=max(prior,key=lambda eid:self.objects[eid]['completed_at']) if prior else None
-                if usable_mint:self.derive('prior-controls','controls',{'mint':usable_mint,**optional_epoch,'selection_scope':'earlier_pinned_snapshot_newer_unpinned'})
+                if usable_mint:
+                    # The latest pinned snapshot carries the controls fact; the newer unpinned read is a stated limit
+                    # (with whether its authorities still match), never a coverage gap that blocks the surface.
+                    params={'mint':usable_mint,**optional_epoch,'selection_scope':'earlier_pinned_snapshot_newer_unpinned','newer_unpinned':self.newer_unpinned(mint,usable_mint)}
+            self.derive('auto-controls','controls',params)
         if usable_mint:
             # Aggregates take the latest usable snapshot, never a newer unusable one.
             params={'mint':usable_mint}
@@ -289,7 +332,9 @@ class Importer:
             sales=rebuys=None
             if candidates:
                 # Both directions are derived from the same receipts; a buy is never a failed sale.
-                sales=self.derive('auto-sales','sales',{'candidates':candidates[:2]});rebuys=self.derive('auto-rebuys','rebuys',{'candidates':candidates[:2]})
+                from solana_transactions import MAX_TRADE_RECEIPTS
+                # Every sampled receipt at a known pool counts, start's and the presets', up to the verifier's bound.
+                sales=self.derive('auto-sales','sales',{'candidates':candidates[:MAX_TRADE_RECEIPTS]});rebuys=self.derive('auto-rebuys','rebuys',{'candidates':candidates[:MAX_TRADE_RECEIPTS]})
             attributed=[]
             for init in (launch or {}).get('initializations',[]):
                 for address in (init['creator_argument'],):

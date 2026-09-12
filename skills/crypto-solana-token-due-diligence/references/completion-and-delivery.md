@@ -8,8 +8,13 @@ evidenced adverse finding; no-issue cannot hide an observed concern.
 
 A completed bounded investigation can retain unknown ratings. Each dimension must
 have a supported resolved boundary or an evidenced external limit. External limits
-retain primary and feasible alternate attempts at distinct real captured sources,
-an access limitation, the remaining gap and its decision impact. A mere helper
+retain failed primary and alternate attempts at distinct real captured sources (every
+cited attempt a captured access limitation), the remaining gap and its decision impact.
+Capture routes are assigned by the importer: planned discovery routes keep their plan
+label (DEX Screener pools and GeckoTerminal token info `primary`; GeckoTerminal pool
+pages and Solana Explorer `alternate`); for any other capture, per surface and owner,
+the first host that owner registered is `primary` and a later, different host is
+`alternate`. A mere helper
 failure, unsupported local implementation, elapsed budget, missing lane or unattempted
 feasible route cannot establish that boundary. Do not relabel them as provider failure.
 

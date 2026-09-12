@@ -40,7 +40,7 @@ def decode(program,raw,accounts):
     a=accounts
     family={m.PROGRAM:m.CAPABILITY['id'] for m in (cp,amm,clmm,orca,dlmm,damm,pump)}
     if program not in family:return None
-    p=source=dest=trader=None;vaults=[];mints=[];amount=threshold=None;mode=None;fee_accounts=[]
+    p=source=dest=trader=None;vaults=[];mints=[];amount=threshold=None;mode=None;fee_accounts=[];rebate_accounts=[]
     if program == cp.PROGRAM and raw[:8] in (tag('swap_base_input'),tag('swap_base_output')):
         need(len(raw)==24 and len(a)==13, 'unsupported CPMM swap arguments/accounts')
         p,source,dest,trader=a[3],a[4],a[5],a[0];vaults=a[6:8];mints=a[10:12]
@@ -83,12 +83,24 @@ def decode(program,raw,accounts):
         fee_accounts=[a[11]] if a[11]!=damm.PROGRAM else []  # optional referral_token_account
     elif program==pump.PROGRAM and raw[:8] in (tag('sell'),tag('buy'),tag('buy_exact_quote_in')):
         sell=raw[:8]==tag('sell');exact_quote=raw[:8]==tag('buy_exact_quote_in')
-        need(len(a)==(21 if sell else 23) and len(raw)==(24 if sell else 25),'unsupported PumpSwap trade layout')
-        if not sell:need(raw[24] in (0,1),'invalid PumpSwap track-volume flag')
+        # Named roles are positional (21 for sell, 23 for a buy); routers append remaining accounts after them, and the
+        # trailing track_volume flag of a buy is optional on the wire. Flow reconciliation still binds every transfer.
+        need(len(a)>=(21 if sell else 23) and (len(raw)==24 or (not sell and len(raw)==25)),'unsupported PumpSwap trade layout')
+        if not sell and len(raw)==25:need(raw[24] in (0,1),'invalid PumpSwap track-volume flag')
         need(all(p in (TOKEN_PROGRAM,TOKEN_2022) for p in a[11:13]),'invalid PumpSwap token programs')
+        from adapters.pump_common import pda
+        from solana_addresses import associated_token_address
+        from solana_common import base58_bytes
         p,trader=a[0],a[1];source,dest=(a[5],a[6]) if sell else (a[6],a[5]);vaults=a[7:9];mints=a[3:5]
-        mode='exact_in' if sell or exact_quote else 'exact_out'
-        fee_accounts=[a[10],a[17]]  # protocol_fee_recipient_token_account and coin_creator_vault_ata
+        # buy_exact_quote_in spends the specified quote amount fees inclusive; the verifier checks leg plus fees.
+        mode='exact_in' if sell else 'exact_in_fee_inclusive' if exact_quote else 'exact_out'
+        # A cashback coin rebates the trader on the quote ATA of their user_volume_accumulator PDA (pinned cashback
+        # notes): trader proceeds, never a fee, so that account is declared a rebate and excluded from the sinks.
+        rebate=associated_token_address(pda(pump.PROGRAM,b'user_volume_accumulator',base58_bytes(trader,32)),a[4],a[12])[0]
+        # protocol_fee_recipient_token_account, coin_creator_vault_ata, then the appended accounts the 2026-09 upgrade
+        # pays buyback/holder-reward fees to; every flow is still reconciled leg by leg, so an appended account that is
+        # not a fee sink cannot make a receipt verify.
+        fee_accounts=[a[10],a[17]]+[x for x in a[21 if sell else 23:] if x!=rebate];rebate_accounts=[rebate]
     elif program == amm.PROGRAM and raw and raw[0] in (9,11,16,17):
         need(len(raw)==17 and a and a[0]==TOKEN_PROGRAM, 'invalid AMM v4 swap')
         if raw[0] in (16,17):
@@ -106,5 +118,5 @@ def decode(program,raw,accounts):
     if mints:need(len(set(mints))==2,'swap mints overlap')
     need(not set(fee_accounts)&{source,dest,*vaults},'fee sink overlaps swap roles')
     return {'adapter':family[program], 'pool':p,'input_account':source,'output_account':dest,'trader':trader,
-        'vaults':vaults,'mints':mints,'mode':mode,'specified_amount_atomic':str(amount),'threshold_atomic':str(threshold),'fee_accounts':fee_accounts,
+        'vaults':vaults,'mints':mints,'mode':mode,'specified_amount_atomic':str(amount),'threshold_atomic':str(threshold),'fee_accounts':fee_accounts,'rebate_accounts':rebate_accounts,
         'role_scope':'pinned successful instruction roles; token flows and seller ownership require separate verification'}

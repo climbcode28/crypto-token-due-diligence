@@ -10,9 +10,11 @@ class PumpTests(unittest.TestCase):
         import json,base64
         data=json.loads((Path(__file__).parent/'fixtures/acceptance/pump-live-accounts.json').read_text())
         pool,curve_row=data['accounts'];p=swap.decode_pool(pool['account']);c=curve.decode_pool(curve_row['account'])
-        self.assertEqual(p['allocated_padding_bytes'],40);self.assertEqual(p['virtual_quote_reserves'],17584505289)
+        self.assertEqual(p['allocated_padding_bytes'],30);self.assertEqual(p['virtual_quote_reserves'],17584505289)  # the 301-byte allocation holds the zeroed tail group
+        self.assertEqual((p['creator_fee_bps'],p['can_edit_creator_fee'],p['is_holder_reward'],p['absent_fields']),(0,False,False,[]))
         self.assertEqual(p['base_mint'],'2fRDA5f353VXLs2PeLJNqqHqTMhrjJunAXmWWpLkpump')
         self.assertEqual(c['allocated_padding_bytes'],9);self.assertTrue(c['complete']);self.assertTrue(c['zero_completed_reserves'])
+        self.assertEqual(c['absent_fields'],['creator_fee_bps','can_edit_creator_fee','is_holder_reward'])  # a 124-byte allocation predates the tail group
         self.assertEqual(c['token_total_supply'],1000000000000000)
         self.assertTrue(all(c[k]==0 for k in ('virtual_token_reserves','virtual_quote_reserves','real_token_reserves','real_quote_reserves')))
         for row,decoder in ((pool,swap.decode_pool),(curve_row,curve.decode_pool)):
@@ -21,15 +23,53 @@ class PumpTests(unittest.TestCase):
         value=copy.deepcopy(curve_row['account']);raw=bytearray(base64.b64decode(value['data'][0]));raw[48]=0;value['data'][0]=base64.b64encode(raw).decode()
         with self.assertRaisesRegex(ValueError,'token reserves'):curve.decode_pool(value)
 
-    def test_unevidenced_allocation_lengths_are_refused_and_tail_policy_is_declared(self):
+    def test_zero_padded_allocations_of_any_length_decode_and_truncation_is_refused(self):
         import base64
         target,a,v=fixture()
-        for address,decoder,size in ((a['curve'],curve.decode_pool,150),(a['pool'],swap.decode_pool,300)):
+        def resized(address,size):
             value=copy.deepcopy(v[address]);raw=base64.b64decode(value['data'][0]);raw=raw+bytes(size-len(raw)) if size>len(raw) else raw[:size]
-            value['data'][0]=base64.b64encode(raw).decode();value['space']=len(raw)
-            with self.assertRaisesRegex(ValueError,'unsupported Pump account layout length'):decoder(value)
-        self.assertEqual(curve.CAPABILITY['allocation_bytes'],[115,124]);self.assertEqual(swap.CAPABILITY['allocation_bytes'],[261,301])
+            value['data'][0]=base64.b64encode(raw).decode();value['space']=len(raw);return value
+        # A longer zero-padded allocation (the live 151-byte curve of 2026-09-12) decodes: the tail group is read as zeros.
+        c=curve.decode_pool(resized(a['curve'],151));self.assertEqual((c['allocated_padding_bytes'],c['absent_fields'],c['creator_fee_bps'],c['tail_group_zero']),(26,[],0,True))
+        self.assertIsNone(curve.decode_pool(v[a['curve']])['tail_group_zero'])  # a pre-upgrade allocation has no tail group at all
+        p=swap.decode_pool(resized(a['pool'],300));self.assertEqual((p['allocated_padding_bytes'],p['absent_fields']),(29,[]))
+        for address,decoder,size in ((a['curve'],curve.decode_pool,100),(a['pool'],swap.decode_pool,200)):
+            with self.assertRaisesRegex(ValueError,'truncated binary account'):decoder(resized(address,size))
+        self.assertEqual(curve.CAPABILITY['allocation_bytes'],[115,124,125,151]);self.assertEqual(swap.CAPABILITY['allocation_bytes'],[261,271,301])
         for cap in (curve.CAPABILITY,swap.CAPABILITY):self.assertIn('nonzero tail is refused',cap['reserved_tail_policy'])
+
+    def test_upgraded_allocations_carry_the_creator_fee_and_holder_reward_tail(self):
+        import base64,struct
+        from pump_fixture import batch
+        target,a,v=fixture()
+        def extended(address,size,writes):
+            value=copy.deepcopy(v[address]);raw=bytearray(base64.b64decode(value['data'][0]));raw+=bytes(size-len(raw))
+            for offset,fmt,val in writes:struct.pack_into(fmt,raw,offset,val)
+            value['data'][0]=base64.b64encode(bytes(raw)).decode();value['space']=len(raw);return value
+        v[a['curve']]=extended(a['curve'],151,[(115,'<Q',150),(123,'<B',1),(124,'<B',1)])
+        v[a['pool']]=extended(a['pool'],301,[(261,'<Q',75),(269,'<B',1),(270,'<B',0)])
+        v[curve.GLOBAL]=extended(curve.GLOBAL,1087,[(1045,'<B',1),(1046,'<Q',1000),(1086,'<B',1)]);v[swap.GLOBAL]=extended(swap.GLOBAL,949,[(940,'<B',1),(941,'<Q',500)])
+        c=curve.decode_pool(v[a['curve']]);self.assertEqual((c['creator_fee_bps'],c['can_edit_creator_fee'],c['is_holder_reward'],c['absent_fields'],c['allocated_padding_bytes'],c['tail_group_zero']),(150,True,True,[],26,False))
+        with self.assertRaisesRegex(ValueError,'creator fee rate'):curve.decode_pool(extended(a['curve'],151,[(115,'<Q',20000)]))
+        over=curve.analyze(target,a['curve'],batch({**v,a['curve']:extended(a['curve'],151,[(115,'<Q',1500)])}));self.assertIn('creator fee exceeds the configurable maximum',over['gaps'])
+        p=swap.decode_pool(v[a['pool']]);self.assertEqual((p['creator_fee_bps'],p['can_edit_creator_fee'],p['is_holder_reward'],p['allocated_padding_bytes']),(75,True,False,30))
+        r=curve.analyze(target,a['curve'],batch(v));self.assertEqual((r['global']['creator_fee_configurable'],r['global']['max_configurable_creator_fee_bps'],r['global']['is_holder_reward_enabled']),(True,1000,True))
+        r=swap.analyze(target,a['pool'],batch(v));self.assertEqual((r['global']['creator_fee_configurable'],r['global']['max_configurable_creator_fee_bps']),(True,500));self.assertEqual(r['reserves_atomic'],['10000','20000'])
+        self.assertIsNone(r['fee_config']['exotic_flat_fees']);self.assertIsNone(r['fee_config']['exotic_flat_fees_zero'])
+
+    def test_extended_fee_config_with_many_tiers_decodes(self):
+        import struct
+        from adapters.pump_common import decode_fees,FEE_PROGRAM
+        from adapters.binary import discriminator
+        from solana_addresses import find_program_address
+        from solana_common import base58_bytes
+        address,bump=find_program_address([b'fee_config',base58_bytes(swap.PROGRAM,32)],FEE_PROGRAM)
+        tier=lambda i:(i*1000).to_bytes(16,'little')+struct.pack('<3Q',20,5,5)
+        raw=discriminator('FeeConfig')+bytes([bump])+base58_bytes(key(60),32)+struct.pack('<3Q',25,5,0)+struct.pack('<I',25)+b''.join(tier(i) for i in range(25))+struct.pack('<I',25)+b''.join(tier(i) for i in range(25))+struct.pack('<3Q',20,5,5)
+        raw+=bytes(4097-len(raw))  # the live extend_fee_config allocation
+        fees=decode_fees(address,owned(raw,FEE_PROGRAM),swap.PROGRAM)
+        self.assertEqual((len(fees['fee_tiers']),len(fees['stable_fee_tiers']),fees['exotic_flat_fees'],fees['exotic_flat_fees_zero']),(25,25,{'lp_fee_bps':'20','protocol_fee_bps':'5','creator_fee_bps':'5'},False))
+        self.assertEqual(fees['fee_tiers'][3]['market_cap_quote_atomic_threshold'],'3000')
 
     def test_pre_and_completed_curve_are_not_migrated(self):
         for complete in (False,True):
@@ -100,6 +140,7 @@ class PumpTests(unittest.TestCase):
         for name in ('pump_curve','pumpswap'):
             rows=pump_sample(name,target,{'pool':a['pool'],'packets':obs})
             self.assertEqual(len(rows),1);self.assertIn(fee_address(pool_adapter(name).PROGRAM),rows[0]['params'][0])
+            self.assertIn(pool_adapter(name).PROGRAM,rows[0]['params'][0])  # the program account is a dependency for both products
 
 
 if __name__=='__main__':unittest.main()

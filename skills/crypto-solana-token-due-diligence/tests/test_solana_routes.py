@@ -112,6 +112,43 @@ class RouteTests(unittest.TestCase):
         accounts[10]=accounts[7]
         with self.assertRaises(ValueError):swap_decode(pump.PROGRAM,tag('sell')+struct.pack('<QQ',1000,1),accounts)
 
+    def test_pumpswap_trades_accept_router_remaining_accounts_and_optional_track_flag(self):
+        from solana_swaps import decode as swap_decode
+        from adapters import pump_swap as pump
+        # Live routers (2026-09-12) append remaining accounts after the named roles and omit the trailing track_volume flag.
+        accounts=[key(100+i) for i in range(24)];accounts[11]=accounts[12]=TOKEN_PROGRAM
+        sell=swap_decode(pump.PROGRAM,tag('sell')+struct.pack('<QQ',1000,1),accounts)
+        self.assertEqual((sell['pool'],sell['input_account'],sell['output_account'],sell['vaults'],sell['mode']),(accounts[0],accounts[5],accounts[6],accounts[7:9],'exact_in'))
+        buy=swap_decode(pump.PROGRAM,tag('buy_exact_quote_in')+struct.pack('<QQ',2000,1),accounts+[key(130),key(131)])
+        self.assertEqual((buy['input_account'],buy['output_account'],buy['mode'],buy['fee_accounts']),(accounts[6],accounts[5],'exact_in_fee_inclusive',[accounts[10],accounts[17],accounts[23],key(130),key(131)]))
+        self.assertEqual(sell['fee_accounts'],[accounts[10],accounts[17],accounts[21],accounts[22],accounts[23]])  # appended accounts are candidate fee sinks
+        # The trader's cashback rebate account (quote ATA of their user_volume_accumulator PDA) is never a fee sink.
+        from adapters.pump_common import pda
+        from solana_addresses import associated_token_address
+        from solana_common import base58_bytes
+        rebate=associated_token_address(pda(pump.PROGRAM,b'user_volume_accumulator',base58_bytes(accounts[1],32)),accounts[4],TOKEN_PROGRAM)[0]
+        cashback=accounts[:22]+[rebate];sell=swap_decode(pump.PROGRAM,tag('sell')+struct.pack('<QQ',1000,1),cashback)
+        self.assertEqual((sell['fee_accounts'],sell['rebate_accounts']),([accounts[10],accounts[17],accounts[21]],[rebate]))
+        self.assertEqual(swap_decode(pump.PROGRAM,tag('buy')+struct.pack('<QQ',2000,1)+b'\x01',accounts[:23])['mode'],'exact_out')
+        for data,keys in ((tag('buy')+struct.pack('<QQ',2000,1)+b'\x02',accounts[:23]),(tag('buy')+struct.pack('<QQ',2000,1),accounts[:22]),(tag('sell')+struct.pack('<QQ',1000,1)[:15],accounts)):
+            with self.assertRaises(ValueError):swap_decode(pump.PROGRAM,data,keys)
+
+    def test_fee_inclusive_buy_verifies_leg_plus_fees_and_a_rebate_is_refused(self):
+        from solana_transactions import verify_rebuys
+        target,a,p,b=fixture(buy=True);e=decode_transaction(target,p,b);swap=next(x for x in e['effects'] if x['kind']=='swap_instruction')
+        inp=next(x for x in e['effects'] if x['kind']=='transfer' and x['participants']['source']==a['source'])
+        sink=key(66);fee=copy.deepcopy(inp);fee['id']='fee';fee['amount_atomic']='7';fee['participants']={**inp['participants'],'destination':sink}
+        fee['locator']={'outer_index':inp['locator']['outer_index'],'inner_index':2};e['effects'].append(fee);e['instructions'].append({**e['instructions'][-1],'id':'fee','locator':fee['locator'],'stack_height':2})
+        e['post_token_balances'][a['source']]['amount_atomic']=str(int(e['post_token_balances'][a['source']]['amount_atomic'])-7)
+        for side,value in (('pre_token_balances','0'),('post_token_balances','7')):e[side][sink]={'mint':inp['mint'],'owner':key(67),'program':TOKEN_PROGRAM,'amount_atomic':value,'decimals':9}
+        swap.update(mode='exact_in_fee_inclusive',specified_amount_atomic='1007',fee_accounts=[sink])
+        row=verify_rebuys(target,[{'pool':a['pool'],'execution':e}])['receipts'][0]
+        self.assertEqual((row['status'],row['input_atomic'],[f['amount_atomic'] for f in row['protocol_fees_atomic']]),('verified_rebuy','1000',['7']),row['gaps'])
+        swap['specified_amount_atomic']='1000'
+        row=verify_rebuys(target,[{'pool':a['pool'],'execution':e}])['receipts'][0];self.assertIn('spendable-input',row['gaps'][0])
+        swap.update(specified_amount_atomic='1007',fee_accounts=[],rebate_accounts=[sink])  # the same flow declared as the trader's rebate
+        row=verify_rebuys(target,[{'pool':a['pool'],'execution':e}])['receipts'][0];self.assertIn('cashback rebate',row['gaps'][0])
+
     def test_token_2022_leg_verifies_only_with_both_checked_boundaries(self):
         target,a,p,b=fixture();tx=p['response']['result']
         for row in tx['meta']['preTokenBalances']+tx['meta']['postTokenBalances']:row['programId']=TOKEN_2022

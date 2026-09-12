@@ -24,7 +24,10 @@ def scaffold(root,owner='coordinator',allow_synthetic=False):
         note['signal_assignments']={f['id']:{'signal':None,'input_digests':{r['evidence_id']:digests[r['evidence_id']] for r in f['support']}} for f in parents}
         note['coverage']=[empty_coverage(dim,[f['id'] for f in pipeline['findings'] if f['dimension']==dim],
             [a['id'] for a in m['attempts'] if a['dimension']==dim]) for dim in DIMENSIONS]
-        note['judgment_todo']='TODO: review facts, assign signals, complete coverage and explicitly answer every original ask.'
+        note['judgment_todo']=('TODO: review facts, assign signals, complete coverage and explicitly answer every original ask. '
+            'Copy decision_template into decision; mitigations rows are {finding_id, status: unmitigated|partial|mitigated, text, evidence_ids}, '
+            'actions rows are {kind: user_choice|risk_response, text}; a support whose subject is not the finding subject must be listed in participants; '
+            'cite a failed read in a coverage_gap with role attempt.')
         note['decision_template']={'verdict_kind':'TODO','text':'TODO','requirements':[{'quote':m['intake']['question'],'status':'unverified','text':'TODO','finding_ids':[]}],
          'axes':{a:{'text':'TODO','finding_ids':[],'coverage_dimensions':[]} for a in AXES},'finding_ids':[],'counterevidence_ids':[],'mitigations':[],'actions':[]}
     else:

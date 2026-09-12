@@ -4,7 +4,7 @@ from solana_wire import validate_response, amount
 from solana_swaps import decode as decode_swap,position_instruction
 from adapters.pump_instructions import decode as decode_pump
 
-VERSION='1.2.0'
+VERSION='1.3.0'
 SYSTEM='11111111111111111111111111111111'
 WSOL='So11111111111111111111111111111111111111112'
 
@@ -306,10 +306,13 @@ def _frame(execution,swap):
     return {i['id'] for i in frame},direct
 
 
+MAX_TRADE_RECEIPTS=10  # start's two automatic receipts plus up to four per pool_activity preset, two presets at most
+
+
 def _verify_trades(target,candidates,*,buy=False):
-    """At most two specific historical receipts; candidate pool labels cannot verify sales."""
+    """At most MAX_TRADE_RECEIPTS specific historical receipts; candidate pool labels cannot verify sales."""
     target=target_identity(target)
-    need(isinstance(candidates,list) and len(candidates)<=2,'ordinary-sale sample capped at two')
+    need(isinstance(candidates,list) and len(candidates)<=MAX_TRADE_RECEIPTS,'ordinary-sale sample capped at '+str(MAX_TRADE_RECEIPTS)+' receipts')
     rows=[];seen=set()
     for candidate in candidates:
         execution=candidate['execution'];pool=pubkey(candidate['pool'])
@@ -337,6 +340,7 @@ def _verify_trades(target,candidates,*,buy=False):
             # Protocol/creator fees leave the same vault (sells) or the trader's input account (buys)
             # only to the adapter-declared sinks; any other flow keeps the receipt ambiguous.
             fees=[e for e in transfers if e['id'] not in (inp['id'],out['id']) and e['participants']['destination'] in sinks and e['participants']['source'] in (*swap['vaults'],swap['input_account'])]
+            need(not any(e['participants'].get('destination') in swap.get('rebate_accounts',[]) for e in transfers),'trader cashback rebate makes net proceeds ambiguous')
             need(len(transfers)==2+len(fees),'swap token flow count ambiguous')
             need(inp['participants']['destination']!=out['participants']['source'],'same swap vault cannot supply both sides')
             need(not swap['mints'] or set(swap['mints'])=={inp['mint'],out['mint']},'swap role mint mismatch')
@@ -369,9 +373,17 @@ def _verify_trades(target,candidates,*,buy=False):
                 if e['participants'].get('account')==swap['output_account']:
                     if e['kind']=='token_account_initialize':need(effects.index(e)<effects.index(out),'output account initialized after swap')
                     if e['kind']=='token_account_close':need(effects.index(e)>effects.index(out),'output account closed before swap')
+            # A wrapped-SOL input account the trader funds in this transaction (a system transfer, then sync_native,
+            # both before the leg) legitimately moves by the wrap minus the leg; funding by anyone else before the sync
+            # stays ambiguous, and a later, unsynced lamport transfer cannot have funded the leg.
+            wrap=0
+            if inp['mint']==WSOL:
+                synced=[e for e in effects if e['kind']=='sync_native' and e['participants'].get('account')==swap['input_account'] and effects.index(e)<effects.index(inp)]
+                funding=[e for e in effects if synced and e['kind']=='native_transfer' and e['participants'].get('destination')==swap['input_account'] and effects.index(e)<effects.index(synced[-1])]
+                if funding and all(e['participants'].get('source')==seller for e in funding):wrap=sum(int(e['amount_atomic']) for e in funding)
             # Every account the leg touches must move by exactly the net of the leg's own flows
             # (trade legs plus declared fee flows); a vault paying a fee moves by output plus fee.
-            expected={}
+            expected={swap['input_account']:wrap} if wrap else {}
             for e in (inp,out,*fees):
                 expected[e['participants']['source']]=expected.get(e['participants']['source'],0)-int(e['amount_atomic'])
                 expected[e['participants']['destination']]=expected.get(e['participants']['destination'],0)+int(e['amount_atomic'])
@@ -390,19 +402,23 @@ def _verify_trades(target,candidates,*,buy=False):
             if swap['mode']=='exact_in':need(amount_in==specified and amount_out>=threshold,'swap exact-input/threshold contradiction')
             elif swap['mode']=='exact_out':need(amount_out==specified and amount_in<=threshold,'swap exact-output/threshold contradiction')
             elif swap['mode']=='exact_out_max_first':need(amount_out==threshold and amount_in<=specified,'swap maximum-input contradiction')
+            elif swap['mode']=='exact_in_fee_inclusive':
+                # The specified amount is spent fees inclusive: the leg plus the fees drawn from the input account.
+                paid=amount_in+sum(int(f['amount_atomic']) for f in fees if f['participants']['source']==swap['input_account'])
+                need(paid==specified and amount_out>=threshold,'swap spendable-input/threshold contradiction')
             else:need(False,'partial-fill ordinary-sale classification unsupported')
             converted=swap['output_account'] in hops
             row.update(status='verified_rebuy' if buy else 'verified_sale',seller=seller,input_atomic=str(amount_in),output_atomic=str(amount_out),counter_mint=inp['mint'] if buy else out['mint'],
                 effect_ids=[swap['id'],inp['id'],out['id'],*[f['id'] for f in fees]],transaction_evidence_id=execution['transaction_evidence_id'],block_evidence_id=execution['block_evidence_id'],slot=execution['slot'],
                 route=route,protocol_fees_atomic=[{'effect_id':f['id'],'mint':f['mint'],'amount_atomic':f['amount_atomic'],'destination':f['participants']['destination']} for f in fees],
-                counter_asset_realization='converted_within_route' if converted else 'retained_in_recipient_account' if swap['output_account'] not in hops else None,
+                counter_asset_realization='converted_within_route' if converted else 'retained_in_recipient_account',
                 token_programs=sorted({inp['program'],out['program']}),
                 evidence_scope='one successful supported swap leg at the exact pool with same-owner source/output and matched vault deltas; beneficial ownership/profit unknown')
             if out['mint']==WSOL and not buy and not converted:
                 try:row['native_proceeds']=_native_proceeds(execution,seller,swap['output_account'],amount_out)
                 except ValueError as exc:row['gaps'].append(str(exc))
         except (ValueError,KeyError,TypeError) as exc:row['gaps'].append(str(exc))
-    return {'schema_version':1,'target':target,'requested_receipts':len(candidates),'maximum_receipts':2,
+    return {'schema_version':1,'target':target,'requested_receipts':len(candidates),'maximum_receipts':MAX_TRADE_RECEIPTS,
             'verified_receipts':sum(r['status'] in ('verified_sale','verified_rebuy') for r in rows),'receipts':rows,
             'indexed_activity_count':None,'scope':'bounded trade sample; indexed activity and observed restrictions remain independent'}
 
@@ -441,5 +457,5 @@ def verify_sales(target,candidates):return _verify_trades(target,candidates)
 
 def verify_rebuys(target,candidates):
     result=_verify_trades(target,candidates,buy=True)
-    for row in result['receipts']:row['buyer']=row.pop('seller')
+    for row in result['receipts']:row['buyer']=row.pop('seller',None)  # a duplicate-signature row carries only its gap
     return result

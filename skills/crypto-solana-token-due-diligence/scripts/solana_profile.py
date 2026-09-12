@@ -298,6 +298,14 @@ class Evidence:
             output=derivations.compute(d['operation'],d['parameters'],self.target,resolve)
             check(used==set(names),p+'.inputs','unused/unbound input evidence')
             check(encoded(output)==encoded(self.objects[eid]) and encoded(d['output'])==encoded(output),p+'.output','output does not recompute from bound inputs')
+            if operation=='controls' and params.get('newer_unpinned') is not None:
+                # The note about a newer unpinned read is recomputed from the retained packets; the read itself is never an input.
+                from solana_accounts import newer_unpinned_note
+                n=params['newer_unpinned'];q=p+'.parameters.newer_unpinned';o=n.get('observation') if isinstance(n,dict) else None;c=self.checked.get(o)
+                check(o in self.rows and self.rows[o]['kind']=='rpc' and o not in names and c is not None and c['status']=='ok' and self.objects[o]['request']['method'] in ('getAccountInfo','getMultipleAccounts')
+                    and self.target['mint'] in c.get('addresses',[]) and o not in self.usable and utc(self.rows[o]['captured_at'],q)>utc(self.rows[params['mint']]['captured_at'],q),q,
+                    'newer unpinned note must name a later, unusable, successful mint account read that is not an input')
+                check({k:n.get(k) for k in ('authorities_match','reason')}==newer_unpinned_note(self.objects[n['observation']],self.objects[params['mint']],self.target),q,'newer unpinned note does not recompute from the retained observations')
             category='publication' if d['operation'] in derivations.PUBLICATION_OPS else 'execution' if d['operation'] in derivations.EXECUTION_OPS else 'state'
             self.categories[eid]=category;self.closure[eid]=closure
             if all(i in self.usable for i in names) and e['status']=='ok':self.usable.add(eid)
@@ -333,7 +341,9 @@ class Evidence:
         eid=row['evidence_id'];check(eid in self.rows,path,'unknown support evidence');e=self.rows[eid]
         sub=subject(row['subject'],self.target,path+'.subject');role=row['role']
         check(role in ('state','execution','publication','derivation','attempt','context'),path+'.role','invalid support role')
-        allowed=[finding['subject'],*finding['participants']];check(sub in allowed,path+'.subject','support subject not declared by finding')
+        allowed=[finding['subject'],*finding['participants']]
+        # The message carries the typed subject so the analyst can declare it without opening the manifest.
+        check(sub in allowed,path+'.subject','support subject not declared by finding; list '+json.dumps(sub,sort_keys=True)+' under participants or make it the finding subject')
         if role in ('attempt','context'):
             check(sub==e['subject'],path+'.subject','attempt/context subject mismatch');return False
         check(eid in self.usable,path,'unusable evidence cannot support resolved fact')
@@ -458,7 +468,7 @@ def coverage(evidence,report,known,completed):
             else:
                 attempts=[evidence.attempts[a] for a in c['attempt_ids']]
                 check({'primary','alternate'}<={a['route'] for a in attempts} and len({a['source'] for a in attempts})>=2,p,'external boundary needs primary and feasible alternate attempts')
-                check(any(a['status'] in EXTERNAL_FAILURES for a in attempts) and bool(gaps),p,'external boundary lacks captured access limitation/gap')
+                check(all(a['status'] in EXTERNAL_FAILURES for a in attempts) and bool(gaps),p,'external boundary needs every cited attempt to be a captured access limitation, plus the remaining gap')
                 check(not any(a['status'] in ('budget_denied','invalid','unsupported') for a in attempts),p,'local/unsupported/budget work cannot be relabeled external')
     return {r['dimension']:r for r in rows}
 

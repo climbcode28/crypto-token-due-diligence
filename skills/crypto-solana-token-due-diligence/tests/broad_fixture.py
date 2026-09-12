@@ -13,7 +13,7 @@ class RichRpc(Rpc):
     def reset(cls):
         target,a,v=fixture();cls.target=target;cls.pool=a;cls.values=copy.deepcopy(v);cls.values[CLOCK]=clock(timestamp=int(time.time()))
         cls.values[key(7)]=holding(target['mint'],key(8),10000);cls.largest={target['mint']:[key(7)],a['lp']:[a['holder']]}
-        cls.calls=[];cls.active=cls.peak=0;cls.mode='normal';cls.stamp=int(time.time());cls.receipt=None;cls.receipts={};Web.token_info=True;return target
+        cls.calls=[];cls.active=cls.peak=0;cls.mode='normal';cls.stamp=int(time.time());cls.receipt=None;cls.receipts={};Web.token_info=True;Web.pairs=None;return target
     def __call__(self,req):
         cls=type(self)
         with cls.lock:cls.calls.append(copy.deepcopy(req));cls.active+=1;cls.peak=max(cls.peak,cls.active)
@@ -54,12 +54,12 @@ class RichRpc(Rpc):
 
 
 class Web:
-    calls=[];blocked=False;token_info=True
+    calls=[];blocked=False;token_info=True;pairs=None  # pairs overrides the single default DEX Screener pair
     def open(self,request,timeout):
         cls=type(self);cls.calls.append(request.full_url);url=request.full_url
         if cls.blocked:return Response(b'Unavailable',403,{'Content-Type':'text/plain'})
         if 'api.dexscreener.com' in url:
-            value=[{'chainId':'solana','pairAddress':RichRpc.pool['pool'],'baseToken':{'address':RichRpc.target['mint']},'quoteToken':{'address':key(3)},'dexId':'raydium',
+            value=cls.pairs if cls.pairs is not None else [{'chainId':'solana','pairAddress':RichRpc.pool['pool'],'baseToken':{'address':RichRpc.target['mint']},'quoteToken':{'address':key(3)},'dexId':'raydium',
               'liquidity':{'usd':'1000000'},'priceUsd':'2','volume':{'h24':'500000'},'info':{'websites':[{'url':'https://project.example/token'}]}}]
         elif 'geckoterminal' in url and url.endswith('/info'):
             value={'data':{'id':'solana_'+RichRpc.target['mint'],'type':'token','attributes':{'address':RichRpc.target['mint'],'name':'Coin','symbol':'COIN','websites':['https://project.example/'],'twitter_handle':None,'telegram_handle':None,'discord_url':None}}} if cls.token_info else {'data':{}}

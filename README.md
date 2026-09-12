@@ -468,7 +468,7 @@ bundled code, while isolated replay requires explicit trust. Operational feedbac
 bounded, nonblocking and separately reviewed; no active lessons are installed.
 
 All three unittest suites above remain mandatory. Current implementation checks:
-Solana **386**, router **30**, EVM **429** are the current suite counts (Solana grew with the 2026-09-11 review fixes and the 2026-09-12 delivery work and review),
+Solana **401**, router **30**, EVM **429** are the current suite counts (Solana grew with the 2026-09-11 review fixes and the 2026-09-12 delivery work and review),
 including independent outcome, live-regression, legacy and default-dispatch tests. See [implementation](plans/solana-evm-parity-2026-09-11/implementation.md)
 and [evidence tools](skills/crypto-solana-token-due-diligence/references/evidence-and-tools.md).
 Targets are seven-minute ordinary research and ten-minute handling, with two minutes

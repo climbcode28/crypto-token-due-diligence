@@ -38,9 +38,11 @@ class CompletionTests(unittest.TestCase):
         with self.assertRaisesRegex(ProfileError,'completed broad'):validate(b.root,True)
 
     def test_external_limit_requires_real_alternate_and_failed_capture(self):
-        for case in ('source','alternate','no_gap','false_status'):
+        for case in ('source','alternate','no_gap','false_status','primary_ok'):
             b=self.fixture(completed=True);row=b.r['coverage'][1]
             if case=='source':b.m['attempts'][1]['source']=b.m['attempts'][0]['source']
+            if case=='primary_ok':  # A successful primary is not an access limitation: every cited closure attempt must have failed.
+                a=b.m['attempts'][0];a['status']='ok';e=b.obs(a['evidence_id']);e['status']='ok';e['source']['capture']['status']='ok';e['source']['capture']['http_status']=200
             if case=='alternate':row['closure']['attempt_ids']=row['closure']['attempt_ids'][:1]
             if case=='no_gap':row['finding_ids']=[]
             if case=='false_status':

@@ -48,8 +48,9 @@ Use background public sources. The maintained batch command is
 `solana_broad_collect.py capture RUN --owner project --url URL [--url URL]
 --allow-network --cost-policy free`. Add `--dimension SURFACE` when a capture
 serves one coverage surface (for example `utility_redemption_rights` for terms). It
-registers ownership and charges actual sends/retries/redirects under the shared session. Reuse existing capture IDs rather
-than fetching the same URL again. You cannot overwrite another owner's evidence.
+registers ownership and charges actual sends/retries/redirects under the shared session. Quote every URL
+(an unquoted `?` or `*` is a zsh glob) and do not wrap the helper in `timeout`, which macOS lacks; the helper
+enforces its own cutoff. Reuse existing capture IDs rather than fetching the same URL again. You cannot overwrite another owner's evidence.
 Return exact repository/audit/program/creator leads with the captured source IDs;
 request coordinator import/targeted presets where needed.
 

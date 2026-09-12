@@ -8,7 +8,7 @@ alternate within the original time/source budget, without retrying until favorab
 Top-account balances are not holder-population counts. Aggregate sampled spending
 owners using the same-batch supply denominator, retaining custody exclusions and
 beneficial-ownership uncertainty. Indexer volume/trade counts are broader source
-claims; two verified sale receipts are only the verification sample. Record both
+claims; the verified sale receipts (at most ten) are only the verification sample. Record both
 without inventing organic adoption, universal rankings or total trading history.
 
 Current controls, liquidity principal/custody, holder economics and project maturity

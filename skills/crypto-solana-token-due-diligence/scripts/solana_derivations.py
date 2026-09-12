@@ -3,15 +3,20 @@ import re
 from solana_common import need,target_identity,pubkey
 from solana_programs import observed_account
 
-VERSION='1.1.0'  # Persisted derivation contract; bumped whenever any operation's output shape changes.
-RUNTIME_VERSION='1.4.0'
+VERSION='1.2.0'  # Persisted derivation contract; bumped whenever any operation's output shape changes.
+RUNTIME_VERSION='1.5.0'
 # The contract version in which each operation's output last changed. A derivation recorded
 # before its operation last changed cannot be recomputed by this engine: read or replay it
 # with its frozen engine instead. Operations absent here have not changed since 1.0.0.
 # 1.1.0 (2026-09-11 review): controllers root_links; discovery project-link corroboration; holders discovery
 # record and rounding; mint/controls Token-2022 metadata fields and authority; pool limitation scope;
 # transaction/sales/rebuys route and fee-sink fields; launch history page limits; public quote sources.
-CHANGED_IN={op:'1.1.0' for op in ('controllers','discovery_pools','holders','mint','controls','pool','transaction','sales','rebuys','history')}
+# 1.2.0 (2026-09-12): sales/rebuys accept up to ten receipts (maximum_receipts 10, so pool_activity receipts count)
+# and verify a same-transaction wrapped-SOL input; pool facts for the Pump adapters carry the creator-fee/holder-reward
+# tail fields, absent_fields and exotic flat fees; transaction effects decode PumpSwap trades with router accounts and
+# carry rebate_accounts (decoder 1.3.0). controls gained an optional newer_unpinned note in the same release; a controls
+# derivation recorded without it still recomputes, so its entry stays at 1.1.0.
+CHANGED_IN={**{op:'1.1.0' for op in ('controllers','discovery_pools','holders','mint','controls','history')},'pool':'1.2.0','transaction':'1.2.0','sales':'1.2.0','rebuys':'1.2.0'}
 
 
 def version_tuple(value):
@@ -54,6 +59,11 @@ def compute(operation,parameters,target,resolve):
         if p.get('selection_scope'):
             need(p['selection_scope'] in ('latest_retained_account_snapshot','earlier_pinned_snapshot_newer_unpinned'),'unknown control snapshot selection')
             result['selection_scope']=p['selection_scope']
+        if p.get('newer_unpinned') is not None:
+            # A note about the newer unpinned read, never an input: the fact stays derived from the pinned snapshot only.
+            n=p['newer_unpinned'];need(isinstance(n,dict) and set(n)=={'observation','authorities_match','reason'} and isinstance(n['observation'],str) and n['authorities_match'] in (True,False,None) and (n['reason'] is None or isinstance(n['reason'],str)),'invalid newer unpinned snapshot note')
+            need(p.get('selection_scope')=='earlier_pinned_snapshot_newer_unpinned','newer unpinned note needs the earlier-pinned selection scope')
+            result['newer_unpinned']=n
         return result
     if operation=='holders':
         from solana_accounts import aggregate_holders

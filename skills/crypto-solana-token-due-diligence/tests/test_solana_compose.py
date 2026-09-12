@@ -27,6 +27,16 @@ class ComposeTests(unittest.TestCase):
         n['overrides'][0]['input_digests']['controls']='0'*64;save(b,n)
         with self.assertRaisesRegex(ComposeError,'input_digests'):compose(b.root,allow_synthetic=True)
 
+    def test_override_on_a_fact_reaches_its_field_restatements(self):
+        b=self.fixture();n=note(b);n['signal_assignments']=assign(b,'potential_risk',{'pipeline-controls'})
+        n['overrides']=[{'finding_id':'pipeline-controls','reason':'The sampled powers are absent; the earlier concern misread the sample.','evidence_ids':['controls'],'input_digests':{'controls':b.obs('controls')['sha256']},'changes':{'signal':'good'}}]
+        save(b,n);r=compose(b.root,allow_synthetic=True)['report']
+        children=[f for f in r['findings'] if f['id'].startswith('pipeline-controls-')];self.assertTrue(children)
+        self.assertEqual({f['signal'] for f in children},{'good'});self.assertEqual(next(f for f in r['findings'] if f['id']=='pipeline-controls')['signal'],'good')
+        self.assertNotEqual(r['ratings']['token_controls'],'concern')
+        n['findings']=[{'id':'coordinator-extra','dimension':'token_controls','claim':'state_observation','strength':'direct','text':'x','support':['controls'],'override':{'reason':'smuggled'}}];save(b,n)
+        with self.assertRaisesRegex(ComposeError,'Unknown finding keys'):compose(b.root,allow_synthetic=True)
+
     def test_both_lanes_round_trip_and_cannot_replace_pipeline(self):
         b=self.fixture();n=note(b);save(b,n);lane(b,'liquidity');lane(b,'project');compose(b.root,allow_synthetic=True);m,r=validate(b.root,True)
         self.assertEqual({x['owner'] for x in m['lanes']},{'liquidity','project'});before=(b.root/'report.json').read_bytes()

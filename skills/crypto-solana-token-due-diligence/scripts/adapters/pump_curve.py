@@ -9,12 +9,13 @@ PROGRAM=CURVE_PROGRAM
 GLOBAL=pda(PROGRAM,b'global')
 CAPABILITY=capability('pump_curve',PROGRAM,REVISION,model='bonding_curve_real_and_virtual_separate',
     dependencies=['curve','global','base_mint','base_holding','quote_holding_if_non_native','fee_config','program_control'])
-CAPABILITY.update(version='1.2.0',allocation_bytes=[115,124],reserved_tail_policy='evidenced allocation lengths only; an all-zero trailing allocation is accepted, any nonzero tail is refused',migration='successful exact migration instruction plus current destination pool required',
+CAPABILITY.update(version='1.3.0',allocation_bytes=[115,124,125,151],reserved_tail_policy='known fields, the creator-fee/holder-reward tail group when the allocation holds it, then an all-zero trailing allocation of any length; a truncated account or any nonzero tail is refused',migration='successful exact migration instruction plus current destination pool required',
     quote=False,historical_execution='typed create/migrate/trade-intent/fee roles; native direct lamport effects may remain unresolved')
 
 
 def decode_pool(account):
-    v=fixed(account,PROGRAM,'BondingCurve',sizes=(115,124))
+    v=fixed(account,PROGRAM,'BondingCurve')  # allocations observed: 115, 124, 125, 151 bytes
+    need(v['creator_fee_bps']<=10000,'invalid Pump creator fee rate')
     v.update(quote_mint_stored=v['quote_mint'],quote_mint=WSOL if v['quote_mint']==ZERO else v['quote_mint'])
     zero_completed=v['complete'] and all(v[k]==0 for k in ('virtual_token_reserves','virtual_quote_reserves','real_token_reserves','real_quote_reserves'))
     need((v['virtual_token_reserves']>0 or zero_completed) and v['real_token_reserves']<=v['virtual_token_reserves'],'invalid Pump curve token reserves')
@@ -32,6 +33,7 @@ def analyze(target,pool,observations,**unused):
     try:
         global_state=fixed(sample.account(GLOBAL),PROGRAM,'Global');sample.result['global']=global_state
         need(global_state['fee_basis_points']+global_state['creator_fee_basis_points']+global_state['buyback_basis_points']<10000,'invalid Pump global fees')
+        need(global_state['max_configurable_creator_fee_bps']==0 or state['creator_fee_bps']<=global_state['max_configurable_creator_fee_bps'],'creator fee exceeds the configurable maximum')
         mint_account=sample.account(target['mint']);token_program=mint_account['owner'];mint=sample.mint(target['mint'],token_program)
         holding=associated_token_address(pool,target['mint'],token_program)[0]
         vault=sample.vault(holding,target['mint'],token_program,pool)

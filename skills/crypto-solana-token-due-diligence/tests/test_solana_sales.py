@@ -55,11 +55,26 @@ class SaleTests(unittest.TestCase):
         p['response']['result']['meta']['err']='failed'
         self.assertEqual(verify_sales(target,[{'pool':a['pool'],'execution':decode_transaction(target,p,b)}])['verified_receipts'],0)
 
+    def test_wrapped_sol_funded_in_the_same_transaction_verifies_a_buy(self):
+        from solana_transactions import verify_rebuys
+        target,a,p,b=fixture(buy=True,wrapped=1000);e=decode_transaction(target,p,b)
+        self.assertEqual([x['kind'] for x in e['effects']][:2],['native_transfer','sync_native'])
+        r=verify_rebuys(target,[{'pool':a['pool'],'execution':e}]);self.assertEqual(r['verified_receipts'],1,r['receipts'][0]['gaps'])
+        self.assertEqual((r['receipts'][0]['input_atomic'],r['receipts'][0]['output_atomic'],r['receipts'][0]['buyer']),('1000','500',a['owner']))
+        # Lamports wrapped by someone other than the trader keep the receipt ambiguous.
+        target,a,p,b=fixture(buy=True,wrapped=1000,wrap_source='payer');e=decode_transaction(target,p,b)
+        r=verify_rebuys(target,[{'pool':a['pool'],'execution':e}]);self.assertEqual(r['verified_receipts'],0);self.assertIn('token delta disagree',r['receipts'][0]['gaps'][0])
+        # An unwrapped buy still verifies.
+        target,a,p,b=fixture(buy=True);self.assertEqual(verify_rebuys(target,[{'pool':a['pool'],'execution':decode_transaction(target,p,b)}])['verified_receipts'],1)
+
     def test_sample_cap_and_duplicate_receipts(self):
         target,a,p,b=fixture();c={'pool':a['pool'],'execution':decode_transaction(target,p,b)}
-        with self.assertRaises(ValueError):verify_sales(target,[c,c,c])  # The sample cap is a contract violation.
+        with self.assertRaises(ValueError):verify_sales(target,[c]*11)  # The ten-receipt sample cap is a contract violation.
+        self.assertEqual(verify_sales(target,[c]*10)['maximum_receipts'],10)
         duplicate=verify_sales(target,[c,c])  # A repeated receipt is one execution plus a row gap, never a dropped derivation.
         self.assertEqual(duplicate['verified_receipts'],1);self.assertEqual(duplicate['receipts'][1]['status'],'unverified');self.assertIn('duplicate receipt',duplicate['receipts'][1]['gaps'][0])
+        from solana_transactions import verify_rebuys
+        rebuy=verify_rebuys(target,[c,c]);self.assertEqual((rebuy['receipts'][1]['status'],rebuy['receipts'][1]['buyer']),('unverified',None));self.assertIn('duplicate receipt',rebuy['receipts'][1]['gaps'][0])
         self.assertEqual(verify_sales(target,[])['verified_receipts'],0)
 
     def test_ephemeral_initialization_after_transfer_is_not_valid_custody(self):

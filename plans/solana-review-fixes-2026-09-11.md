@@ -585,3 +585,224 @@ measurement rather than a re-render, and the unavailable-probe test asserts the 
 transient retry, the sample outcome, and that a classified non-swap row in the legacy shape
 without `receipt_status` (not a sampled receipt, so only the compatibility default can skip it)
 is not probed again.
+
+### Open items landed (2026-09-12, night): receipt cap, capture routes, pinned-snapshot controls
+
+Implemented in order, then reviewed as one scoped pass over the sale verifier, the importer and
+the compose inheritance logic (the files these items touch).
+
+**1. Sales and rebuys verify every sampled receipt.** `_verify_trades` accepts up to
+`MAX_TRADE_RECEIPTS` (10: start's two plus up to four per `pool_activity` preset, two presets)
+and reports `maximum_receipts` 10; the importer passes every candidate at a known pool up to that
+bound instead of `candidates[:2]`. Because the recorded `maximum_receipts` value changes, the
+derivation contract is 1.2.0 with `sales` and `rebuys` marked changed there (an older bundle's
+sale facts are read or replayed with its frozen engine, as the contract says); runtime 1.5.0
+in `release.json`. Test: start samples two swaps, a preset adds a third, sales report 3 of 3
+verified and rebuys 3 requested; the cap test now refuses eleven.
+
+**2. Capture routes by registration order.** Planned discovery routes keep their plan label
+(DEX Screener pools and GeckoTerminal token info `primary`; GeckoTerminal pool pages and Solana
+Explorer `alternate`; token info is filed under development disclosure, the surface it serves).
+For every other capture, per coverage surface and owner, the first host that owner registered
+(web_sources order) is `primary` and a later, different host is `alternate`, so a lane's two
+failed captures at distinct hosts carry the routes an evidenced external limit needs whatever the
+pipeline registered earlier. The closure rule now requires every cited attempt to be a captured
+access limitation (a successful primary plus a failed alternate no longer closes a surface). Test:
+the lane registers a docs host (primary) then the project host twice (alternate); the pipeline's
+own project link and token info stay primary; the market captures keep DEX Screener primary and
+GeckoTerminal alternate; a completion case with a successful primary is refused.
+
+**3. Controls from the latest pinned snapshot.** When the newest mint read is unpinned and an
+earlier pinned one exists, `auto-controls` is derived from the pinned snapshot with
+`selection_scope` `earlier_pinned_snapshot_newer_unpinned` and a `newer_unpinned` note
+(`observation` id, `authorities_match`, `reason`). The note compares every controller the
+controls fact names (mint and freeze authority, decoded extension authorities, delegates and
+close authorities, via `solana_accounts.controllers_of`), is computed by the importer from the
+two retained packets and passed as a parameter, so the unpinned read is never an input, and the
+validator recomputes it from those packets (`newer_unpinned_note`) so a hand-edited note fails
+validation. It is a limit row and prefixes the summary ("its controllers differ", "are unchanged"
+or "could not be compared"); `prior-controls` no longer exists. Pool and program facts likewise
+prefer the latest pinned read per address (`latest_accounts(usable)`), so a late unpinned pool
+re-read no longer turns the pool fact into a coverage gap. Trade-off recorded: the unpinned
+read's own quantities are not a fact any more (it stays a retained partial sample in the
+manifest). `controls` stays at derivation contract 1.1.0 because an entry recorded without the
+note still recomputes.
+
+**Small items.** The Summary and Assessment verdict lines no longer repeat a kind label the
+analyst wrote at the start of the decision text (`verdict_line`; renderer 1.2.1). The broad
+tests patch the public connection-rate window (40 per 10 s) so a synthetic start plus preset no
+longer waits a real window; the Solana suite runs in about 39 s instead of 57 s. Lane briefs in
+run b are 14.7 KB and 17.4 KB (the facts excerpt is capped at 4,096 characters) and the pointer
+already says to open them with Read, so that item needed no change. X13 indexer lead ranking
+stays deferred by design.
+
+**Scoped review pass.** Two independent reviewers took the second look at the sale verifier
+(with item 1) and at the importer and compose inheritance (with items 2 and 3). Applied from the
+verifier review: `verify_rebuys` no longer crashes on a duplicate signature (the duplicate row
+carries only its gap); `transactions_version` 1.4.0; the refusal message states the constant;
+an unreachable branch in `counter_asset_realization` removed; three more "two receipts" sentences
+(contract reference, liquidity brief, adoption reference) now say the bounded sample of at most
+ten; the aggregated-route asymmetry (a hop into the input account before the leg is tolerated, a
+hop back after it is a round trip) is documented; the verdict test covers the underscore kind.
+Applied from the importer review: the controller comparison, validator recomputation, pinned-read
+preference for pools and programs, per-owner routes and the all-failed closure rule above; field-
+level inheritance in compose now runs after overrides so a corrected parent judgment reaches its
+restatements; a supplied coverage row cannot narrow the surface's attempts; unknown finding keys
+in a note are an error rather than passed through; derivation errors reach the coordinator
+diagnostics as `derivation_errors`; the GeckoTerminal host check is exact. From the confirmation
+pass: the validator's note check now accepts only a later, unusable, successful mint account read
+(a note naming an older pinned read or an unrelated row is refused); the extension comparison
+names the transfer-hook program (extension authorities are already powers); `profile_runtime`,
+`compose`, `session_import`, `accounts`, `facts` and `broad_runner` versions bumped in
+`release.json`. Not changed: `validate` reports the first failing derivation only (fail-fast by
+design).
+
+Suites: Solana 392, router 30, EVM 429.
+
+### Live diversity starts (2026-09-12, night): Token-2022, PumpSwap, Meteora DLMM, pump.fun curve
+
+One broad `start` each, new run directories under `research/<mint>-2026-09-12-diversity-<tag>`, run
+sequentially so the public tier's per-IP windows were not shared (about a minute each):
+
+| Tag | Mint | Result |
+| --- | --- | --- |
+| `t22` | PYUSD `2b1kV6…24GXo` (Token-2022, Orca Whirlpool pools) | 15 facts, all usable; extensions decoded (mint close authority, permanent delegate, transfer fee, confidential transfer); holders stay an explicit gap on the refused method; the sampled sell is a three-hop Jupiter route through an unsupported program, refused by design |
+| `dlmm` | STONK `6GmAFS…pUNgx` (Meteora DLMM principal, Raydium CLMM side pool) | 18 facts, all usable; one buy and one sell probed; the bounded holder census returned an invalid answer (no holders fact) |
+| `pumpswap` | USOIL `GKziLr…LTWn` (PumpSwap principal, dust Meteora DAMM v2 side pool) | 19 facts, all usable, but three defects below |
+| `curve` | bALLs `EN557i…Lpump` (live pump.fun curve) | 7 facts and **no curve lead at all** |
+
+Defects found and fixed, then confirmed on fresh `curve2` and `pumpswap2` starts:
+
+1. **Pump layouts were one upgrade behind.** pump-public-docs commit `e0687ae9` (2026-09-12) appended a
+creator-fee/holder-reward tail group to `BondingCurve` (+`creator_fee_bps`, `can_edit_creator_fee`,
+`is_holder_reward`; 125 bytes, allocated at 151 live), `Pool` (same three; 271 in a 301 allocation),
+`GlobalConfig` (+`creator_fee_configurable`, `max_configurable_creator_fee_bps`; 949 live) and
+`Global` (+those two, `holder_reward_claim_authority`, `is_holder_reward_enabled`; 1087), and
+`exotic_flat_fees` to the fee program's `FeeConfig`. The pinned decoder refused the live curve
+("unsupported Pump account layout length") and the live GlobalConfig ("unknown Pump reserved
+layout extension"), so a curve token had no pool fact and a PumpSwap pool had no vaults or
+reserves. `pump_layouts.FIELDS` carry the new fields; a `TAIL_GROUP` is read only when the
+allocation holds all of it and reported in `absent_fields` otherwise; enumerated allocation
+lengths are replaced by "known fields, optional tail group, zero padding of any length"
+(truncation and any nonzero tail are still refused); `decode_fees` reads the optional exotic flat
+fees; the three IDL pins in `layout-sources.json` move to `e0687ae9`; pump adapters 1.3.0; the
+`pool` operation is marked changed in derivation contract 1.2.0.
+2. **Activity sampling took pools in observation order.** The USOIL receipts were both sampled from
+the USD 0.05 Meteora side pool because `automatic_dependencies` took decodable pools in account
+order. `ordered_leads` now sorts them by exact-mint discovery liquidity, so the pool with the highest
+exact-mint discovery liquidity is sampled first (for USOIL that was the Meteora pool by the run's
+own evidence).
+3. **Wrapped SOL funded in the same transaction failed the delta check.** A buy whose trader
+transferred lamports into a pre-existing WSOL account and called `sync_native` before the leg was
+refused ("instruction amount and historical token delta disagree") because the input account's
+token delta is the wrap minus the leg. `_verify_trades` now adds the trader's own same-transaction
+wrap (system transfers into the input account before its `sync_native`, all from the observed
+owner) to the expected delta; funding by anyone else stays ambiguous. The transaction fixture
+gained `buy`, `wrapped` and `wrap_source`, giving the verifier its first unit-tested buy.
+4. **Failed reads were invisible to the coordinator.** The DLMM run's holder census answered with an
+invalid body and nothing in `diagnostics` said so. `provider_diagnostics` now lists RPC read
+families with no successful attempt (`unresolved_reads`), refused methods excluded; web captures
+keep reporting their own status.
+
+The `curve2` and `pumpswap2` re-runs then exposed two more: both pump programs' fee-config accounts
+are 4,097 bytes after `extend_fee_config` (the decoder's cap was 4,096) with 25 tiers plus 25 stable
+tiers on the PumpSwap one (the vector cap was 32), so `decode_fees` allows up to 16,384 bytes and
+128 tiers per table; and the curve dependency sample never read the curve program account, so the
+pool fact carried `program_control_not_observed` (the PumpSwap preset sample lacked it too). Both
+fixed; `curve3` shows a fully decoded curve (reserves, fee tables, program control). USOIL's
+liquidity collapsed between the first run and the re-run (DEX Screener now reports 0 for its
+PumpSwap pool), so that token cannot demonstrate the ordering live; the confirmation moved to the
+PUMP token (`pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn`; a first attempt with a mis-cased
+address showed the identity-failure path working: null mint read, no expansion, explicit
+derivation errors in `diagnostics`). Not fixed, by design: pump.fun curve trades are lamport
+legs without a token vault, so the four probed curve signatures classified as "no supported swap"
+and the curve's activity stays unsampled (the adapter declares native lamport effects unresolved).
+
+The PUMP run (`pumpswap4`) confirmed the liquidity ordering (PumpSwap sampled before the DLMM
+side pool) and the pool decode (reserves matching the indexer's USD 21M), and exposed the last
+PumpSwap gap: routers append two or three remaining accounts after the named roles of `sell` and
+`buy_exact_quote_in` and omit a buy's trailing `track_volume` flag, so every probed receipt was
+"unsupported PumpSwap trade layout". The swap decoder now takes the named roles positionally
+(at least 21 or 23 accounts, 24 bytes, or 25 with a valid flag) and declares the appended accounts
+as candidate fee sinks, because the upgrade pays a third fee (buyback, holder rewards or cashback)
+from the vault to the second appended account; flow reconciliation still binds every transfer, so
+an appended account that receives nothing changes nothing and an undeclared flow still leaves a
+receipt unverified. `pumpswap5` then sampled two sells from the PumpSwap pool; re-imported with
+the sinks declared, both move from "flow count ambiguous" to "unrelated balance/authority changes
+touch sale accounts", which is correct: they are FLASHX router legs whose input and output
+accounts are router-owned custody accounts fed and drained by plain transfers, so the spending
+owner is the router and the beneficial owner is unknown, exactly the distinction the verifier
+refuses to collapse. `pumpswap6` (17 s) found one probe-able signature and no swap; the sample
+size on a router-dominated pool is small by design.
+
+**Scoped review of the diversity fixes.** An independent pass confirmed the IDL pins byte for
+byte, the field offsets, the live decodes and the wrap logic under adversarial cases, and returned
+one must-fix and eight should-fix items, all applied: the pump adapters' `REVISION` (the
+`source_revision` every pump pool fact carries) and the launch reference's links now pin
+`e0687ae9`; the trader's cashback rebate account (the quote ATA of their `user_volume_accumulator`
+PDA) is derived and excluded from the fee sinks, returned as `rebate_accounts`, and a receipt
+paying it is refused as ambiguous proceeds; `buy_exact_quote_in` is a fee-inclusive mode whose
+specified amount must equal the leg plus the fees drawn from the input account (live receipts
+never matched the old exact-input rule); the transaction operation is marked changed in contract
+1.2.0 with decoder 1.3.0; a zero tail group and a zero exotic fee table are flagged as such rather
+than reported as written values; creator fee rates are bounded (10,000 bps and the global's
+configurable maximum); every recent-signature listing is recorded per pool and a pool whose
+listed signatures all failed on chain is a stated diagnostic; and the sampler's liquidity order
+is exercised by a two-pool fixture whose related-stage read order is deliberately reversed.
+Still open: no live PumpSwap receipt has verified with the declared sinks (the PUMP receipts are
+router custody legs).
+
+Suites after the fixes: Solana 401, router 30, EVM 429.
+
+### Cold-start runs by a fresh model (2026-09-12, night)
+
+Each run is a fresh general-purpose agent given only the skill directory, a mint and the standard
+question, told not to read source, tests, plans or earlier runs, and asked for a process log.
+Runs are sequential (the public tier's windows are per IP). New run directories
+`research/<mint>-2026-09-12-coldstart-<tag>`.
+
+| Tag | Mint | Receipt to delivery | Outcome |
+| --- | --- | --- | --- |
+| `jup` | JUP (Meteora DLMM principal, Orca side pool) | 8 min 25 s | checkpoint; compose valid on the third attempt (8 errors, 2, 0) |
+| `bonk` | BONK (Orca Whirlpool principal, Raydium CLMM side pool) | 8 min 32 s | checkpoint; compose valid on the first attempt (the updated compose reference had landed mid-run) |
+| `jto` | JTO (Raydium CLMM principal, Orca side pool), on the corrected guidance | 8 min 45 s | checkpoint; lanes dispatched at receipt + 59 s; none of the enum or decision-shape gaps recurred; compose valid on the third attempt, both failures the support-subject rule |
+
+Both followed the runbook's order (start, lanes, facts and at most two presets, note, `compose
+--check`, checkpoint, read) without reading source, both chose a checkpoint correctly (lanes late,
+holder census refused, no executable quote for concentrated pools), and both answered in the
+contract shape from the read payload. Both exceeded the 420 s target and stayed inside the 600 s
+maximum; the time went to reading the 30 KB start output before dispatching lanes (dispatch at
+receipt + 64 s and + 150 s, leaving the lanes 90 to 150 s of their 240 s), to two `holders`
+presets that repeated a census `start` had already failed, and (JUP) to two note repairs.
+
+Guidance fixed from their logs, all in documentation or the scaffold, none in the engine's
+judgments: `compose.md` now states how a support whose subject differs from the finding's must be
+declared (`participants`), the six support roles and which two may cite unusable evidence, how a
+failed read is cited inside a `coverage_gap` (role `attempt`), that a `state_observation` needs
+RPC-derived state (a page supports only `source_analysis`), the claim and strength enums, the
+coverage `status` enum with what `unavailable` requires, that closure `attempt_ids` come from the
+scaffold row, the subject `kind` enum, and the full `decision` shape including mitigation and
+action rows and what `met`/`not_met`/`unverified` mean; the scaffold's `judgment_todo` repeats the
+row shapes; `SKILL.md` tells the coordinator to dispatch the lanes in the turn `start` returns
+(their cutoff counts from receipt) and no longer says "do not retry until results look
+favorable"; the runbook says `--deadline-at` is receipt + 600 s with 420 s as the target, that the
+`holders` preset repeats what `start` attempted, and that the pointers lead the start output;
+both lane briefs warn to quote URLs (zsh globs) and not to wrap the helper in `timeout`. Two
+small engine changes serve the same end: `start` prints `lane_pointers` and `next` first and the
+facts summary last, and `diagnostics` gains a `holder_scan_failed` row when the bounded census
+already failed. The third cold-start (`jto`) then stumbled only on the support-subject rule, because
+the error named the rule but not the subject to declare; the profile's message now carries the
+typed subject to list under `participants`. From its log as well: `SKILL.md` names the subagent
+type, `compose.md` says which signal an informational publication takes and that a `resolved`
+boundary needs `checked` status, the runbook says presets spend the grant `start` left
+(`session.remaining_requests`), and `SKILL.md` says decimal display of an atomic figure is
+presentation, not arithmetic.
+
+Assessment. All three runs followed the runbook without reading source, chose a checkpoint
+correctly and answered in the contract shape; the guidance stumbles fell from seven (JUP) to one
+(JTO), and that one is now self-explaining. The cost that did not move is time: 8 min 25 s to
+8 min 45 s in every run, all past the 420 s target and inside the 600 s maximum, with the lanes
+late in all three because `start` takes 30 to 45 s and the lane cutoff counts 240 s from receipt.
+Recommendation, not applied here because it changes the workflow limits the profile enforces:
+give lanes min(receipt + 300, deadline − 120) or count their 240 s from dispatch, and treat a
+lane that returns valid but incomplete as the normal case for the coordinator to finish locally.

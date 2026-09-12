@@ -48,10 +48,14 @@ def alias(value,facts,evidence,path):
     return choices[0]
 
 
+FINDING_KEYS={'id','owner','dimension','claim','strength','text','signal','confidence','impact','concern','subject','participants','support','counterevidence','time_basis','limitations','assertion'}
+
+
 def expand_finding(value,owner,facts,evidence,path):
     f=copy.deepcopy(value);fid=f['id']
     for name in ('dimension','claim','strength','text'):
         check(name in f,path+'.'+name,'Required field; provide an explicit scoped value.')
+    check(set(f)<=FINDING_KEYS,path,'Unknown finding keys '+repr(sorted(set(f)-FINDING_KEYS))+'; a note finding carries only '+repr(sorted(FINDING_KEYS))+'.')
     check(f['dimension'] in DIMENSIONS,path+'.dimension','Use a defined coverage dimension: '+repr(DIMENSIONS))
     check(isinstance(fid,str) and fid.startswith(owner+'-'),path+'.id','Finding ID must start with '+owner+'-; another owner cannot be replaced.')
     sub=f.get('subject',{'genesis_hash':evidence.target['genesis_hash'],'kind':'mint','address':evidence.target['mint']})
@@ -160,14 +164,6 @@ def assemble(root,note,*,lane_notes=None,allow_synthetic=False):
             expected={r['evidence_id']:e.rows[r['evidence_id']]['sha256'] for r in pipeline_rows[fid]['support']}
             if digests!=expected:error(errors,'note.signal_assignments.'+fid+'.input_digests','Bind the signal to the current fact digest(s) '+json.dumps(expected,sort_keys=True)+'; a changed fact needs re-review.');continue
         pipeline_rows[fid].update(assignment)
-    # Field-level restatements of one fact inherit that fact's judgment unless assigned explicitly,
-    # so a coordinator judges each fact once rather than every typed field.
-    from solana_pipeline_note import finding_id
-    for fid,row in pipeline_rows.items():
-        parent=finding_id(row['support'][0]['evidence_id']) if row.get('support') else None
-        if row.get('signal') is None and parent and parent!=fid and parent in pipeline_rows and pipeline_rows[parent].get('signal') is not None:
-            for k in ('signal','confidence','concern'):  # Severity (impact) stays on the parent fact only.
-                if pipeline_rows[parent].get(k) is not None:row[k]=copy.deepcopy(pipeline_rows[parent][k])
     for i,override in enumerate(note.get('overrides',[])):
         at='note.overrides['+str(i)+']'
         def apply_override():
@@ -180,12 +176,21 @@ def assemble(root,note,*,lane_notes=None,allow_synthetic=False):
             for eid in ids:
                 if not any(r['evidence_id']==eid for r in f['counterevidence']):f['counterevidence'].append({'evidence_id':eid,'subject':e.rows[eid]['subject'],'role':'derivation' if e.rows[eid]['kind']=='derived' else 'publication' if e.rows[eid]['kind']=='document' else 'state'})
         caught(errors,at,apply_override)
+    # Field-level restatements of one fact inherit that fact's judgment unless assigned explicitly, so a
+    # coordinator judges each fact once rather than every typed field; this runs after overrides so a
+    # corrected parent judgment reaches its restatements too.
+    from solana_pipeline_note import finding_id
+    for fid,row in pipeline_rows.items():
+        parent=finding_id(row['support'][0]['evidence_id']) if row.get('support') else None
+        if row.get('signal') is None and parent and parent!=fid and parent in pipeline_rows and pipeline_rows[parent].get('signal') is not None:
+            for k in ('signal','confidence','concern'):  # Severity (impact) stays on the parent fact only.
+                if pipeline_rows[parent].get(k) is not None:row[k]=copy.deepcopy(pipeline_rows[parent][k])
     coverage_rows=[];supplied={r.get('dimension'):r for r in note.get('coverage',[]) if isinstance(r,dict)}
     if len(supplied)!=len(note.get('coverage',[])) or not set(supplied)<=set(DIMENSIONS):error(errors,'note.coverage','Unique known coverage dimensions required.')
     ratings={}
     for dim in DIMENSIONS:
         found=[f for f in rows if f['dimension']==dim];ids=[f['id'] for f in found];attempts=[a['id'] for a in m['attempts'] if a['dimension']==dim]
-        row=copy.deepcopy(supplied.get(dim,empty_coverage(dim,ids,attempts)));row['finding_ids']=ids;row.setdefault('attempt_ids',attempts);coverage_rows.append(row)
+        row=copy.deepcopy(supplied.get(dim,empty_coverage(dim,ids,attempts)));row['finding_ids']=ids;row['attempt_ids']=attempts;coverage_rows.append(row)
         ratings[dim]='concern' if any(f['signal'] in ('bad','potential_risk') for f in found) else 'not_applicable' if row['status']=='not_applicable' else 'no_issue_detected' if row['status']=='checked' and found and all(f['signal']=='good' for f in found) else 'unknown'
     summary=list(note.get('summary_ids',[]));decision=copy.deepcopy(note.get('decision'))
     severe=[f['id'] for f in rows if f['signal'] in ('bad','potential_risk') and f['impact'] in ('high','critical')]

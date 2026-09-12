@@ -201,7 +201,12 @@ through that derived evidence ID. This keeps execution and downstream sale/launc
 results within one transitive evidence ledger rather than a second mutable copy.
 
 Samples add `status` (`pinned` or `partial`) and `critical` boolean. Unpinned usable
-wire responses may remain in partial snapshots but do not support resolved state.
+wire responses may remain in partial snapshots but do not support resolved state. The
+controls fact is derived from the latest pinned mint snapshot; when a newer read is
+unpinned it stays a retained sample and the fact carries a `newer_unpinned` limit
+(whether that read still names the same controllers, recomputed by the validator from
+the retained packets) instead of becoming a coverage gap; pool and program facts likewise
+prefer the latest pinned read per address.
 Time basis includes `kind`, `sample_ids` and optional `stability`; all actual state
 inputs must be named. A stability-dependent claim needs unchanged critical rechecks.
 Capture artifacts retain native numeric transport times while normalized evidence
