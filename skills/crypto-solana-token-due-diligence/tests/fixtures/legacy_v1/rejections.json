@@ -1,0 +1,24 @@
+[
+  {
+    "fixture": "collection",
+    "mutation": "alter_evidence",
+    "path": "evidence/mint.json"
+  },
+  {
+    "fixture": "collection",
+    "mutation": "missing_evidence",
+    "path": "evidence/mint.json"
+  },
+  {
+    "fixture": "independent",
+    "mutation": "copied_recheck"
+  },
+  {
+    "fixture": "independent",
+    "mutation": "unknown_completed"
+  },
+  {
+    "fixture": "independent",
+    "mutation": "wrong_subject"
+  }
+]

@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "collection_sha256": null,
+  "launch": {
+    "definition": null,
+    "receipt_evidence_ids": ["launch-receipt"],
+    "source_addresses": [],
+    "excluded_recipients": {},
+    "supply_evidence_id": "launch-supply",
+    "flag_at_bps": 1000
+  },
+  "fee_checks": []
+}

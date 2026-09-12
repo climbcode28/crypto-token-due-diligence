@@ -1,0 +1,145 @@
+{
+  "stale_worker": {
+    "exhausted_acquire": false,
+    "review": "replan",
+    "replanned": {
+      "schema_version": 2,
+      "investigation_id": "be3d0946-0308-4460-81d3-6c1cc3f83625",
+      "request_limit": 3,
+      "started_attempts": 2,
+      "reserved_requests": 0,
+      "remaining_requests": 1,
+      "remaining_seconds": 99.989,
+      "deadline_unix": 1789050283.522203,
+      "request_ceiling": 5,
+      "deadline_ceiling_unix": 1789050383.522203,
+      "limit_basis": "analyst_safety",
+      "replanning_available": true,
+      "authorization": "Current trusted policy and invocation gates remain required"
+    },
+    "existing_worker_acquire_after_replan": true,
+    "existing_worker_limit_enforced": false,
+    "status": {
+      "schema_version": 2,
+      "investigation_id": "be3d0946-0308-4460-81d3-6c1cc3f83625",
+      "request_limit": 3,
+      "started_attempts": 3,
+      "reserved_requests": 0,
+      "remaining_requests": 0,
+      "remaining_seconds": 99.989,
+      "deadline_unix": 1789050283.522203,
+      "request_ceiling": 5,
+      "deadline_ceiling_unix": 1789050383.522203,
+      "limit_basis": "analyst_safety",
+      "replanning_available": true,
+      "authorization": "Current trusted policy and invocation gates remain required"
+    }
+  },
+  "fixed": {
+    "status": {
+      "schema_version": 2,
+      "investigation_id": "6e095ff2-e6b6-4f5f-8bca-2388c57eeac5",
+      "request_limit": 2,
+      "started_attempts": 2,
+      "reserved_requests": 0,
+      "remaining_requests": 0,
+      "remaining_seconds": 99.992,
+      "deadline_unix": 1789050283.533586,
+      "request_ceiling": 2,
+      "deadline_ceiling_unix": 1789050283.533586,
+      "limit_basis": "fixed",
+      "replanning_available": false,
+      "authorization": "Current trusted policy and invocation gates remain required"
+    },
+    "review": "limit_review_required",
+    "replan_error": "replan requires a shortfall that fits the existing ceilings; review limits otherwise"
+  },
+  "legacy": {
+    "status": {
+      "schema_version": 1,
+      "investigation_id": "synthetic_legacy",
+      "request_limit": 2,
+      "started_attempts": 2,
+      "reserved_requests": 0,
+      "remaining_requests": 0,
+      "remaining_seconds": 99.999,
+      "deadline_unix": 1789050283.5450938,
+      "request_ceiling": 2,
+      "deadline_ceiling_unix": 1789050283.5450938,
+      "limit_basis": "legacy_fixed",
+      "replanning_available": false,
+      "authorization": "Current trusted policy and invocation gates remain required"
+    },
+    "exhausted_acquire": false,
+    "review_error": "legacy fixed sessions cannot be replanned; retain their original limits",
+    "schema_after_probe": 1
+  },
+  "unknown_flag": {
+    "command": [
+      "investigation.py",
+      "init",
+      "/private/tmp/evm-forward-workflow-20260910/unknown-flag.sqlite",
+      "--max-requests",
+      "2",
+      "--timeout",
+      "100",
+      "--unrecognized-option"
+    ],
+    "exit_code": 2,
+    "stdout": "",
+    "stderr": "usage: investigation.py [-h] [--max-requests MAX_REQUESTS] [--timeout TIMEOUT]\n                        [--request-ceiling REQUEST_CEILING]\n                        [--timeout-ceiling TIMEOUT_CEILING]\n                        [--limit-basis {user,provider,analyst_safety}]\n                        [--plan PLAN] [--reason REASON]\n                        [--operation OPERATION] [--count COUNT]\n                        {init,status,charge,review,replan} path\ninvestigation.py: error: unrecognized arguments: --unrecognized-option",
+    "file_created": false
+  },
+  "ignored_limit_flags": {
+    "command": [
+      "investigation.py",
+      "replan",
+      "/private/tmp/evm-forward-workflow-20260910/fixed.sqlite",
+      "--plan",
+      "/private/tmp/evm-forward-workflow-20260910/compat-plan.json",
+      "--reason",
+      "Synthetic unsupported bound expansion probe",
+      "--request-ceiling",
+      "1000",
+      "--timeout-ceiling",
+      "1000",
+      "--limit-basis",
+      "analyst_safety"
+    ],
+    "exit_code": 2,
+    "stdout": "",
+    "stderr": "Investigation failed: replan requires a shortfall that fits the existing ceilings; review limits otherwise"
+  },
+  "frozen_handoff": {
+    "command": [
+      "bundle_assemble.py",
+      "handoff",
+      "/private/tmp/evm-forward-workflow-20260910/frozen_handoff-probe",
+      "/private/tmp/evm-forward-workflow-20260910/empty-lane.json"
+    ],
+    "exit_code": 2,
+    "stdout": "",
+    "stderr": "Assembly failed: [Errno 2] No such file or directory: '/private/tmp/evm-forward-workflow-20260910/frozen_handoff-probe/draft.json'",
+    "added_files": [
+      ".operational-feedback.lock",
+      "assembly-observation-cd78d9f4a8b9144a.json",
+      "operational-feedback.json"
+    ],
+    "changed_files": [],
+    "removed_files": []
+  },
+  "checkpoint_deliver": {
+    "command": [
+      "bundle_assemble.py",
+      "deliver",
+      "/private/tmp/evm-forward-workflow-20260910/checkpoint_deliver-probe",
+      "--allow-synthetic"
+    ],
+    "exit_code": 2,
+    "stdout": "",
+    "stderr": "Assembly failed: not eligible for final delivery: continue required work; a checkpoint is internal storage only",
+    "added_files": [],
+    "changed_files": [],
+    "removed_files": []
+  }
+}

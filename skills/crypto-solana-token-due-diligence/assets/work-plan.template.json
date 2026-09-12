@@ -1,0 +1,121 @@
+{
+  "work_plan_version": 1,
+  "profile": "solana-evidence-v2",
+  "scope": "broad",
+  "received_at": null,
+  "target_at": null,
+  "deadline_at": null,
+  "user_hard_deadline": false,
+  "limits": {
+    "attempts": 120,
+    "response_bytes": 67108864,
+    "rpc_concurrency": 3,
+    "web_origin_concurrency": 2
+  },
+  "reservations": {
+    "liquidity": 15,
+    "project": 15,
+    "final_and_retry": 12
+  },
+  "surfaces": [
+    {
+      "dimension": "token_controls",
+      "state": "pending",
+      "owner": "coordinator",
+      "required": true,
+      "attempt_ids": [],
+      "finding_ids": [],
+      "closure": null
+    },
+    {
+      "dimension": "canonical_lp_principal_custody",
+      "state": "pending",
+      "owner": "coordinator",
+      "required": true,
+      "attempt_ids": [],
+      "finding_ids": [],
+      "closure": null
+    },
+    {
+      "dimension": "side_pool_removal_risk",
+      "state": "pending",
+      "owner": "coordinator",
+      "required": true,
+      "attempt_ids": [],
+      "finding_ids": [],
+      "closure": null
+    },
+    {
+      "dimension": "sellability_exit_depth",
+      "state": "pending",
+      "owner": "coordinator",
+      "required": true,
+      "attempt_ids": [],
+      "finding_ids": [],
+      "closure": null
+    },
+    {
+      "dimension": "current_concentration",
+      "state": "pending",
+      "owner": "coordinator",
+      "required": true,
+      "attempt_ids": [],
+      "finding_ids": [],
+      "closure": null
+    },
+    {
+      "dimension": "historical_launch_integrity",
+      "state": "pending",
+      "owner": "coordinator",
+      "required": true,
+      "attempt_ids": [],
+      "finding_ids": [],
+      "closure": null
+    },
+    {
+      "dimension": "admin_treasury_reward_custody",
+      "state": "pending",
+      "owner": "coordinator",
+      "required": true,
+      "attempt_ids": [],
+      "finding_ids": [],
+      "closure": null
+    },
+    {
+      "dimension": "reward_accounting_liveness",
+      "state": "pending",
+      "owner": "coordinator",
+      "required": true,
+      "attempt_ids": [],
+      "finding_ids": [],
+      "closure": null
+    },
+    {
+      "dimension": "utility_redemption_rights",
+      "state": "pending",
+      "owner": "coordinator",
+      "required": true,
+      "attempt_ids": [],
+      "finding_ids": [],
+      "closure": null
+    },
+    {
+      "dimension": "external_dependencies",
+      "state": "pending",
+      "owner": "coordinator",
+      "required": true,
+      "attempt_ids": [],
+      "finding_ids": [],
+      "closure": null
+    },
+    {
+      "dimension": "development_disclosure",
+      "state": "pending",
+      "owner": "coordinator",
+      "required": true,
+      "attempt_ids": [],
+      "finding_ids": [],
+      "closure": null
+    }
+  ]
+}

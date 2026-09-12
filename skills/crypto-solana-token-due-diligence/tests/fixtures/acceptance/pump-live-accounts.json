@@ -1,0 +1,42 @@
+{
+  "scope": "Offline account-layout regression only; source frozen public case is partial and this fixture cannot establish a fresh pin, migration or custody.",
+  "source_case": "research/solana-parity-2026-09-11/pump/checkpoint",
+  "accounts": [
+    {
+      "address": "DtbMVnPihodk3ch6T1yZKPPLXYoQX3MAc6zRUWTCmEwr",
+      "account": {
+        "data": [
+          "8ZptBBGxbbz8AAD7swJDgdBUNRV1ta0oeTPRqLLU7JyxuGfHoe6pk9idhRizIa0oq7s9ZRPZD8SHry26zHyorHvbK4pJvpYuCmqfBpuIV/6rgYT7aH9jRhjANdrEOdwa6ztVmKDwAAAAAAH7q7vANTe8bYK5XHC5DG7UtElJrnFAMnHI3gswveN/K0opnMwp+8z5mSg+4QzQb2RtgXRoEG8gvcsurFkkUedMgfmSVgH6Fpm1r9YjIbwVEJd+j4qgSveYvmbYenZQU4YeQ2tZ0AMAAEGugzip5IzdmbzsWASjakDJU5NkwS648QZMMyNiZRc4AADJQR4YBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+          "base64"
+        ],
+        "executable": false,
+        "lamports": 2716857,
+        "owner": "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+        "rentEpoch": 18446744073709551615,
+        "space": 301
+      },
+      "context_slot": 446298206,
+      "original_packet_sha256": "b4a9525e0c6fa6a3800f90c403d5404a2cde8923b053aa955c41a0bc0b24fba0",
+      "data_sha256": "8b7106dc0155b2b690752aff973e9986c3d103b7dfc1b4a80ce09787fbca2ee4",
+      "source_observation": "custody1lead_critical_0_0"
+    },
+    {
+      "address": "9osxnUjfYprLRrF9R7ZmAKKF3PvsJD2Byir23iuEFBsg",
+      "account": {
+        "data": [
+          "F7f4N2DYrGAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAxqR+jQMAAUGugzip5IzdmbzsWASjakDJU5NkwS648QZMMyNiZRc4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+          "base64"
+        ],
+        "executable": false,
+        "lamports": 1595916,
+        "owner": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+        "rentEpoch": 18446744073709551615,
+        "space": 124
+      },
+      "context_slot": 446298267,
+      "original_packet_sha256": "e3b29fcba7e0c253361062fe6415bb6a123cc32f158304e8efe5bd178be08450",
+      "data_sha256": "eabb2af425999a70adcbb929c201e56681e8a153cfedc204febba313cb2cc8eb",
+      "source_observation": "stage1lead_critical_0_0"
+    }
+  ]
+}

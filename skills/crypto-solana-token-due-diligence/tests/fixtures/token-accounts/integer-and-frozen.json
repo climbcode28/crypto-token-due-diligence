@@ -1,0 +1,31 @@
+{
+  "synthetic": true,
+  "layout_source": "https://github.com/solana-program/token-2022/blob/a3e696e42a9fbf87dea68af1443d354fc4054a9b/interface/src/state.rs",
+  "holding": {
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "executable": false,
+    "lamports": 100,
+    "space": 178,
+    "data": [
+      "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwkAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgIACAA3AAAAAAAAAA==",
+      "base64"
+    ]
+  },
+  "mint": {
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "executable": false,
+    "lamports": 100,
+    "space": 82,
+    "data": [
+      "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEQAAAAAAABAJAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+      "base64"
+    ]
+  },
+  "expected": {
+    "amount_atomic": "1152921504606846985",
+    "state": "frozen",
+    "withheld_atomic": "55",
+    "supply_atomic": "1152921504606846993",
+    "freeze_authority": null
+  }
+}

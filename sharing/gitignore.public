@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+.DS_Store
+.venv/
+.env
+.env.*
+!.env.example
+/cache/
+/runs/
+/research/
+/HANDOFF.local.md
+.claude/settings.local.json

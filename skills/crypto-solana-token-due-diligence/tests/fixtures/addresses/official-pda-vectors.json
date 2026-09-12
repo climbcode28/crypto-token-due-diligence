@@ -1,0 +1,35 @@
+{
+  "source": "https://github.com/anza-xyz/solana-sdk/blob/d89042bd5ef842c9a933be8dfd1abcf7fdef9ab7/address/src/lib.rs",
+  "test": "test_create_program_address",
+  "program": "BPFLoaderUpgradeab1e11111111111111111111111",
+  "vectors": [
+    {
+      "seeds_hex": [
+        "",
+        "01"
+      ],
+      "address": "BwqrghZA2htAcqq8dzP1WDAhTXYTYWj7CHxF5j7TDBAe"
+    },
+    {
+      "seeds_hex": [
+        "e29889",
+        "00"
+      ],
+      "address": "13yWmRpaTR4r5nAktwLqMpRNr28tnVUZw26rTvPSSB19"
+    },
+    {
+      "seeds_hex": [
+        "54616c6b696e67",
+        "537175697272656c73"
+      ],
+      "address": "2fnQrngrQT4SeLcdToJAD96phoEjNL2man2kfRLCASVk"
+    },
+    {
+      "seed_pubkey": "SeedPubey1111111111111111111111111111111111",
+      "seeds_hex": [
+        "01"
+      ],
+      "address": "976ymqVnfE32QFe6NfGDctSvVa36LWnvYxhU6G2232YL"
+    }
+  ]
+}

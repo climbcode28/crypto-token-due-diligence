@@ -1,0 +1,357 @@
+[
+  {
+    "command": [
+      "python3",
+      "investigation.py",
+      "init",
+      "/private/tmp/evm-forward-workflow-20260910/case1.sqlite",
+      "--max-requests",
+      "200",
+      "--timeout",
+      "400",
+      "--request-ceiling",
+      "600",
+      "--timeout-ceiling",
+      "1200",
+      "--limit-basis",
+      "analyst_safety"
+    ],
+    "exit_code": 0,
+    "stdout": "{\"authorization\": \"Current trusted policy and invocation gates remain required\", \"deadline_ceiling_unix\": 1789018502.754954, \"deadline_unix\": 1789017702.754954, \"investigation_id\": \"744bdf41-732e-4e0b-a28e-b96dde70b9dd\", \"limit_basis\": \"analyst_safety\", \"remaining_requests\": 200, \"remaining_seconds\": 399.996, \"replanning_available\": true, \"request_ceiling\": 600, \"request_limit\": 200, \"reserved_requests\": 0, \"schema_version\": 2, \"started_attempts\": 0}",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "python3",
+      "investigation.py",
+      "charge",
+      "/private/tmp/evm-forward-workflow-20260910/case1.sqlite",
+      "--operation",
+      "synthetic_consumed_attempts",
+      "--count",
+      "100"
+    ],
+    "exit_code": 0,
+    "stdout": "{\"authorization\": \"Current trusted policy and invocation gates remain required\", \"deadline_ceiling_unix\": 1789018502.754954, \"deadline_unix\": 1789017702.754954, \"investigation_id\": \"744bdf41-732e-4e0b-a28e-b96dde70b9dd\", \"limit_basis\": \"analyst_safety\", \"remaining_requests\": 100, \"remaining_seconds\": 399.874, \"replanning_available\": true, \"request_ceiling\": 600, \"request_limit\": 200, \"reserved_requests\": 0, \"schema_version\": 2, \"started_attempts\": 100}",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "python3",
+      "investigation.py",
+      "charge",
+      "/private/tmp/evm-forward-workflow-20260910/case1.sqlite",
+      "--operation",
+      "synthetic_consumed_attempts",
+      "--count",
+      "100"
+    ],
+    "exit_code": 0,
+    "stdout": "{\"authorization\": \"Current trusted policy and invocation gates remain required\", \"deadline_ceiling_unix\": 1789018502.754954, \"deadline_unix\": 1789017702.754954, \"investigation_id\": \"744bdf41-732e-4e0b-a28e-b96dde70b9dd\", \"limit_basis\": \"analyst_safety\", \"remaining_requests\": 0, \"remaining_seconds\": 399.757, \"replanning_available\": true, \"request_ceiling\": 600, \"request_limit\": 200, \"reserved_requests\": 0, \"schema_version\": 2, \"started_attempts\": 200}",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "python3",
+      "investigation.py",
+      "review",
+      "/private/tmp/evm-forward-workflow-20260910/case1.sqlite",
+      "--plan",
+      "/private/tmp/evm-forward-workflow-20260910/case1-plan.json"
+    ],
+    "exit_code": 0,
+    "stdout": "{\"action\": \"replan\", \"final_delivery_eligible\": false, \"pending_dimensions\": [\"token_controls\", \"canonical_lp_principal_custody\", \"side_pool_removal_risk\", \"sellability_exit_depth\", \"current_concentration\", \"historical_launch_integrity\", \"admin_treasury_reward_custody\", \"reward_accounting_liveness\", \"utility_redemption_rights\"], \"projected_total_attempts\": 280, \"remaining_request_need\": 80, \"session\": {\"authorization\": \"Current trusted policy and invocation gates remain required\", \"deadline_ceiling_unix\": 1789018502.754954, \"deadline_unix\": 1789017702.754954, \"investigation_id\": \"744bdf41-732e-4e0b-a28e-b96dde70b9dd\", \"limit_basis\": \"analyst_safety\", \"remaining_requests\": 0, \"remaining_seconds\": 399.691, \"replanning_available\": true, \"request_ceiling\": 600, \"request_limit\": 200, \"reserved_requests\": 0, \"schema_version\": 2, \"started_attempts\": 200}}",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "python3",
+      "investigation.py",
+      "replan",
+      "/private/tmp/evm-forward-workflow-20260910/case1.sqlite",
+      "--plan",
+      "/private/tmp/evm-forward-workflow-20260910/case1-plan.json",
+      "--reason",
+      "Nine required synthetic surfaces need 80 further attempts including overhead within standing authorized ceilings"
+    ],
+    "exit_code": 0,
+    "stdout": "{\"authorization\": \"Current trusted policy and invocation gates remain required\", \"deadline_ceiling_unix\": 1789018502.754954, \"deadline_unix\": 1789017702.754954, \"investigation_id\": \"744bdf41-732e-4e0b-a28e-b96dde70b9dd\", \"limit_basis\": \"analyst_safety\", \"remaining_requests\": 80, \"remaining_seconds\": 399.624, \"replanning_available\": true, \"request_ceiling\": 600, \"request_limit\": 280, \"reserved_requests\": 0, \"schema_version\": 2, \"started_attempts\": 200}",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "python3",
+      "investigation.py",
+      "review",
+      "/private/tmp/evm-forward-workflow-20260910/case1.sqlite",
+      "--plan",
+      "/private/tmp/evm-forward-workflow-20260910/case1-plan.json"
+    ],
+    "exit_code": 0,
+    "stdout": "{\"action\": \"continue\", \"final_delivery_eligible\": false, \"pending_dimensions\": [\"token_controls\", \"canonical_lp_principal_custody\", \"side_pool_removal_risk\", \"sellability_exit_depth\", \"current_concentration\", \"historical_launch_integrity\", \"admin_treasury_reward_custody\", \"reward_accounting_liveness\", \"utility_redemption_rights\"], \"projected_total_attempts\": 280, \"remaining_request_need\": 80, \"session\": {\"authorization\": \"Current trusted policy and invocation gates remain required\", \"deadline_ceiling_unix\": 1789018502.754954, \"deadline_unix\": 1789017702.754954, \"investigation_id\": \"744bdf41-732e-4e0b-a28e-b96dde70b9dd\", \"limit_basis\": \"analyst_safety\", \"remaining_requests\": 80, \"remaining_seconds\": 399.56, \"replanning_available\": true, \"request_ceiling\": 600, \"request_limit\": 280, \"reserved_requests\": 0, \"schema_version\": 2, \"started_attempts\": 200}}",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "python3",
+      "investigation.py",
+      "charge",
+      "/private/tmp/evm-forward-workflow-20260910/case1.sqlite",
+      "--operation",
+      "synthetic_followup_batch",
+      "--count",
+      "10"
+    ],
+    "exit_code": 0,
+    "stdout": "{\"authorization\": \"Current trusted policy and invocation gates remain required\", \"deadline_ceiling_unix\": 1789018502.754954, \"deadline_unix\": 1789017702.754954, \"investigation_id\": \"744bdf41-732e-4e0b-a28e-b96dde70b9dd\", \"limit_basis\": \"analyst_safety\", \"remaining_requests\": 70, \"remaining_seconds\": 399.489, \"replanning_available\": true, \"request_ceiling\": 600, \"request_limit\": 280, \"reserved_requests\": 0, \"schema_version\": 2, \"started_attempts\": 210}",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "python3",
+      "investigation.py",
+      "init",
+      "/private/tmp/evm-forward-workflow-20260910/case2.sqlite",
+      "--max-requests",
+      "200",
+      "--timeout",
+      "400",
+      "--request-ceiling",
+      "420",
+      "--timeout-ceiling",
+      "1200",
+      "--limit-basis",
+      "analyst_safety"
+    ],
+    "exit_code": 0,
+    "stdout": "{\"authorization\": \"Current trusted policy and invocation gates remain required\", \"deadline_ceiling_unix\": 1789018503.328907, \"deadline_unix\": 1789017703.328907, \"investigation_id\": \"0787141c-20a9-4f1e-9c3e-02fe650a4ac9\", \"limit_basis\": \"analyst_safety\", \"remaining_requests\": 200, \"remaining_seconds\": 399.996, \"replanning_available\": true, \"request_ceiling\": 420, \"request_limit\": 200, \"reserved_requests\": 0, \"schema_version\": 2, \"started_attempts\": 0}",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "python3",
+      "investigation.py",
+      "charge",
+      "/private/tmp/evm-forward-workflow-20260910/case2.sqlite",
+      "--operation",
+      "synthetic_consumed_attempts",
+      "--count",
+      "100"
+    ],
+    "exit_code": 0,
+    "stdout": "{\"authorization\": \"Current trusted policy and invocation gates remain required\", \"deadline_ceiling_unix\": 1789018503.328907, \"deadline_unix\": 1789017703.328907, \"investigation_id\": \"0787141c-20a9-4f1e-9c3e-02fe650a4ac9\", \"limit_basis\": \"analyst_safety\", \"remaining_requests\": 100, \"remaining_seconds\": 399.867, \"replanning_available\": true, \"request_ceiling\": 420, \"request_limit\": 200, \"reserved_requests\": 0, \"schema_version\": 2, \"started_attempts\": 100}",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "python3",
+      "investigation.py",
+      "charge",
+      "/private/tmp/evm-forward-workflow-20260910/case2.sqlite",
+      "--operation",
+      "synthetic_consumed_attempts",
+      "--count",
+      "70"
+    ],
+    "exit_code": 0,
+    "stdout": "{\"authorization\": \"Current trusted policy and invocation gates remain required\", \"deadline_ceiling_unix\": 1789018503.328907, \"deadline_unix\": 1789017703.328907, \"investigation_id\": \"0787141c-20a9-4f1e-9c3e-02fe650a4ac9\", \"limit_basis\": \"analyst_safety\", \"remaining_requests\": 30, \"remaining_seconds\": 399.754, \"replanning_available\": true, \"request_ceiling\": 420, \"request_limit\": 200, \"reserved_requests\": 0, \"schema_version\": 2, \"started_attempts\": 170}",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "python3",
+      "investigation.py",
+      "review",
+      "/private/tmp/evm-forward-workflow-20260910/case2.sqlite",
+      "--plan",
+      "/private/tmp/evm-forward-workflow-20260910/case2-plan.json"
+    ],
+    "exit_code": 0,
+    "stdout": "{\"action\": \"replan\", \"final_delivery_eligible\": false, \"pending_dimensions\": [\"token_controls\", \"canonical_lp_principal_custody\", \"side_pool_removal_risk\", \"sellability_exit_depth\", \"current_concentration\", \"historical_launch_integrity\", \"admin_treasury_reward_custody\", \"reward_accounting_liveness\", \"utility_redemption_rights\"], \"projected_total_attempts\": 233, \"remaining_request_need\": 57, \"session\": {\"authorization\": \"Current trusted policy and invocation gates remain required\", \"deadline_ceiling_unix\": 1789018503.328907, \"deadline_unix\": 1789017703.328907, \"investigation_id\": \"0787141c-20a9-4f1e-9c3e-02fe650a4ac9\", \"limit_basis\": \"analyst_safety\", \"remaining_requests\": 24, \"remaining_seconds\": 399.689, \"replanning_available\": true, \"request_ceiling\": 420, \"request_limit\": 200, \"reserved_requests\": 6, \"schema_version\": 2, \"started_attempts\": 170}}",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "python3",
+      "investigation.py",
+      "replan",
+      "/private/tmp/evm-forward-workflow-20260910/case2.sqlite",
+      "--plan",
+      "/private/tmp/evm-forward-workflow-20260910/case2-plan.json",
+      "--reason",
+      "Required work and overhead exceed the active allowance; retain all six final-header reservations"
+    ],
+    "exit_code": 0,
+    "stdout": "{\"authorization\": \"Current trusted policy and invocation gates remain required\", \"deadline_ceiling_unix\": 1789018503.328907, \"deadline_unix\": 1789017703.328907, \"investigation_id\": \"0787141c-20a9-4f1e-9c3e-02fe650a4ac9\", \"limit_basis\": \"analyst_safety\", \"remaining_requests\": 57, \"remaining_seconds\": 399.622, \"replanning_available\": true, \"request_ceiling\": 420, \"request_limit\": 233, \"reserved_requests\": 6, \"schema_version\": 2, \"started_attempts\": 170}",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "python3",
+      "investigation.py",
+      "status",
+      "/private/tmp/evm-forward-workflow-20260910/case2.sqlite"
+    ],
+    "exit_code": 0,
+    "stdout": "{\"authorization\": \"Current trusted policy and invocation gates remain required\", \"deadline_ceiling_unix\": 1789018503.328907, \"deadline_unix\": 1789017703.328907, \"investigation_id\": \"0787141c-20a9-4f1e-9c3e-02fe650a4ac9\", \"limit_basis\": \"analyst_safety\", \"remaining_requests\": 57, \"remaining_seconds\": 399.559, \"replanning_available\": true, \"request_ceiling\": 420, \"request_limit\": 233, \"reserved_requests\": 6, \"schema_version\": 2, \"started_attempts\": 170}",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "python3",
+      "investigation.py",
+      "init",
+      "/private/tmp/evm-forward-workflow-20260910/case3.sqlite",
+      "--max-requests",
+      "50",
+      "--timeout",
+      "400",
+      "--request-ceiling",
+      "50",
+      "--timeout-ceiling",
+      "1200",
+      "--limit-basis",
+      "user"
+    ],
+    "exit_code": 0,
+    "stdout": "{\"authorization\": \"Current trusted policy and invocation gates remain required\", \"deadline_ceiling_unix\": 1789018503.830661, \"deadline_unix\": 1789017703.830661, \"investigation_id\": \"3c4818d9-7175-4bc6-8213-fca4015e3862\", \"limit_basis\": \"user\", \"remaining_requests\": 50, \"remaining_seconds\": 399.996, \"replanning_available\": true, \"request_ceiling\": 50, \"request_limit\": 50, \"reserved_requests\": 0, \"schema_version\": 2, \"started_attempts\": 0}",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "python3",
+      "investigation.py",
+      "charge",
+      "/private/tmp/evm-forward-workflow-20260910/case3.sqlite",
+      "--operation",
+      "synthetic_consumed_attempts",
+      "--count",
+      "50"
+    ],
+    "exit_code": 0,
+    "stdout": "{\"authorization\": \"Current trusted policy and invocation gates remain required\", \"deadline_ceiling_unix\": 1789018503.830661, \"deadline_unix\": 1789017703.830661, \"investigation_id\": \"3c4818d9-7175-4bc6-8213-fca4015e3862\", \"limit_basis\": \"user\", \"remaining_requests\": 0, \"remaining_seconds\": 399.903, \"replanning_available\": true, \"request_ceiling\": 50, \"request_limit\": 50, \"reserved_requests\": 0, \"schema_version\": 2, \"started_attempts\": 50}",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "python3",
+      "investigation.py",
+      "review",
+      "/private/tmp/evm-forward-workflow-20260910/case3.sqlite",
+      "--plan",
+      "/private/tmp/evm-forward-workflow-20260910/case3-plan.json"
+    ],
+    "exit_code": 0,
+    "stdout": "{\"action\": \"limit_review_required\", \"final_delivery_eligible\": false, \"pending_dimensions\": [\"token_controls\", \"canonical_lp_principal_custody\", \"side_pool_removal_risk\", \"sellability_exit_depth\", \"current_concentration\", \"historical_launch_integrity\", \"admin_treasury_reward_custody\", \"reward_accounting_liveness\", \"utility_redemption_rights\"], \"projected_total_attempts\": 62, \"remaining_request_need\": 12, \"session\": {\"authorization\": \"Current trusted policy and invocation gates remain required\", \"deadline_ceiling_unix\": 1789018503.830661, \"deadline_unix\": 1789017703.830661, \"investigation_id\": \"3c4818d9-7175-4bc6-8213-fca4015e3862\", \"limit_basis\": \"user\", \"remaining_requests\": 0, \"remaining_seconds\": 399.84, \"replanning_available\": true, \"request_ceiling\": 50, \"request_limit\": 50, \"reserved_requests\": 0, \"schema_version\": 2, \"started_attempts\": 50}}",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "python3",
+      "investigation.py",
+      "replan",
+      "/private/tmp/evm-forward-workflow-20260910/case3.sqlite",
+      "--plan",
+      "/private/tmp/evm-forward-workflow-20260910/case3-plan.json",
+      "--reason",
+      "Synthetic refusal test: required work would exceed the explicit user request cap"
+    ],
+    "exit_code": 2,
+    "stdout": "",
+    "stderr": "Investigation failed: replan requires a shortfall that fits the existing ceilings; review limits otherwise"
+  },
+  {
+    "command": [
+      "python3",
+      "investigation.py",
+      "status",
+      "/private/tmp/evm-forward-workflow-20260910/case3.sqlite"
+    ],
+    "exit_code": 0,
+    "stdout": "{\"authorization\": \"Current trusted policy and invocation gates remain required\", \"deadline_ceiling_unix\": 1789018503.830661, \"deadline_unix\": 1789017703.830661, \"investigation_id\": \"3c4818d9-7175-4bc6-8213-fca4015e3862\", \"limit_basis\": \"user\", \"remaining_requests\": 0, \"remaining_seconds\": 399.711, \"replanning_available\": true, \"request_ceiling\": 50, \"request_limit\": 50, \"reserved_requests\": 0, \"schema_version\": 2, \"started_attempts\": 50}",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "python3",
+      "investigation.py",
+      "init",
+      "/private/tmp/evm-forward-workflow-20260910/case4.sqlite",
+      "--max-requests",
+      "100",
+      "--timeout",
+      "400",
+      "--request-ceiling",
+      "300",
+      "--timeout-ceiling",
+      "1200",
+      "--limit-basis",
+      "analyst_safety"
+    ],
+    "exit_code": 0,
+    "stdout": "{\"authorization\": \"Current trusted policy and invocation gates remain required\", \"deadline_ceiling_unix\": 1789018504.1847959, \"deadline_unix\": 1789017704.1847959, \"investigation_id\": \"48dc6128-93d7-4e26-bb90-339a055c7e6c\", \"limit_basis\": \"analyst_safety\", \"remaining_requests\": 100, \"remaining_seconds\": 399.996, \"replanning_available\": true, \"request_ceiling\": 300, \"request_limit\": 100, \"reserved_requests\": 0, \"schema_version\": 2, \"started_attempts\": 0}",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "python3",
+      "investigation.py",
+      "review",
+      "/private/tmp/evm-forward-workflow-20260910/case4.sqlite",
+      "--plan",
+      "/private/tmp/evm-forward-workflow-20260910/case4-plan.json"
+    ],
+    "exit_code": 0,
+    "stdout": "{\"action\": \"completion_review_required\", \"final_delivery_eligible\": false, \"pending_dimensions\": [], \"projected_total_attempts\": 0, \"remaining_request_need\": 0, \"session\": {\"authorization\": \"Current trusted policy and invocation gates remain required\", \"deadline_ceiling_unix\": 1789018504.1847959, \"deadline_unix\": 1789017704.1847959, \"investigation_id\": \"48dc6128-93d7-4e26-bb90-339a055c7e6c\", \"limit_basis\": \"analyst_safety\", \"remaining_requests\": 100, \"remaining_seconds\": 399.932, \"replanning_available\": true, \"request_ceiling\": 300, \"request_limit\": 100, \"reserved_requests\": 0, \"schema_version\": 2, \"started_attempts\": 0}}",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "python3",
+      "investigation.py",
+      "init",
+      "/private/tmp/evm-forward-workflow-20260910/case5.sqlite",
+      "--max-requests",
+      "100",
+      "--timeout",
+      "60",
+      "--request-ceiling",
+      "300",
+      "--timeout-ceiling",
+      "60",
+      "--limit-basis",
+      "user"
+    ],
+    "exit_code": 0,
+    "stdout": "{\"authorization\": \"Current trusted policy and invocation gates remain required\", \"deadline_ceiling_unix\": 1789017364.3172212, \"deadline_unix\": 1789017364.3172212, \"investigation_id\": \"5ee494a8-c6d2-4269-beeb-9bdf8fbe3ccc\", \"limit_basis\": \"user\", \"remaining_requests\": 100, \"remaining_seconds\": 59.996, \"replanning_available\": true, \"request_ceiling\": 300, \"request_limit\": 100, \"reserved_requests\": 0, \"schema_version\": 2, \"started_attempts\": 0}",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "python3",
+      "investigation.py",
+      "review",
+      "/private/tmp/evm-forward-workflow-20260910/case5.sqlite",
+      "--plan",
+      "/private/tmp/evm-forward-workflow-20260910/case5-plan.json"
+    ],
+    "exit_code": 0,
+    "stdout": "{\"action\": \"limit_review_required\", \"final_delivery_eligible\": false, \"pending_dimensions\": [\"token_controls\", \"canonical_lp_principal_custody\", \"side_pool_removal_risk\", \"sellability_exit_depth\", \"current_concentration\", \"historical_launch_integrity\", \"admin_treasury_reward_custody\", \"reward_accounting_liveness\", \"utility_redemption_rights\"], \"projected_total_attempts\": 12, \"remaining_request_need\": 12, \"session\": {\"authorization\": \"Current trusted policy and invocation gates remain required\", \"deadline_ceiling_unix\": 1789017364.3172212, \"deadline_unix\": 1789017364.3172212, \"investigation_id\": \"5ee494a8-c6d2-4269-beeb-9bdf8fbe3ccc\", \"limit_basis\": \"user\", \"remaining_requests\": 100, \"remaining_seconds\": 59.933, \"replanning_available\": true, \"request_ceiling\": 300, \"request_limit\": 100, \"reserved_requests\": 0, \"schema_version\": 2, \"started_attempts\": 0}}",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "python3",
+      "investigation.py",
+      "replan",
+      "/private/tmp/evm-forward-workflow-20260910/case5.sqlite",
+      "--plan",
+      "/private/tmp/evm-forward-workflow-20260910/case5-plan.json",
+      "--reason",
+      "Synthetic refusal test: caller deadline cannot fit required 120 seconds"
+    ],
+    "exit_code": 2,
+    "stdout": "",
+    "stderr": "Investigation failed: replan requires a shortfall that fits the existing ceilings; review limits otherwise"
+  }
+]

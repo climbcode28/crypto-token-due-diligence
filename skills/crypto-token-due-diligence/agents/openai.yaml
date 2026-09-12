@@ -1,0 +1,4 @@
+interface:
+  display_name: "Crypto Token Due Diligence"
+  short_description: "Route token questions to EVM or Solana diligence"
+  default_prompt: "Use $crypto-token-due-diligence to assess this token and preserve all my questions when routing to the appropriate specialist."

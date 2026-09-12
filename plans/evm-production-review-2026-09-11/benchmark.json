@@ -1,0 +1,116 @@
+{
+  "comparison": "same current synthetic fixture, separate engines; no network or model execution",
+  "normalized_method_parameter_multisets_equal": true,
+  "before": {
+    "skill": "/tmp/evm-production-review-20260911/baseline/skills/crypto-evm-token-due-diligence",
+    "runs": [
+      {
+        "pipeline_compose_scaffold_seconds": 0.4266909579746425,
+        "rpc_requests": 78,
+        "charged_attempts": 87,
+        "web_twenty_captures_seconds": 0.0443965420126915,
+        "pipeline_findings": 0
+      },
+      {
+        "pipeline_compose_scaffold_seconds": 0.41070395905990154,
+        "rpc_requests": 78,
+        "charged_attempts": 87,
+        "web_twenty_captures_seconds": 0.04522895789705217,
+        "pipeline_findings": 0
+      },
+      {
+        "pipeline_compose_scaffold_seconds": 0.4607084169983864,
+        "rpc_requests": 78,
+        "charged_attempts": 87,
+        "web_twenty_captures_seconds": 0.04192487499676645,
+        "pipeline_findings": 0
+      },
+      {
+        "pipeline_compose_scaffold_seconds": 0.40164829208515584,
+        "rpc_requests": 78,
+        "charged_attempts": 87,
+        "web_twenty_captures_seconds": 0.06779362505767494,
+        "pipeline_findings": 0
+      },
+      {
+        "pipeline_compose_scaffold_seconds": 0.40105562494136393,
+        "rpc_requests": 78,
+        "charged_attempts": 87,
+        "web_twenty_captures_seconds": 0.028525249916128814,
+        "pipeline_findings": 0
+      },
+      {
+        "pipeline_compose_scaffold_seconds": 0.41862466698512435,
+        "rpc_requests": 78,
+        "charged_attempts": 87,
+        "web_twenty_captures_seconds": 0.036292166099883616,
+        "pipeline_findings": 0
+      },
+      {
+        "pipeline_compose_scaffold_seconds": 0.39879770798143,
+        "rpc_requests": 78,
+        "charged_attempts": 87,
+        "web_twenty_captures_seconds": 0.044129832996986806,
+        "pipeline_findings": 0
+      }
+    ],
+    "median_pipeline_seconds": 0.41070395905990154,
+    "median_web_seconds": 0.044129832996986806
+  },
+  "after": {
+    "skill": "skills/crypto-evm-token-due-diligence",
+    "runs": [
+      {
+        "pipeline_compose_scaffold_seconds": 0.45909866702277213,
+        "rpc_requests": 78,
+        "charged_attempts": 87,
+        "web_twenty_captures_seconds": 0.034088041982613504,
+        "pipeline_findings": 0
+      },
+      {
+        "pipeline_compose_scaffold_seconds": 0.43893120798747987,
+        "rpc_requests": 78,
+        "charged_attempts": 87,
+        "web_twenty_captures_seconds": 0.04470433294773102,
+        "pipeline_findings": 0
+      },
+      {
+        "pipeline_compose_scaffold_seconds": 0.4864021249813959,
+        "rpc_requests": 78,
+        "charged_attempts": 87,
+        "web_twenty_captures_seconds": 0.04452104202937335,
+        "pipeline_findings": 0
+      },
+      {
+        "pipeline_compose_scaffold_seconds": 0.5112644999753684,
+        "rpc_requests": 78,
+        "charged_attempts": 87,
+        "web_twenty_captures_seconds": 0.04994516703300178,
+        "pipeline_findings": 0
+      },
+      {
+        "pipeline_compose_scaffold_seconds": 0.43840037507470697,
+        "rpc_requests": 78,
+        "charged_attempts": 87,
+        "web_twenty_captures_seconds": 0.04231912503018975,
+        "pipeline_findings": 0
+      },
+      {
+        "pipeline_compose_scaffold_seconds": 0.4269165830919519,
+        "rpc_requests": 78,
+        "charged_attempts": 87,
+        "web_twenty_captures_seconds": 0.04363433306571096,
+        "pipeline_findings": 0
+      },
+      {
+        "pipeline_compose_scaffold_seconds": 0.41635779093485326,
+        "rpc_requests": 78,
+        "charged_attempts": 87,
+        "web_twenty_captures_seconds": 0.049962582997977734,
+        "pipeline_findings": 0
+      }
+    ],
+    "median_pipeline_seconds": 0.43893120798747987,
+    "median_web_seconds": 0.04452104202937335
+  }
+}

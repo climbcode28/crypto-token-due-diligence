@@ -1,0 +1,114 @@
+from pathlib import Path
+import copy
+import json
+import sys
+import unittest
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'scripts'))
+from solana_quotes import size_policy,estimate,quote_url,public_quote
+from solana_common import TOKEN_PROGRAM,TOKEN_2022
+from pool_fixture import fixture,batch,key
+from meteora_fixture import clock
+from adapters.meteora_common import CLOCK
+from test_solana_raydium import mutate
+from test_solana_discovery import capture
+
+
+class QuoteTests(unittest.TestCase):
+    def test_three_sizes_user_priority_price_exact_units_and_fallback(self):
+        target,a,v=fixture();p=batch(v)[target['mint']]
+        price={'genesis_hash':target['genesis_hash'],'price_denominator_mint':target['mint'],'price_usd':'2.50','captured_at':1000,'evidence':['price']}
+        result=size_policy(target,p,price=price,now=1001)
+        self.assertEqual([r['input_atomic'] for r in result['sizes']],['40000000','400000000','4000000000'])
+        result=size_policy(target,p,user_sizes=['0.000001','2','3'],price=price,now=1001)
+        self.assertEqual([r['input_atomic'] for r in result['sizes']],['1','2000000','3000000'])
+        result=size_policy(target,p,user_sizes=['7'])
+        self.assertEqual(result['sizes'][0]['input_atomic'],'7000000');self.assertEqual(len(result['sizes']),3)
+        for altered in ({**price,'price_denominator_mint':key(9)},{**price,'genesis_hash':key(9)},{**price,'captured_at':600},{**price,'conflicts':[{'other':1}]}):
+            result=size_policy(target,p,price=altered,now=1001)
+            self.assertEqual(result['basis'],'illustrative_token_quantity_probes');self.assertTrue(result['gaps'])
+        with self.assertRaises(ValueError):size_policy(target,p,user_sizes=['0.0000001'])
+
+    def test_cpmm_golden_rounding_and_input_output_creator_fee(self):
+        for mode,outputs in [(0,['196','1812','9924']),(2,['195','1811','9922'])]:
+            target,a,v=fixture();v[CLOCK]=clock();v[a['pool']]=mutate(v[a['pool']],389,bytes([mode]))
+            for quantity,expected in zip(['100','1000','10000'],outputs):
+                r=estimate(target,'raydium_cpmm',a['pool'],batch(v),quantity)
+                self.assertEqual(r['status'],'modeled',r);self.assertEqual(r['output_atomic'],expected)
+                self.assertLess(int(r['minimum_output_atomic']),int(expected));self.assertFalse(r['execution_observed'])
+            self.assertEqual(r['fees']['trade_input_atomic'],'25');self.assertEqual(r['fees']['creator_atomic'],'5')
+            self.assertEqual(r['fees']['protocol_input_atomic'],'3');self.assertEqual(r['fees']['fund_input_atomic'],'1')
+
+    def test_quote_refuses_missing_fee_clock_frozen_disabled_or_token2022_state(self):
+        for case in ('fee','clock','frozen','disabled','token22','unknown_tail','future_time'):
+            target,a,v=fixture();v[CLOCK]=clock()
+            if case=='fee':del v[a['config']]
+            if case=='clock':del v[CLOCK]
+            if case=='frozen':v[a['vaults'][0]]=mutate(v[a['vaults'][0]],108,b'\2')
+            if case=='disabled':v[a['pool']]=mutate(v[a['pool']],329,b'\4')
+            if case=='token22':v[a['mints'][0]]['owner']=TOKEN_2022
+            if case=='unknown_tail':v[a['pool']]=mutate(v[a['pool']],636,b'\1')
+            if case=='future_time':v[a['pool']]=mutate(v[a['pool']],373,(1001).to_bytes(8,'little'))
+            r=estimate(target,'raydium_cpmm',a['pool'],batch(v),'1000')
+            self.assertIsNone(r['output_atomic'],case);self.assertTrue(r['gaps'])
+        target,a,v=fixture()
+        for family in ('raydium_clmm','orca_whirlpool','meteora_dlmm','meteora_damm_v2','raydium_amm_v4'):
+            r=estimate(target,family,a['pool'],batch(v),'1000')
+            self.assertIsNone(r['output_atomic']);self.assertTrue(r['gaps'])
+
+    def quote(self,source):
+        target,a,_=fixture();url=quote_url(source,target,a['mints'][1],'1000')
+        if source=='jupiter_v2':
+            body={'inputMint':target['mint'],'outputMint':a['mints'][1],'inAmount':'1000','outAmount':'500','otherAmountThreshold':'497',
+                  'slippageBps':50,'swapMode':'ExactIn','transaction':None,'priceImpact':'-0.1','feeBps':0,'feeMint':target['mint'],
+                  'routePlan':[{'swapInfo':{'ammKey':a['pool'],'inputMint':target['mint'],'outputMint':a['mints'][1],'feeAmount':'3','feeMint':target['mint']},'percent':100}]}
+        else:
+            body={'version':'V1','success':True,'data':{'inputMint':target['mint'],'outputMint':a['mints'][1],'inputAmount':'1000','outputAmount':'500',
+                'otherAmountThreshold':'497','slippageBps':50,'swapType':'BaseIn','priceImpactPct':0.0012,
+                'routePlan':[{'poolId':a['pool'],'inputMint':target['mint'],'outputMint':a['mints'][1],'feeAmount':'3','feeMint':target['mint']}]}}
+        return target,a,url,body
+
+    def test_public_quotes_keep_thresholds_fee_scopes_context_and_impact_units(self):
+        for source in ('jupiter_v2','raydium_quote'):
+            target,a,url,body=self.quote(source);rec,raw=capture(body,url)
+            q=public_quote(source,target,rec,raw,a['mints'][1],'1000')
+            self.assertEqual(q['output_atomic'],'500');self.assertEqual(q['minimum_output_atomic'],'497')
+            self.assertIsNone(q['context_slot']);self.assertEqual(q['route'][0]['pool'],a['pool'])
+            self.assertNotIn('taker',url);self.assertNotIn('wallet',url);self.assertFalse(q['execution_observed'])
+            if source=='jupiter_v2':self.assertEqual(q['price_impact_fraction'],{'numerator':'-1','denominator':'1000'})
+            else:self.assertIsNone(q['price_impact_fraction'])
+
+    def test_captured_quote_bytes_input_route_and_transaction_assembly_attacks(self):
+        for kind in ('transaction','input','mint','route','threshold','hash','url','leg'):
+            target,a,url,body=self.quote('jupiter_v2')
+            if kind=='transaction':body['transaction']='serialized-transaction'
+            if kind=='input':body['inAmount']='1001'
+            if kind=='mint':body['outputMint']=key(90)
+            if kind=='route':body['routePlan'][0]['swapInfo']['outputMint']=key(90)
+            if kind=='leg':body['routePlan'][0]=None
+            if kind=='threshold':body['otherAmountThreshold']='501'
+            rec,raw=capture(body,url)
+            if kind=='hash':rec['sha256']='f'*64
+            if kind=='url':rec['url']+='&taker='+key(9)
+            with self.assertRaises(ValueError):public_quote('jupiter_v2',target,rec,raw,a['mints'][1],'1000')
+
+    def test_quoted_price_with_error_or_missing_rfq_route_is_not_execution(self):
+        target,a,url,body=self.quote('jupiter_v2');body.update(transaction='',errorCode=1,routePlan=[])
+        rec,raw=capture(body,url);q=public_quote('jupiter_v2',target,rec,raw,a['mints'][1],'1000')
+        self.assertEqual(q['status'],'quote_with_execution_error');self.assertEqual(q['output_atomic'],'500');self.assertTrue(q['gaps'])
+
+    def test_quote_preset_and_tiny_input_fee_rounding(self):
+        from solana_presets import quote_sample
+        target,a,v=fixture();v[CLOCK]=clock();obs=batch(v)
+        plan=quote_sample('raydium_cpmm',a['pool'],obs[a['pool']])
+        self.assertEqual(len(plan),1);self.assertIn(CLOCK,plan[0]['params'][0])
+        r=estimate(target,'raydium_cpmm',a['pool'],obs,'1')
+        self.assertIsNone(r['output_atomic']);self.assertIn('fees round input to zero',r['gaps'])
+
+    def test_zero_combined_fee_respects_pinned_split_failure(self):
+        target,a,v=fixture();v[CLOCK]=clock()
+        v[a['config']]=mutate(v[a['config']],12,bytes(8));v[a['config']]=mutate(v[a['config']],108,bytes(8))
+        r=estimate(target,'raydium_cpmm',a['pool'],batch(v),'1000')
+        self.assertIsNone(r['output_atomic']);self.assertIn('pinned CPMM input fee split has zero denominator',r['gaps'])
+
+
+if __name__=='__main__':unittest.main()

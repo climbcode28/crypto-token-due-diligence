@@ -1,0 +1,109 @@
+{
+  "commit": "fc6020193f1471af0f6c49e0ca54b625e624eebf",
+  "measurement": "offline synthetic baseline; no provider checks or live collection",
+  "preexisting_changes": [
+    "plans/solana-evm-parity-plan-2026-09-11.md (untracked)"
+  ],
+  "python": "3.14.7 (main, Aug  5 2026, 10:29:49) [Clang 21.0.0 (clang-2100.1.1.101)]",
+  "sha256": {
+    "skills/crypto-evm-token-due-diligence/references/adoption-and-assessment.md": "69ca80af06c30fa5f57a81da17cf6481b8552b90ca82be50fe429df7baad4ea1",
+    "skills/crypto-evm-token-due-diligence/references/bundle-format.md": "11aab9ddb2aacbbf35ff05e9f87590d5fa64ea511b80eed0f1483374a0071cdc",
+    "skills/crypto-evm-token-due-diligence/references/completion-and-delivery.md": "892b29bab47e0eb2c31d946d8c9c1c72b567026594ff1591b9ca2e8a15dcbbac",
+    "skills/crypto-evm-token-due-diligence/references/compose.md": "030db67f31bdbd73944964608d922d9af814417d8b7ae3fea623d19fd799e4fa",
+    "skills/crypto-evm-token-due-diligence/references/core-surfaces.md": "04af0ee8993e8eea36e365e76ea0be0ee563721008c53a15b871196cd60a3286",
+    "skills/crypto-evm-token-due-diligence/references/decision-review.md": "3438411d1cb9cd01ffb5965ddc2d727f45afea6ffa7d6090f533a5da07b39f66",
+    "skills/crypto-evm-token-due-diligence/references/dependencies-redemption.md": "af14e15b8313df7f5acadf6d77231275e71ddc537a9b7283e98d3c7cadee9a69",
+    "skills/crypto-evm-token-due-diligence/references/deterministic-backend.md": "a5d78540658866c2418b5947fcada43ee8b97dcda1211e901a71499fa8f3e609",
+    "skills/crypto-evm-token-due-diligence/references/evidence-and-output.md": "f299db73dc5d868a3b3d161019d9600047fd2725234af9ee1157cf3d9ab95b36",
+    "skills/crypto-evm-token-due-diligence/references/examples.md": "59cadd55fb44a1c9fc45c0e8c1ddefda532898701dbe6f0d321857d59c66c7db",
+    "skills/crypto-evm-token-due-diligence/references/fees-and-proceeds.md": "98b51f4e9810ae384a4484d769ab365ebb91804822a28aeb7e0d838dc34085a7",
+    "skills/crypto-evm-token-due-diligence/references/holder-replay.md": "fa92d75a8376c29bee6f5c1008a4d3eef26fa4c599e67b26ded6c3db6b27497f",
+    "skills/crypto-evm-token-due-diligence/references/improvement-loop.md": "92f21c15c533ac948e58a38d4d9b48f48bac21c06717dd81ebebda964092ca21",
+    "skills/crypto-evm-token-due-diligence/references/launch-cohort.md": "012e1acc00721e4fedc091d81c25eb2ea253da32bde8d0ae5b2aa265a7e9ce5f",
+    "skills/crypto-evm-token-due-diligence/references/operational-attribution.md": "58130475da2b2f8a9bd2af10fff1da85fec78c76f985f85c62ae2ffde3e0d88f",
+    "skills/crypto-evm-token-due-diligence/references/platforms.md": "b8915f8cb22c762a1071e3f3efcfef55652ba0aceef78558351c7263c9c1a1aa",
+    "skills/crypto-evm-token-due-diligence/references/pool-history.md": "558d53de066ba903a662b3311601f3db5a2f392cdc7cf4e2f100e8098154c878",
+    "skills/crypto-evm-token-due-diligence/references/project-credibility.md": "325f3ba69f96821df205ee6aaf1745a3e45d095096f20f6143725da134e2b803",
+    "skills/crypto-evm-token-due-diligence/references/proxy-bytecode.md": "eb7c7db29f92f2bc2994996042e6713c43554c2e9b2f138e824e401224b9c968",
+    "skills/crypto-evm-token-due-diligence/references/report-replay.md": "f9197aa87e9e836a2ef0c3bbe78cb6af894b62e92b764aa0264f98343138c2e7",
+    "skills/crypto-evm-token-due-diligence/references/reporting-scenarios.md": "73c59879aa995367f15b46b15589e4db9b2b4b1cba7d2246183a17638bf4a1c6",
+    "skills/crypto-evm-token-due-diligence/references/reward-accounting.md": "fa6068cb6f951979c4935f289c0bde315277027ff8b8503436e3807053e02b16",
+    "skills/crypto-evm-token-due-diligence/references/runbook.md": "a5fe6dda98be1108ef97104252a91b7c53d1e9d9e2672a2628a686b8e44b445b",
+    "skills/crypto-evm-token-due-diligence/references/simulation.md": "dbcdd999445900f008dc58c1c5de4d3e48fa29ca913cadc4d113dc34216aa8dc",
+    "skills/crypto-evm-token-due-diligence/references/source-routing-and-execution.md": "0f488d74dc67a6a7fb5c9a94889c114143bdedf43a4a0152f05cfd6dc28bf54c",
+    "skills/crypto-evm-token-due-diligence/references/stopping-and-escalation.md": "86e492fbd265eb83778e2947caa8fa85d352b23c25a46ada91b86ab68c47c0f8",
+    "skills/crypto-evm-token-due-diligence/references/strict-report-profile.md": "67f382ecadefe128b3b962cb198e991e50ed2538804a054b75f4f39de3f669f6",
+    "skills/crypto-evm-token-due-diligence/references/supported-research-flow.md": "a1f11305393b5bfb0f346657ffa7b9fe2e232de1596fd6fea8064695bea8c7e6",
+    "skills/crypto-evm-token-due-diligence/scripts/backend_common.py": "0ba4ccef424cbc43b1a5a6cd6d907273ef5ade1906035a3887d52aa0d6cb1a0d",
+    "skills/crypto-evm-token-due-diligence/scripts/bootstrap.py": "a5146a4bf85f64c10c48a1eea4fa45c81bf6c9d312da07f758db5e42e6e340ed",
+    "skills/crypto-evm-token-due-diligence/scripts/broad_collect.py": "9dc9d41323415d535a15f2b7565a86b9a7cfdcbff77f9e1ce00d6b30909a92a1",
+    "skills/crypto-evm-token-due-diligence/scripts/bundle_assemble.py": "8300fed6ecc3d5e87b62ed90a8614efd28a3584a39cf9ee959260b6297cff607",
+    "skills/crypto-evm-token-due-diligence/scripts/compose.py": "df8578083f94be068e9e4bd6d7b6ce8733aba22ecbfa3ee11f76bc0f2d56c42c",
+    "skills/crypto-evm-token-due-diligence/scripts/detect.py": "8b6b8f411faa374ce25fb6cfffafb8ada112b2e9890f03d494f03a2f26082703",
+    "skills/crypto-evm-token-due-diligence/scripts/evm_decode.py": "7de8b718b7c00b78ca5e506a1cef237f459247ffc37359a613e2b64bec1caa55",
+    "skills/crypto-evm-token-due-diligence/scripts/facts.py": "40a9823423e66abe204706b040c6a059ed85ffbe0cde108a447cb0db14498fb9",
+    "skills/crypto-evm-token-due-diligence/scripts/investigation.py": "25cc74fd7ca6879c1638ff95ff42d2e89d9abd933d198684f1baf88c9346f9f3",
+    "skills/crypto-evm-token-due-diligence/scripts/keccak.py": "9a7d92741274f8be90e19eee6b7e9886ae1b73ace61f5f78237967efbb3ee483",
+    "skills/crypto-evm-token-due-diligence/scripts/maintain.py": "cfb02bc12d1c9d4526f81fe3b36768f8dc0babe900caa917dd0d18a91ce252e7",
+    "skills/crypto-evm-token-due-diligence/scripts/operations.py": "73ffea0be6ba369885a10b1c5380dbcf23c1ea183b339f6d34fa47a6674b9111",
+    "skills/crypto-evm-token-due-diligence/scripts/pipeline_note.py": "3b69d9ee14e250d0937bb219c90a1cef4acb7e32b08a75e3821270264fcee50a",
+    "skills/crypto-evm-token-due-diligence/scripts/presets.py": "690ab1f9404ac9093cedb794dffe0e224ace21e2a7cbb1d33ec5b995ced62ba5",
+    "skills/crypto-evm-token-due-diligence/scripts/provider_context.py": "1ac21dbae3f17a689f94bae09df9483c1a52dcc2d584fdb60402e53a0f649b09",
+    "skills/crypto-evm-token-due-diligence/scripts/render_legacy_v1.py": "f41e1aa6e64e161d5ed8ae4bf0c16bbc04640c0d3972c4344dc6069f6e98c275",
+    "skills/crypto-evm-token-due-diligence/scripts/render_report.py": "26d07c6d98112de8842eb2471e618d6e55b921fb18a33c21fc20c96e8de60207",
+    "skills/crypto-evm-token-due-diligence/scripts/report_profile.py": "5c8e170c9dfe98c37996fb9b2a3381a6b3f3d723e6f4456f801689323ef13ee4",
+    "skills/crypto-evm-token-due-diligence/scripts/report_replay.py": "f050a4d3658c7da9abd141e2d2ad7d17e54955291ee3446b84e255d3a36b0b5b",
+    "skills/crypto-evm-token-due-diligence/scripts/rpc_collect.py": "69634080eeb14c45dfc5c56add212ed6e11976c83a721ce4f88ac3693d16137a",
+    "skills/crypto-evm-token-due-diligence/scripts/rpc_wire.py": "f8a96900e3f1298c4f8900c4e2bcd101a8ec645ac73ad805ca5aae67a7a3f159",
+    "skills/crypto-evm-token-due-diligence/scripts/sale_decode.py": "9dda35d406f2acf0ac7b4ca006b773c6993f6255a7fe19baab1fa01ebdb55d72",
+    "skills/crypto-evm-token-due-diligence/scripts/scaffold.py": "ee3f4ca6c0043fb927ffc2c3e1a5fd1b93bc5e096dfd4f57fe30027c440a13e5",
+    "skills/crypto-evm-token-due-diligence/scripts/source_lookup.py": "dc22e6be4334b5530518b496d3478822982136381b95e876890f9165e6c1ffa1",
+    "skills/crypto-evm-token-due-diligence/scripts/validate_bundle.py": "001c8a40893bae48ba2daf29aff904c750eb3b31c1a99c89f9af07aaffb05c02",
+    "skills/crypto-evm-token-due-diligence/scripts/web_capture.py": "1e420c0dcb822a61a7748419e2831ff24b033ff35c49f4b3fdc467d74114c952",
+    "skills/crypto-solana-token-due-diligence/references/evidence-and-tools.md": "446e1b2546f4e1466c788832cd3e55183b741b645642e1c0808db0b7186d5da9",
+    "skills/crypto-solana-token-due-diligence/references/surfaces.md": "a320b0992cb99a05dfe34dcd33454e7fc53ecd1ba571ad2c6c764e988b5ac8b8",
+    "skills/crypto-solana-token-due-diligence/scripts/solana_bundle.py": "4f658b6610a5315ab12b80f53ebb4811796f55d1053faed49ccea555bd958e73",
+    "skills/crypto-solana-token-due-diligence/scripts/solana_collect.py": "aed536c52ec8a12f88e538d46af178dcd084fd9a605a8d30824406ab8b0f6870",
+    "skills/crypto-solana-token-due-diligence/scripts/solana_common.py": "466839e35022b42f1b0331c92cf684000f8c09bc7568463fb5e5260359b84586",
+    "skills/crypto-token-due-diligence/scripts/route.py": "652d4e627953ca382728be26970f2f6c45ccd57e9dd2d51328f56525b430c49f"
+  },
+  "suites": [
+    {
+      "result": "OK",
+      "seconds": 0.638,
+      "skill": "crypto-token-due-diligence",
+      "tests": 30
+    },
+    {
+      "result": "OK",
+      "seconds": 19.008,
+      "skill": "crypto-evm-token-due-diligence",
+      "tests": 428,
+      "warnings": [
+        "HTTPError 429 and 403 temporary-file ResourceWarning"
+      ]
+    },
+    {
+      "result": "OK",
+      "seconds": 2.002,
+      "skill": "crypto-solana-token-due-diligence",
+      "tests": 23
+    }
+  ],
+  "versions": {
+    "date": "2026-09-11",
+    "dependency": "crypto-evm-token-due-diligence transport; self-contained timing policy with inherited router deadlines",
+    "engine_version": "1.0.0",
+    "limits": {
+      "concurrency": 3,
+      "default_seconds": 30,
+      "maximum_requests": 24,
+      "maximum_seconds": 55
+    },
+    "packet_schema_version": 1,
+    "provider_workflow_version": "1.1.0",
+    "review_record": "../../../plans/token-diligence-router-2026-09-11.md",
+    "validation_scope": "Offline synthetic tests; not a detection-accuracy or live-latency benchmark",
+    "workflow_version": "1.0.1"
+  }
+}

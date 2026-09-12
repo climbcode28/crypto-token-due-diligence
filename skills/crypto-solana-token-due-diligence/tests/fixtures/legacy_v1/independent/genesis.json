@@ -1,0 +1,13 @@
+{
+  "request": {
+    "id": "genesis",
+    "jsonrpc": "2.0",
+    "method": "getGenesisHash",
+    "params": []
+  },
+  "response": {
+    "id": "genesis",
+    "jsonrpc": "2.0",
+    "result": "8qbHbw2BbbTHBW1sbeqakYXVKRQM8Ne7pLK7m6CVfeR"
+  }
+}

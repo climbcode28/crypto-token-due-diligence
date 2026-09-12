@@ -1,0 +1,83 @@
+{
+  "collection_sha256": null,
+  "engine_version": "1.0.0",
+  "evidence": [
+    {
+      "artifact": "genesis.json",
+      "id": "genesis",
+      "kind": "rpc",
+      "sha256": "5f300968a7f43da73fb4ce0cf4dcab44ff6f3c2bff34173455b122f222929963",
+      "source": "offline synthetic fixture",
+      "subject": {
+        "family": "solana",
+        "genesis_hash": "8qbHbw2BbbTHBW1sbeqakYXVKRQM8Ne7pLK7m6CVfeR",
+        "mint": "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi"
+      },
+      "time_basis": "finalized slot 100; synthetic"
+    },
+    {
+      "artifact": "mint.json",
+      "id": "mint",
+      "kind": "rpc",
+      "sha256": "6f36e44a5e7a115b34366afcd80add58b1ba857208f53a007c5369529d0f9b16",
+      "source": "offline synthetic fixture",
+      "state": {
+        "block_evidence_id": "block",
+        "block_recheck_evidence_id": "block_recheck",
+        "commitment": "finalized",
+        "slot": 100
+      },
+      "subject": {
+        "family": "solana",
+        "genesis_hash": "8qbHbw2BbbTHBW1sbeqakYXVKRQM8Ne7pLK7m6CVfeR",
+        "mint": "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi"
+      },
+      "time_basis": "finalized slot 100; synthetic"
+    },
+    {
+      "artifact": "block.json",
+      "id": "block",
+      "kind": "rpc",
+      "sha256": "1a484bfd90a694b0c7da8605f14f2abb6edf43e8dd488bf96cf8bc897bd8fba6",
+      "source": "offline synthetic fixture",
+      "subject": {
+        "family": "solana",
+        "genesis_hash": "8qbHbw2BbbTHBW1sbeqakYXVKRQM8Ne7pLK7m6CVfeR",
+        "mint": "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi"
+      },
+      "time_basis": "finalized slot 100; synthetic"
+    },
+    {
+      "artifact": "block_recheck.json",
+      "id": "block_recheck",
+      "kind": "rpc",
+      "sha256": "c543800d7a951d3dcf74756d541bed8c852f90f69a5d75383ee033f16570a51d",
+      "source": "offline synthetic fixture",
+      "subject": {
+        "family": "solana",
+        "genesis_hash": "8qbHbw2BbbTHBW1sbeqakYXVKRQM8Ne7pLK7m6CVfeR",
+        "mint": "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi"
+      },
+      "time_basis": "finalized slot 100; synthetic"
+    }
+  ],
+  "identity_evidence": [
+    "genesis",
+    "mint"
+  ],
+  "limitations": [
+    "Initial packet only; all broad dimensions need research and reconciliation."
+  ],
+  "safety": {
+    "no_broadcast": true,
+    "no_real_keys": true,
+    "no_real_signing": true
+  },
+  "schema_version": 1,
+  "synthetic": true,
+  "target": {
+    "family": "solana",
+    "genesis_hash": "8qbHbw2BbbTHBW1sbeqakYXVKRQM8Ne7pLK7m6CVfeR",
+    "mint": "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi"
+  }
+}

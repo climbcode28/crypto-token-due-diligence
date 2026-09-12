@@ -1,0 +1,262 @@
+"""Rebuild a strict draft from one durable session; never manufacture missing captures."""
+import base64,json,time
+from pathlib import Path
+from urllib.parse import urlsplit
+from solana_common import sha,need
+from solana_session import Session,utc
+from solana_profile import Evidence,PROFILE,DIMENSIONS,normalized_status,validate_report
+from solana_facts import encoded,atomic
+from solana_compose import empty_coverage,draft_lock,save_pair
+from solana_wire import validate_response
+from solana_derivations import compute,VERSION
+from solana_programs import observed_account
+
+ADAPTERS=('raydium_cpmm','raydium_amm_v4','raydium_clmm','orca_whirlpool','meteora_dlmm','meteora_damm_v2','pump_curve','pumpswap')
+
+
+class Importer:
+    def __init__(self,session_root):
+        self.session=Session(session_root);self.root=self.session.root/'draft';self.root.mkdir(exist_ok=True);s=self.session.meta
+        self.m={'schema_version':2,'profile':PROFILE,'target':s['target'],'investigation_id':s['investigation_id'],'synthetic':s['synthetic'],
+          'intake':{k:s[k] for k in ('target','investigation_id','question','focus','urls','scope','received_at','target_at','deadline_at','user_hard_deadline')},
+          'artifacts':[],'observations':[],'samples':[],'derivations':[],'attempts':[],'lanes':[],'network_checks':None,'header_checks':[]}
+        self.objects={};self.obs={};self.checked={};self.errors=[];self.critical={};self.intents={}
+
+    def artifact(self,name,data):
+        name='evidence/'+sha(data)+'-'+name;path=self.root/name
+        need(not (self.root/'evidence').is_symlink(),'symlink evidence directory')
+        if path.exists():need(not path.is_symlink() and path.read_bytes()==data,'immutable imported artifact changed')
+        else:atomic(path,data)
+        if not any(r['path']==name for r in self.m['artifacts']):self.m['artifacts'].append({'path':name,'sha256':sha(data),'bytes':len(data)})
+        return name
+
+    def subject(self,kind='mint',address=None):return {'genesis_hash':self.m['target']['genesis_hash'],'kind':kind,'address':address or self.m['target']['mint']}
+
+    def rpc(self):
+        ledger=self.session.observations()
+        # Bodies already have immutable observation artifacts. Preserve every attempt,
+        # including lost workers, without duplicating potentially large response bodies.
+        self.artifact('attempts.json',encoded([{**{k:v for k,v in a.items() if k!='response'},'response_sha256':sha(a['response'].encode()) if a['response'] else None} for a in ledger]))
+        for path in sorted((self.session.root/'sample-plans').glob('*.json')):
+            plan=json.loads(path.read_text());sample=plan['sample_id']
+            for r in plan['reads']:
+                if r['critical']:self.critical[sample+'_'+r['name']]=True
+        for a in ledger:
+            if a['transport_kind']!='rpc' or a['response'] is None:continue
+            p=json.loads(a['response']);eid=p['request']['id']
+            if a['completed_at'] is None:continue
+            p.update(started_at=a['started_at'],completed_at=a['completed_at']);req=p['request'];method=req['method']
+            path=self.artifact(eid+'.json',encoded(p));sub=self.subject()
+            if method in ('getAccountInfo','getTokenSupply','getTokenLargestAccounts','getSignaturesForAddress','getTokenAccountsByOwner','getProgramAccounts'):
+                sub=self.subject('wallet' if method in ('getSignaturesForAddress','getTokenAccountsByOwner') else 'program' if method=='getProgramAccounts' else 'mint',req['params'][0])
+            elif method=='getMultipleAccounts':sub=self.subject('mint',req['params'][0][0])
+            status=normalized_status(p)
+            if p['status']=='ok':
+                try:c=validate_response(req,p['response']);self.checked[eid]=c;status=c['status']
+                except ValueError:status='invalid'
+            o={'id':eid,'kind':'rpc','subject':sub,'status':status,'artifact':path,'sha256':sha(encoded(p)),
+               'captured_at':utc(a['completed_at']),'synthetic':self.m['synthetic'],'source':{'namespace':a['source'],'owner':'pipeline'},'request_id':eid,'sample_id':None}
+            self.obs[eid]=o;self.objects[eid]=p;self.m['observations'].append(o)
+            dimension='current_concentration' if method=='getTokenLargestAccounts' else 'historical_launch_integrity' if method=='getSignaturesForAddress' else 'sellability_exit_depth' if method=='getTransaction' else 'token_controls'
+            self.m['attempts'].append({'id':'a-'+str(a['id']),'evidence_id':eid,'dimension':dimension,'owner':'pipeline','status':status,'route':'primary','source':a['source']})
+        self.pin()
+
+    def pin(self):
+        successful=[eid for eid,c in self.checked.items() if c['status']=='ok']
+        genesis=[eid for eid in successful if self.objects[eid]['request']['method']=='getGenesisHash']
+        genesis.sort(key=lambda eid:self.objects[eid]['started_at'])
+        if len(genesis)>=2 and self.objects[genesis[0]]['completed_at']<self.objects[genesis[-1]]['started_at']:
+            self.m['network_checks']={'initial_evidence_id':genesis[0],'recheck_evidence_id':genesis[-1]}
+        headers={}
+        for eid in successful:
+            p=self.objects[eid]
+            if p['request']['method']=='getBlock':headers.setdefault(p['request']['params'][0],[]).append(eid)
+        pairs={}
+        for slot,ids in headers.items():
+            ids.sort(key=lambda eid:self.objects[eid]['started_at'])
+            if len(ids)>=2 and self.objects[ids[0]]['completed_at']<self.objects[ids[-1]]['started_at']:
+                pairs[slot]=(ids[0],ids[-1]);self.m['header_checks'].append({'initial_evidence_id':ids[0],'recheck_evidence_id':ids[-1]})
+        for eid in successful:
+            c=self.checked[eid]
+            if 'context_slot' not in c:continue
+            p=self.objects[eid];slot=c['context_slot'];h,r=pairs.get(slot,(None,None));critical=self.critical.get(eid.rsplit('_',1)[0],False)
+            sid='s-'+eid;self.obs[eid]['sample_id']=sid
+            stamp=self.objects[h]['response']['result'].get('blockTime') if h else None
+            pinned=bool(h and self.m['network_checks'] and stamp is not None and -60<=p['completed_at']-stamp<=300)
+            self.m['samples'].append({'id':sid,'observation_id':eid,'context_slot':slot,'addresses':c.get('addresses',[]),'address_indices':c.get('address_indices',{}),
+                'encoding':'base64' if p['request']['method'] in ('getAccountInfo','getMultipleAccounts','getTokenAccountsByOwner','getProgramAccounts') else 'json',
+                'commitment':'finalized','captured_at':self.obs[eid]['captured_at'],'block_evidence_id':h,'block_recheck_evidence_id':r,'critical':critical,
+                'recheck_of':None,'status':'pinned' if pinned else 'partial'})
+        used=set()
+        for s in self.m['samples']:
+            if not s['critical']:continue
+            p=self.objects[s['observation_id']];prefix=p['request']['id'].split('_',1)[0]+'_critical_'
+            candidates=[x for x in self.m['samples'] if x['observation_id'].startswith(prefix) and x['id'] not in used and
+                self.objects[x['observation_id']]['started_at']>p['completed_at'] and set(s['addresses'])<=set(x['addresses'])]
+            if candidates:
+                chosen=min(candidates,key=lambda x:self.objects[x['observation_id']]['started_at']);chosen['recheck_of']=s['id'];used.add(chosen['id'])
+                if chosen['status']!='pinned':s['status']='partial'
+            else:s['status']='partial'
+
+    def web(self):
+        for path in sorted((self.session.root/'web-captures').glob('*.json')):
+            record=json.loads(path.read_text())
+            if not record.get('captured_at') or not record.get('sha256'):continue
+            raw=(self.session.root/record['raw']).read_bytes() if record.get('raw') else b''
+            need(sha(raw)==record['sha256'] and len(raw)==record['bytes'],'web capture changed')
+            eid=record['id'];artifact=self.artifact(eid+'.raw',raw);o={'id':eid,'kind':'document','subject':self.subject('document'),
+                'status':normalized_status(record),'artifact':artifact,'sha256':sha(raw),'captured_at':utc(record['captured_at']),'synthetic':self.m['synthetic'],
+                'source':{'capture':record,'owner':'shared' if record['owner']=='ordinary' else record['owner']},'sample_id':None}
+            self.obs[eid]=o;self.objects[eid]={'record':record,'raw':raw};self.m['observations'].append(o)
+            dim='canonical_lp_principal_custody' if urlsplit(record['url']).hostname in ('api.dexscreener.com','api.geckoterminal.com') else 'development_disclosure'
+            route='alternate' if 'geckoterminal.com' in record['url'] else 'primary'
+            self.m['attempts'].append({'id':'capture-'+sha(eid.encode())[:24],'evidence_id':eid,'dimension':dim,'owner':'pipeline' if record['owner']=='ordinary' else record['owner'],
+                'status':o['status'],'route':route,'source':urlsplit(record['url']).hostname})
+
+    def derive(self,eid,operation,params,sub=None):
+        used=set()
+        def resolve(ident):used.add(ident);return self.objects[ident]
+        try:
+            value=compute(operation,params,self.m['target'],resolve);need(bool(used),'derivation needs actual inputs')
+        except (ValueError,KeyError,TypeError,IndexError) as exc:
+            self.errors.append({'operation':operation,'id':eid,'reason':str(exc) if isinstance(exc,ValueError) else type(exc).__name__});return None
+        raw=encoded(value);path=self.artifact(eid+'.json',raw);sub=sub or self.subject();closure=set(used)
+        for d in self.m['derivations']:
+            if d['id'] in used:closure.update(d['transitive_inputs'])
+        captured=max(self.obs[i]['captured_at'] for i in used)
+        d={'id':eid,'operation':operation,'version':VERSION,'parameters':params,'subject':sub,'inputs':[{'id':i,'sha256':self.obs[i]['sha256']} for i in sorted(used)],
+           'transitive_inputs':sorted(closure),'units':'exact atomic units and typed configuration','output':value}
+        o={'id':eid,'kind':'derived','status':'ok','subject':sub,'artifact':path,'sha256':sha(raw),'captured_at':captured,'synthetic':self.m['synthetic'],'source':{'operation':operation},'sample_id':None}
+        self.m['derivations'].append(d);self.m['observations'].append(o);self.objects[eid]=value;self.obs[eid]=o;return value
+
+    def latest_accounts(self):
+        result={}
+        for eid,c in sorted(self.checked.items(),key=lambda item:self.objects[item[0]]['completed_at']):
+            if c['status']=='ok' and self.objects[eid]['request']['method'] in ('getAccountInfo','getMultipleAccounts'):
+                for a in c.get('addresses',[]):result[a]=eid
+        return result
+
+    def facts(self):
+        accounts=self.latest_accounts();target=self.m['target'];mint=accounts.get(target['mint'])
+        raw_evidence=Evidence(self.root,self.m,self.m['synthetic'])
+        prices=[]
+        for eid,o in list(self.obs.items()):
+            if o['kind']!='document' or o['status']!='ok':continue
+            host=urlsplit(o['source']['capture']['url']).hostname
+            if host in ('api.dexscreener.com','api.geckoterminal.com'):
+                did='market-'+sha(eid.encode())[:16]
+                result=self.derive(did,'discovery_pools',{'capture':eid,'source':'geckoterminal' if host=='api.geckoterminal.com' else 'dexscreener'})
+                if result:
+                    prices += [(did,p) for p in result['candidates'] if p['price_denominator_mint']==target['mint'] and p['price_usd'] is not None and not p['conflicts']]
+        leads=[]
+        auto=self.session.root/'automatic-leads.json'
+        if auto.exists():leads+=json.loads(auto.read_text())
+        for path in sorted((self.session.root/'preset-requests').glob('*.json')):
+            request=json.loads(path.read_text())
+            if request['kind'] in ('pool','positions'):leads.append(request.get('parameters',{}))
+        epochs=[i for i,c in self.checked.items() if i in raw_evidence.usable and c['status']=='ok' and self.objects[i]['request']['method']=='getEpochInfo']
+        if mint:
+            optional_epoch={'epoch':epochs[-1]} if epochs else {}
+            self.derive('auto-controls','controls',{'mint':mint,**optional_epoch,'selection_scope':'latest_retained_account_snapshot'})
+            if mint not in raw_evidence.usable:
+                prior=[eid for eid,c in self.checked.items() if eid in raw_evidence.usable and target['mint'] in c.get('addresses',[]) and self.objects[eid]['request']['method'] in ('getAccountInfo','getMultipleAccounts')]
+                if prior:
+                    prior_mint=max(prior,key=lambda eid:self.objects[eid]['completed_at'])
+                    self.derive('prior-controls','controls',{'mint':prior_mint,**optional_epoch,'selection_scope':'earlier_pinned_snapshot_newer_unpinned'})
+            params={'mint':mint}
+            if prices:
+                from solana_session import epoch
+                did,price=prices[0];params.update(price_discovery=did,price_pool=price['pool'],now=max(epoch(self.obs[mint]['captured_at']),price['captured_at']))
+            self.derive('auto-sizes','quote_sizes',params)
+        largest=[i for i,c in self.checked.items() if c['status']=='ok' and self.objects[i]['request']['method']=='getTokenLargestAccounts' and self.objects[i]['request']['params'][0]==target['mint']]
+        samples=[i for i,c in self.checked.items() if c['status']=='ok' and self.objects[i]['request']['method']=='getMultipleAccounts' and target['mint'] in c.get('addresses',[]) and len(c['addresses'])>1 and '_holdings_' in i]
+        if largest and samples:self.derive('auto-holders','holders',{'discovery':largest[-1],'sample':samples[-1]})
+        from adapters import pool_adapter
+        by_program={pool_adapter(k).PROGRAM:k for k in ADAPTERS}
+        for address,eid in accounts.items():
+            value,_=observed_account(address,self.objects[eid])
+            if not value:continue
+            if value.get('executable'):
+                from solana_programs import decode_program
+                try:
+                    initial=decode_program(address,self.objects[eid]);pd=initial.get('programdata_address')
+                    self.derive('program-'+sha(address.encode())[:16],'program',{'address':address,'observation':eid,**({'programdata':accounts[pd]} if pd in accounts else {})},self.subject('program',address))
+                except ValueError:pass
+            kind=by_program.get(value['owner'])
+            if kind:
+                # Prefer the actual pool packet for same-bank arithmetic, adding separately
+                # observed program control only; no mixing fresh vaults into an old pool.
+                c=self.checked[eid];mapping={a:eid for a in c['addresses']}
+                module=pool_adapter(kind)
+                if module.PROGRAM in accounts:mapping[module.PROGRAM]=accounts[module.PROGRAM]
+                params={'adapter':kind,'pool':address,'observations':mapping}
+                for lead in leads:
+                    if lead.get('pool')==address and lead.get('adapter')==kind:
+                        for k in ('lp_accounts','positions'):
+                            if k in lead:params[k]=lead[k]
+                try:
+                    state=module.decode_pool(address,value) if kind in ('raydium_clmm','orca_whirlpool','meteora_dlmm','meteora_damm_v2') else module.decode_pool(value)
+                except ValueError:continue
+                if kind!='pump_curve' and target['mint'] not in state.get('mints',[]):continue
+                fid='pool-'+sha(address.encode())[:16];pool=self.derive(fid,'pool',params,self.subject('pool',address))
+                if pool and kind=='raydium_cpmm' and 'auto-sizes' in self.objects:
+                    for j,size in enumerate(self.objects['auto-sizes'].get('sizes',[])):
+                        self.derive('quote-'+sha(address.encode())[:12]+'-'+str(j),'local_quote',{'adapter':kind,'pool':address,'observations':mapping,'input_atomic':size['input_atomic']})
+        for eid,o in list(self.obs.items()):
+            if o['kind']!='document' or o['status']!='ok':continue
+            host=urlsplit(o['source']['capture']['url']).hostname
+            if host=='api.github.com':
+                pieces=urlsplit(o['source']['capture']['url']).path.strip('/').split('/')
+                if len(pieces)>=3 and pieces[0]=='repos':
+                    repo='/'.join(pieces[1:3]);op='repository_metadata' if len(pieces)==3 else 'repository_revision' if len(pieces)==5 and pieces[3:]==['commits','HEAD'] else None
+                    if op:self.derive('repo-'+sha(eid.encode())[:16],op,{'capture':eid,'repository':repo})
+        txs=[]
+        for eid,c in list(self.checked.items()):
+            if c['status']=='ok' and self.objects[eid]['request']['method']=='getTransaction':
+                headers=[i for i,x in self.checked.items() if x['status']=='ok' and self.objects[i]['request']['method']=='getBlock' and self.objects[i]['request']['params'][0]==c['historical_slot']]
+                if headers:
+                    name='tx-'+sha(eid.encode())[:16]
+                    if self.derive(name,'transaction',{'transaction':eid,'block':headers[0]}):txs.append(name)
+        if txs:
+            self.derive('auto-launch','launch',{'executions':txs[:4]})
+            known_pools={lead['pool'] for lead in leads if lead.get('pool')}
+            candidates=[]
+            for name in txs:
+                swaps=[e for e in self.objects[name].get('effects',[]) if e['kind']=='swap_instruction' and e['pool'] in known_pools]
+                if len(swaps)==1:candidates.append({'pool':swaps[0]['pool'],'execution':name})
+            if candidates:self.derive('auto-sales','sales',{'candidates':candidates[:2]})
+        roots=[d['id'] for d in self.m['derivations'] if d['operation'] in ('controls','pool','program')]
+        if roots:self.derive('auto-controllers','controllers',{'root_derivations':roots,'observations':accounts})
+        for d in list(self.m['derivations']):
+            if d['operation']=='program':self.derive('assurance-'+sha(d['id'].encode())[:16],'source_assurance',{'address':d['subject']['address'],'program':d['id']},d['subject'])
+
+    def write(self):
+        self.rpc();self.web();self.facts();e=Evidence(self.root,self.m,self.m['synthetic']);raw=encoded(self.m)
+        # A refresh is explicitly unjudged; existing analyst files are retained for compose.
+        from solana_facts import build
+        from solana_pipeline_note import build_note
+        m=self.m
+        r={'schema_version':2,'profile':PROFILE,'target':m['target'],'investigation_id':m['investigation_id'],'synthetic':m['synthetic'],
+          **{k:m['intake'][k] for k in ('question','focus','scope')},'manifest_sha256':sha(raw),'research_status':'partial','delivery_status':'draft','findings':[],
+          'ratings':dict.fromkeys(DIMENSIONS,'unknown'),'coverage':[empty_coverage(dim,attempts=[a['id'] for a in m['attempts'] if a['dimension']==dim]) for dim in DIMENSIONS],
+          'summary_ids':[],'decision':None,'limitations':['Standard research and analyst review remain incomplete.']}
+        validate_report(e,r,sha(raw))
+        with draft_lock(self.root):save_pair(self.root,raw,r)
+        from solana_pipeline_note import generate
+        note=generate(self.root,m['synthetic']);r['findings']=note['findings']
+        for c in r['coverage']:
+            c['finding_ids']=[f['id'] for f in r['findings'] if f['dimension']==c['dimension']]
+            if c['finding_ids']:c['status']='partial'
+        validate_report(e,r,sha(raw))
+        with draft_lock(self.root):save_pair(self.root,raw,r)
+        attempts=self.session.observations();started={a['request_id'] for a in attempts}
+        unsent=[p.stem for p in (self.session.root/'read-intents').glob('*.json') if p.stem not in started]
+        atomic(self.session.root/'import-diagnostics.json',encoded({'errors':self.errors,'unfinished_attempts':[a['request_id'] for a in attempts if a['completed_at'] is None],
+            'unsent_intents':sorted(unsent),'unsent_meaning':'Named reads without acquired attempts; budget/deadline/eligibility refusals are not source evidence.'}))
+        return {'draft':str(self.root),'observations':len(self.obs),'facts':len(m['derivations']),'errors':self.errors,'research_status':'partial'}
+
+
+def refresh(root):
+    importer=Importer(root)
+    try:return importer.write()
+    finally:importer.session.close()

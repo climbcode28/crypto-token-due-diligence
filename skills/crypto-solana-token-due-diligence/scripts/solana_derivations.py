@@ -1,0 +1,114 @@
+"""Explicit installed offline fact operations; no arbitrary expression/plugin execution."""
+from solana_common import need,target_identity,pubkey
+from solana_programs import observed_account
+
+VERSION='1.0.0'
+RUNTIME_VERSION='1.3.0'  # VERSION is the persisted derivation schema contract.
+PUBLICATION_OPS={'public_quote','discovery_pools','repository_metadata','repository_revision','repository_tree'}
+EXECUTION_OPS={'transaction','sales','rebuys','launch','creator_activity','inventory','prior_launches'}
+
+
+def compute(operation,parameters,target,resolve):
+    """resolve(id) records every actual direct dependency for exact input closure."""
+    target=target_identity(target);p=parameters
+    need(isinstance(p,dict),'derivation parameters must be an object')
+    def get(name):return resolve(p[name])
+    def packets(name='observations'):return {pubkey(address):resolve(eid) for address,eid in p[name].items()}
+    if operation=='public_quote':
+        from solana_quotes import public_quote
+        d=get('capture');return public_quote(p['source'],target,d['record'],d['raw'],p['output_mint'],p['input_atomic'],slippage_bps=p.get('slippage_bps',50))
+    if operation in ('discovery_pools','repository_metadata','repository_revision','repository_tree'):
+        import solana_discovery as discovery
+        d=get('capture')
+        if operation=='discovery_pools':return discovery.pools(d['record'],d['raw'],target,source=p.get('source','dexscreener'))
+        if operation=='repository_tree':return discovery.repository_tree(d['record'],d['raw'],get('revision'))
+        return getattr(discovery,operation)(d['record'],d['raw'],p['repository'])
+    if operation=='mint':
+        from solana_accounts import decode_mint
+        value,meta=observed_account(p.get('address',target['mint']),get('observation'))
+        need(not meta['sliced'],'full mint required');return {**decode_mint(value),**meta}
+    if operation=='controls':
+        from solana_accounts import controls
+        result=controls(get('mint'),target,epoch_packet=get('epoch') if p.get('epoch') else None)
+        if p.get('selection_scope'):
+            need(p['selection_scope'] in ('latest_retained_account_snapshot','earlier_pinned_snapshot_newer_unpinned'),'unknown control snapshot selection')
+            result['selection_scope']=p['selection_scope']
+        return result
+    if operation=='holders':
+        from solana_accounts import aggregate_holders
+        exclusions=p.get('custody_exclusions',{})
+        for v in exclusions.values():
+            for eid in v['evidence']:resolve(eid)
+        return aggregate_holders(get('discovery'),get('sample'),target,custody_exclusions=exclusions)
+    if operation=='program':
+        from solana_programs import decode_program
+        return decode_program(p['address'],get('observation'),get('programdata') if p.get('programdata') else None)
+    if operation=='source_assurance':
+        from solana_programs import source_assurance
+        import json
+        from solana_transport import unique_object,invalid_constant
+        program=get('program');need(program['address']==p['address'],'source assurance program mismatch')
+        publication=third_party=None
+        if p.get('publication'):
+            rev=get('publication')
+            publication={'url':'https://github.com/'+rev['repository']+'/tree/'+rev['revision'],'revision':rev['revision'],'evidence':rev['evidence']}
+        if p.get('third_party'):
+            captured=get('third_party');claim=json.loads(captured['raw'],object_pairs_hook=unique_object,parse_constant=invalid_constant)
+            need(isinstance(claim,dict) and set(claim)<={'program','status','hash_kind','code_sha256'} and {'program','status'}<=set(claim),'unsupported third-party hash statement schema')
+            third_party={**claim,'evidence':[captured['record']['id']]}
+        return source_assurance(program,publication=publication,third_party=third_party)
+    if operation=='controllers':
+        from solana_programs import authority_graph
+        roots=[]
+        for eid in p['root_derivations']:
+            value=resolve(eid);roots += value.get('controller_roots',[])
+            roots += [{'address':r['controller'],'role':r['role'],'evidence':r['evidence']} for r in value.get('powers',[]) if r['controller']]
+            if value.get('mint',{}).get('program'):
+                roots.append({'address':value['mint']['program'],'role':'owning_token_program','evidence':value['evidence']})
+            if value.get('kind')=='program':
+                roots.append({'address':value['address'],'role':'program_behavior','evidence':value['evidence']})
+        graph=authority_graph(list(dict.fromkeys(r['address'] for r in roots)),packets(),vault_links=p.get('vault_links'),spending_limits=p.get('spending_limits'))
+        graph['root_links']=roots
+        return graph
+    if operation=='pool':
+        from adapters import pool_adapter
+        module=pool_adapter(p['adapter']);kwargs={}
+        if p['adapter'] in ('raydium_clmm','orca_whirlpool','meteora_dlmm','meteora_damm_v2'):kwargs['positions']=p.get('positions',[])
+        elif p['adapter']!='pump_curve':kwargs['lp_accounts']=p.get('lp_accounts',[])
+        return module.analyze(target,p['pool'],packets(),**kwargs)
+    if operation=='transaction':
+        from solana_transactions import decode_transaction
+        return decode_transaction(target,get('transaction'),get('block'))
+    if operation in ('sales','rebuys'):
+        from solana_transactions import verify_sales,verify_rebuys
+        candidates=[{'pool':row['pool'],'execution':resolve(row['execution'])} for row in p['candidates']]
+        return (verify_sales if operation=='sales' else verify_rebuys)(target,candidates)
+    if operation=='quote_sizes':
+        from solana_quotes import size_policy
+        price=get('price') if p.get('price') else None
+        if p.get('price_discovery'):
+            candidates=get('price_discovery')['candidates'];selected=[v for v in candidates if v['pool']==p['price_pool'] and v['price_denominator_mint']==target['mint']]
+            need(len(selected)==1,'one exact-mint captured pool price required');price=selected[0]
+        return size_policy(target,get('mint'),user_sizes=p.get('user_sizes'),price=price,now=p.get('now'))
+    if operation=='local_quote':
+        from solana_quotes import estimate
+        return estimate(target,p['adapter'],p['pool'],packets(),p['input_atomic'],slippage_bps=p.get('slippage_bps',50))
+    if operation=='history':
+        from solana_launch import history_pages
+        return history_pages(p['address'],[resolve(eid) for eid in p['pages']],start_slot=p['start_slot'],end_slot=p['end_slot'])
+    if operation=='launch':
+        from solana_launch import launch_facts
+        return launch_facts(target,[resolve(eid) for eid in p['executions']],curve=get('curve') if p.get('curve') else None,pool=get('pool') if p.get('pool') else None)
+    if operation=='creator_activity':
+        from solana_launch import creator_activity
+        for row in p['attributions']:
+            for eid in row['evidence']:resolve(eid)
+        return creator_activity(target,p['attributions'],[resolve(eid) for eid in p['executions']],histories=[resolve(eid) for eid in p.get('histories',[])],
+            sales=get('sales') if p.get('sales') else None,rebuys=get('rebuys') if p.get('rebuys') else None)
+    if operation=='inventory':
+        from solana_launch import reconcile_inventory
+        return reconcile_inventory(target,p['owner'],packets('opening'),packets('closing'),[resolve(eid) for eid in p['histories']],[resolve(eid) for eid in p['executions']])
+    if operation=='prior_launches':
+        from solana_launch import prior_launches
+        return prior_launches(p['address'],[resolve(eid) for eid in p['executions']])
+    need(False,'unsupported installed derivation operation: '+str(operation))

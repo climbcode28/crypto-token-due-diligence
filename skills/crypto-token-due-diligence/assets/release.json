@@ -1,0 +1,7 @@
+{
+  "router_version": "1.0.0",
+  "date": "2026-09-11",
+  "scope": "Offline candidate-family classification and lossless timed handoff; no token identity verification",
+  "review_record": "../../../plans/token-diligence-router-2026-09-11.md",
+  "replaces": "crypto-research active workflow; historical rubric and evidence remain frozen"
+}

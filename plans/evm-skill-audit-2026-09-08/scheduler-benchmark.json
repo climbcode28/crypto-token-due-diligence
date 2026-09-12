@@ -1,0 +1,27 @@
+{
+  "limitations": "Wave reference chunks the same collector in groups of four. Fixture latency only; no live speed or accuracy claim.",
+  "python": "3.14.7",
+  "results": {
+    "rolling": {
+      "median_seconds": 0.099509,
+      "method_attempts_per_trial": 11,
+      "seconds": [
+        0.099914,
+        0.098377,
+        0.099509
+      ]
+    },
+    "wave_reference": {
+      "median_seconds": 0.181871,
+      "method_attempts_per_trial": 11,
+      "seconds": [
+        0.184364,
+        0.179446,
+        0.181871
+      ]
+    }
+  },
+  "synthetic": true,
+  "trials": 3,
+  "workload": "Eight distinct balances: two 80ms and six 5ms replies; four workers; full collection and evidence packaging"
+}

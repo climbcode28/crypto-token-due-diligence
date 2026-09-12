@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+.DS_Store
+.venv/
+.env
+.env.*
+!.env.example
+/cache/
+/runs/
+# Local investigation output and caches; frozen history remains tracked.
+/research/
+/share-export/
+# Personal, machine-local policy and tool settings never leave this checkout.
+HANDOFF.local.md
+.claude/settings.local.json
+# Frozen development provenance lives on the local archive/pre-publish branch, not in the published tree.
+/history/

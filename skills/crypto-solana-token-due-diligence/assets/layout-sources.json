@@ -1,0 +1,1372 @@
+{
+  "schema_version": 1,
+  "retrieved_at": "2026-09-11",
+  "scope": "Pinned interface definitions and deterministic vectors; source correspondence is not deployment verification.",
+  "sources": [
+    {
+      "repository": "https://github.com/solana-program/token-2022",
+      "revision": "a3e696e42a9fbf87dea68af1443d354fc4054a9b",
+      "path": "interface/src/state.rs",
+      "url": "https://raw.githubusercontent.com/solana-program/token-2022/a3e696e42a9fbf87dea68af1443d354fc4054a9b/interface/src/state.rs",
+      "sha256": "4566daf8b06ff2e7b975bed3e631ef4ab9591a95ddabd4117300ca1f639a59d2",
+      "bytes": 21821,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/solana-program/token-2022",
+      "revision": "a3e696e42a9fbf87dea68af1443d354fc4054a9b",
+      "path": "interface/src/extension/mod.rs",
+      "url": "https://raw.githubusercontent.com/solana-program/token-2022/a3e696e42a9fbf87dea68af1443d354fc4054a9b/interface/src/extension/mod.rs",
+      "sha256": "502b8309d3243f81d3bb7b2ff5f9e412c48d4d68f354b8994792389fc904defd",
+      "bytes": 126230,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/solana-program/token-2022",
+      "revision": "a3e696e42a9fbf87dea68af1443d354fc4054a9b",
+      "path": "interface/src/extension/transfer_fee/mod.rs",
+      "url": "https://raw.githubusercontent.com/solana-program/token-2022/a3e696e42a9fbf87dea68af1443d354fc4054a9b/interface/src/extension/transfer_fee/mod.rs",
+      "sha256": "2f51ac04733271b7578f0fb8c05805aac237f1521ffa1505b4055c03b6cbda5c",
+      "bytes": 17844,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/solana-program/token-2022",
+      "revision": "a3e696e42a9fbf87dea68af1443d354fc4054a9b",
+      "path": "interface/src/extension/cpi_guard/mod.rs",
+      "url": "https://raw.githubusercontent.com/solana-program/token-2022/a3e696e42a9fbf87dea68af1443d354fc4054a9b/interface/src/extension/cpi_guard/mod.rs",
+      "sha256": "f7773ce63c13b2975ce69f1c6f11e2c80cffa229616daf40df0058d8ccbe7aa4",
+      "bytes": 1054,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/solana-program/token-2022",
+      "revision": "a3e696e42a9fbf87dea68af1443d354fc4054a9b",
+      "path": "interface/src/extension/memo_transfer/mod.rs",
+      "url": "https://raw.githubusercontent.com/solana-program/token-2022/a3e696e42a9fbf87dea68af1443d354fc4054a9b/interface/src/extension/memo_transfer/mod.rs",
+      "sha256": "831da8785a008f72bf5a442b7c18f9ecffa1ef3b5fc1ac41ace871807f5d83a0",
+      "bytes": 1106,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/solana-program/token-2022",
+      "revision": "a3e696e42a9fbf87dea68af1443d354fc4054a9b",
+      "path": "interface/src/extension/non_transferable.rs",
+      "url": "https://raw.githubusercontent.com/solana-program/token-2022/a3e696e42a9fbf87dea68af1443d354fc4054a9b/interface/src/extension/non_transferable.rs",
+      "sha256": "8b0b6ac89c5746757afecee8d4af288d7eb032f8c71d14af7422ca0e19baa0a0",
+      "bytes": 1018,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/solana-program/token-2022",
+      "revision": "a3e696e42a9fbf87dea68af1443d354fc4054a9b",
+      "path": "interface/src/extension/transfer_hook/mod.rs",
+      "url": "https://raw.githubusercontent.com/solana-program/token-2022/a3e696e42a9fbf87dea68af1443d354fc4054a9b/interface/src/extension/transfer_hook/mod.rs",
+      "sha256": "23245c8a47f09adaf4803a6ffca8d6dfc9da1e4c87741b33338efedd07d90e3e",
+      "bytes": 3056,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/solana-program/token-2022",
+      "revision": "a3e696e42a9fbf87dea68af1443d354fc4054a9b",
+      "path": "interface/src/extension/pausable/mod.rs",
+      "url": "https://raw.githubusercontent.com/solana-program/token-2022/a3e696e42a9fbf87dea68af1443d354fc4054a9b/interface/src/extension/pausable/mod.rs",
+      "sha256": "ec2d0b938dc296c73c27bbf98b9b1ca7c71124c76cc3a2e9740cdf7093c2d708",
+      "bytes": 1452,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/solana-program/token-2022",
+      "revision": "a3e696e42a9fbf87dea68af1443d354fc4054a9b",
+      "path": "interface/src/extension/confidential_transfer/mod.rs",
+      "url": "https://raw.githubusercontent.com/solana-program/token-2022/a3e696e42a9fbf87dea68af1443d354fc4054a9b/interface/src/extension/confidential_transfer/mod.rs",
+      "sha256": "9dabc8e24aae9e1b2ec48abebd5beb3f16ea3fea015575d1ee37eef3f721b3a6",
+      "bytes": 7649,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/solana-program/token-2022",
+      "revision": "a3e696e42a9fbf87dea68af1443d354fc4054a9b",
+      "path": "interface/src/extension/confidential_transfer_fee/mod.rs",
+      "url": "https://raw.githubusercontent.com/solana-program/token-2022/a3e696e42a9fbf87dea68af1443d354fc4054a9b/interface/src/extension/confidential_transfer_fee/mod.rs",
+      "sha256": "6549992f17bf35f1e3655fb689c117cf63d8eaebf8c72fbc89020c6c10d45b16",
+      "bytes": 2670,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/solana-program/token-2022",
+      "revision": "a3e696e42a9fbf87dea68af1443d354fc4054a9b",
+      "path": "interface/src/extension/immutable_owner.rs",
+      "url": "https://raw.githubusercontent.com/solana-program/token-2022/a3e696e42a9fbf87dea68af1443d354fc4054a9b/interface/src/extension/immutable_owner.rs",
+      "sha256": "8346ba8c6b309d75280550585a1bd7b6a43f0059db9fda0fc4d43d5ac408647d",
+      "bytes": 561,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/solana-program/token-2022",
+      "revision": "a3e696e42a9fbf87dea68af1443d354fc4054a9b",
+      "path": "LICENSE",
+      "url": "https://raw.githubusercontent.com/solana-program/token-2022/a3e696e42a9fbf87dea68af1443d354fc4054a9b/LICENSE",
+      "sha256": "a6cba85bc92e0cff7a450b1d873c0eaa2e9fc96bf472df0247a26bec77bf3ff9",
+      "bytes": 10173,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/anza-xyz/solana-sdk",
+      "revision": "d89042bd5ef842c9a933be8dfd1abcf7fdef9ab7",
+      "path": "pubkey/src/lib.rs",
+      "url": "https://raw.githubusercontent.com/anza-xyz/solana-sdk/d89042bd5ef842c9a933be8dfd1abcf7fdef9ab7/pubkey/src/lib.rs",
+      "sha256": "b174f53f848c0c2e92b0f2a40bdbc19f281408e072bc91e885d1faa35d5318b8",
+      "bytes": 1144,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/anza-xyz/solana-sdk",
+      "revision": "d89042bd5ef842c9a933be8dfd1abcf7fdef9ab7",
+      "path": "LICENSE",
+      "url": "https://raw.githubusercontent.com/anza-xyz/solana-sdk/d89042bd5ef842c9a933be8dfd1abcf7fdef9ab7/LICENSE",
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+      "bytes": 11357,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/solana-program/associated-token-account",
+      "revision": "2dc55ee1009d787eea7e1c401b8f27e6892bff4b",
+      "path": "interface/src/address.rs",
+      "url": "https://raw.githubusercontent.com/solana-program/associated-token-account/2dc55ee1009d787eea7e1c401b8f27e6892bff4b/interface/src/address.rs",
+      "sha256": "8a0d5a01866eec2eaebcd4fc8830bc50fb752ad88fb2279677f8fe3256e5d979",
+      "bytes": 2111,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/solana-program/associated-token-account",
+      "revision": "2dc55ee1009d787eea7e1c401b8f27e6892bff4b",
+      "path": "LICENSE",
+      "url": "https://raw.githubusercontent.com/solana-program/associated-token-account/2dc55ee1009d787eea7e1c401b8f27e6892bff4b/LICENSE",
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+      "bytes": 11357,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/anza-xyz/solana-sdk",
+      "revision": "d89042bd5ef842c9a933be8dfd1abcf7fdef9ab7",
+      "path": "address/src/lib.rs",
+      "url": "https://raw.githubusercontent.com/anza-xyz/solana-sdk/d89042bd5ef842c9a933be8dfd1abcf7fdef9ab7/address/src/lib.rs",
+      "sha256": "c93a7d9fb216e2778fba29a478ebe17ff9a538a7691aeed22e35264f32624904",
+      "bytes": 26467,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/anza-xyz/solana-sdk",
+      "revision": "d89042bd5ef842c9a933be8dfd1abcf7fdef9ab7",
+      "path": "address/src/derive.rs",
+      "url": "https://raw.githubusercontent.com/anza-xyz/solana-sdk/d89042bd5ef842c9a933be8dfd1abcf7fdef9ab7/address/src/derive.rs",
+      "sha256": "5a0d84efa27eab9b97e090c34ba99936c533115372cb87f5dc0649770059875a",
+      "bytes": 7925,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/anza-xyz/solana-sdk",
+      "revision": "d89042bd5ef842c9a933be8dfd1abcf7fdef9ab7",
+      "path": "address/src/syscalls.rs",
+      "url": "https://raw.githubusercontent.com/anza-xyz/solana-sdk/d89042bd5ef842c9a933be8dfd1abcf7fdef9ab7/address/src/syscalls.rs",
+      "sha256": "fa104462d56565e5a87635d81563abb8d05f8be5d8a590a9b187f32415e04481",
+      "bytes": 19794,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/anza-xyz/solana-sdk",
+      "revision": "d89042bd5ef842c9a933be8dfd1abcf7fdef9ab7",
+      "path": "address/src/hasher.rs",
+      "url": "https://raw.githubusercontent.com/anza-xyz/solana-sdk/d89042bd5ef842c9a933be8dfd1abcf7fdef9ab7/address/src/hasher.rs",
+      "sha256": "06727c243727c7996e433619d474eeb0d36dcf7a81587adbe9332bfce05e38af",
+      "bytes": 5218,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/solana-program/token-2022",
+      "revision": "a3e696e42a9fbf87dea68af1443d354fc4054a9b",
+      "path": "interface/src/extension/interest_bearing_mint/mod.rs",
+      "url": "https://raw.githubusercontent.com/solana-program/token-2022/a3e696e42a9fbf87dea68af1443d354fc4054a9b/interface/src/extension/interest_bearing_mint/mod.rs",
+      "sha256": "230efe4355d53125756d6873ca3c5421a3641b876ba962c489e2f1827616d75e",
+      "bytes": 18662,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/solana-program/token-2022",
+      "revision": "a3e696e42a9fbf87dea68af1443d354fc4054a9b",
+      "path": "interface/src/extension/scaled_ui_amount/mod.rs",
+      "url": "https://raw.githubusercontent.com/solana-program/token-2022/a3e696e42a9fbf87dea68af1443d354fc4054a9b/interface/src/extension/scaled_ui_amount/mod.rs",
+      "sha256": "3820cf692608cfc13505d42f12f13237768869fc024516ba57b2a458120c51b2",
+      "bytes": 13771,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/solana-program/token-2022",
+      "revision": "a3e696e42a9fbf87dea68af1443d354fc4054a9b",
+      "path": "interface/src/extension/metadata_pointer/mod.rs",
+      "url": "https://raw.githubusercontent.com/solana-program/token-2022/a3e696e42a9fbf87dea68af1443d354fc4054a9b/interface/src/extension/metadata_pointer/mod.rs",
+      "sha256": "db4f962e95f2a652b8faf06c8821cb2c7e6ecd31e90cc27d46df0ca143768633",
+      "bytes": 1069,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/solana-program/token-2022",
+      "revision": "a3e696e42a9fbf87dea68af1443d354fc4054a9b",
+      "path": "interface/src/extension/group_pointer/mod.rs",
+      "url": "https://raw.githubusercontent.com/solana-program/token-2022/a3e696e42a9fbf87dea68af1443d354fc4054a9b/interface/src/extension/group_pointer/mod.rs",
+      "sha256": "8c19b494458c897c151355aa9795bab9c08201e0f64e6634d1da22711f9caf6c",
+      "bytes": 1045,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/solana-program/token-2022",
+      "revision": "a3e696e42a9fbf87dea68af1443d354fc4054a9b",
+      "path": "interface/src/extension/group_member_pointer/mod.rs",
+      "url": "https://raw.githubusercontent.com/solana-program/token-2022/a3e696e42a9fbf87dea68af1443d354fc4054a9b/interface/src/extension/group_member_pointer/mod.rs",
+      "sha256": "70db39aa59a505e346beb5ed28117ea571a97be56c46874cbffb15150860328b",
+      "bytes": 1079,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/solana-program/token-2022",
+      "revision": "a3e696e42a9fbf87dea68af1443d354fc4054a9b",
+      "path": "interface/src/extension/permissioned_burn/mod.rs",
+      "url": "https://raw.githubusercontent.com/solana-program/token-2022/a3e696e42a9fbf87dea68af1443d354fc4054a9b/interface/src/extension/permissioned_burn/mod.rs",
+      "sha256": "7ecbf5d694e90d48c4e3c1f1eeb0bf31081cf9a12fb43e5f8186177ca5b58f62",
+      "bytes": 933,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/Squads-Protocol/v4",
+      "revision": "af94153ff77a28b6effe46b9c94baaa93742b48c",
+      "path": "programs/squads_multisig_program/src/lib.rs",
+      "url": "https://raw.githubusercontent.com/Squads-Protocol/v4/af94153ff77a28b6effe46b9c94baaa93742b48c/programs/squads_multisig_program/src/lib.rs",
+      "sha256": "de0adebfac926281747c900e9076764800acd569957f0b0c297aa1f5498e345f",
+      "bytes": 11938,
+      "license": "AGPL-3.0"
+    },
+    {
+      "repository": "https://github.com/Squads-Protocol/v4",
+      "revision": "af94153ff77a28b6effe46b9c94baaa93742b48c",
+      "path": "programs/squads_multisig_program/src/state/multisig.rs",
+      "url": "https://raw.githubusercontent.com/Squads-Protocol/v4/af94153ff77a28b6effe46b9c94baaa93742b48c/programs/squads_multisig_program/src/state/multisig.rs",
+      "sha256": "4ad0764e559a0376ad39c9e4d84a106dd0ec8fc040cdf0bf223c55763f07c9a0",
+      "bytes": 10164,
+      "license": "AGPL-3.0"
+    },
+    {
+      "repository": "https://github.com/Squads-Protocol/v4",
+      "revision": "af94153ff77a28b6effe46b9c94baaa93742b48c",
+      "path": "programs/squads_multisig_program/src/state/spending_limit.rs",
+      "url": "https://raw.githubusercontent.com/Squads-Protocol/v4/af94153ff77a28b6effe46b9c94baaa93742b48c/programs/squads_multisig_program/src/state/spending_limit.rs",
+      "sha256": "43046a6e85039d53f0c09757cc020f3eda13bb25f86fe16c6aa10d78a0bd0167",
+      "bytes": 3638,
+      "license": "AGPL-3.0"
+    },
+    {
+      "repository": "https://github.com/Squads-Protocol/v4",
+      "revision": "af94153ff77a28b6effe46b9c94baaa93742b48c",
+      "path": "programs/squads_multisig_program/src/state/seeds.rs",
+      "url": "https://raw.githubusercontent.com/Squads-Protocol/v4/af94153ff77a28b6effe46b9c94baaa93742b48c/programs/squads_multisig_program/src/state/seeds.rs",
+      "sha256": "f062ac588cce48f7474775db6ee9d92e2e29e9931dfc6c7444530a0d908116a1",
+      "bytes": 536,
+      "license": "AGPL-3.0"
+    },
+    {
+      "repository": "https://github.com/Squads-Protocol/v4",
+      "revision": "af94153ff77a28b6effe46b9c94baaa93742b48c",
+      "path": "programs/squads_multisig_program/src/instructions/spending_limit_use.rs",
+      "url": "https://raw.githubusercontent.com/Squads-Protocol/v4/af94153ff77a28b6effe46b9c94baaa93742b48c/programs/squads_multisig_program/src/instructions/spending_limit_use.rs",
+      "sha256": "45aaf25af6f7c8fb2a7ecb4655296a181f4b458373e0371536461af9069b82bb",
+      "bytes": 8997,
+      "license": "AGPL-3.0"
+    },
+    {
+      "repository": "https://github.com/Squads-Protocol/v4",
+      "revision": "af94153ff77a28b6effe46b9c94baaa93742b48c",
+      "path": "LICENSE",
+      "url": "https://raw.githubusercontent.com/Squads-Protocol/v4/af94153ff77a28b6effe46b9c94baaa93742b48c/LICENSE",
+      "sha256": "8486a10c4393cee1c25392769ddd3b2d6c242d6ec7928e1414efff7dfb2f07ef",
+      "bytes": 34523,
+      "license": "AGPL-3.0"
+    },
+    {
+      "repository": "https://github.com/anza-xyz/solana-sdk",
+      "revision": "d89042bd5ef842c9a933be8dfd1abcf7fdef9ab7",
+      "path": "loader-v2-interface/src/lib.rs",
+      "url": "https://raw.githubusercontent.com/anza-xyz/solana-sdk/d89042bd5ef842c9a933be8dfd1abcf7fdef9ab7/loader-v2-interface/src/lib.rs",
+      "sha256": "3bebd51c9e0098b457c0feecfc4cce7ee3fbfee1c45903112f664b7d92d0b2c2",
+      "bytes": 1951,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/anza-xyz/solana-sdk",
+      "revision": "d89042bd5ef842c9a933be8dfd1abcf7fdef9ab7",
+      "path": "loader-v3-interface/src/lib.rs",
+      "url": "https://raw.githubusercontent.com/anza-xyz/solana-sdk/d89042bd5ef842c9a933be8dfd1abcf7fdef9ab7/loader-v3-interface/src/lib.rs",
+      "sha256": "7c72cd7c44a452bae15d9318185b10885496f1f3b39fa8ce8641e068bcd36825",
+      "bytes": 1283,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/anza-xyz/solana-sdk",
+      "revision": "d89042bd5ef842c9a933be8dfd1abcf7fdef9ab7",
+      "path": "loader-v3-interface/src/state.rs",
+      "url": "https://raw.githubusercontent.com/anza-xyz/solana-sdk/d89042bd5ef842c9a933be8dfd1abcf7fdef9ab7/loader-v3-interface/src/state.rs",
+      "sha256": "64f6ee5c4e712bcccae38b4450f679d25e50c132dc8cf9ec40d1756e5c63cb1c",
+      "bytes": 4943,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/Squads-Protocol/v4",
+      "revision": "af94153ff77a28b6effe46b9c94baaa93742b48c",
+      "path": "programs/squads_multisig_program/src/instructions/multisig_config.rs",
+      "url": "https://raw.githubusercontent.com/Squads-Protocol/v4/af94153ff77a28b6effe46b9c94baaa93742b48c/programs/squads_multisig_program/src/instructions/multisig_config.rs",
+      "sha256": "e70db40a62c7c1006b6d2ea186e12c499fa2ff0b8061062ea0ecf4fda1fa8a42",
+      "bytes": 7834,
+      "license": "AGPL-3.0"
+    },
+    {
+      "repository": "https://github.com/Squads-Protocol/v4",
+      "revision": "af94153ff77a28b6effe46b9c94baaa93742b48c",
+      "path": "programs/squads_multisig_program/src/instructions/multisig_create.rs",
+      "url": "https://raw.githubusercontent.com/Squads-Protocol/v4/af94153ff77a28b6effe46b9c94baaa93742b48c/programs/squads_multisig_program/src/instructions/multisig_create.rs",
+      "sha256": "fc7d0f9eb2d5ec895717e5092f06c228533c174f776ad02d2ccb1861086c7197",
+      "bytes": 4097,
+      "license": "AGPL-3.0"
+    },
+    {
+      "repository": "https://github.com/raydium-io/raydium-cp-swap",
+      "revision": "59fb845a9e5bb569c8b2f3415f13b0c0ebcc6b92",
+      "path": "programs/cp-swap/src/states/pool.rs",
+      "url": "https://raw.githubusercontent.com/raydium-io/raydium-cp-swap/59fb845a9e5bb569c8b2f3415f13b0c0ebcc6b92/programs/cp-swap/src/states/pool.rs",
+      "sha256": "439aecb1d3ff023c3907a9189db8ae04571c9d6d96391013d2f2a79a438b20fa",
+      "bytes": 15794,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/raydium-io/raydium-cp-swap",
+      "revision": "59fb845a9e5bb569c8b2f3415f13b0c0ebcc6b92",
+      "path": "programs/cp-swap/src/states/config.rs",
+      "url": "https://raw.githubusercontent.com/raydium-io/raydium-cp-swap/59fb845a9e5bb569c8b2f3415f13b0c0ebcc6b92/programs/cp-swap/src/states/config.rs",
+      "sha256": "016d4bcc219578d1403ee2e625f517cac608e4ee5312669ef67d4e314c286da6",
+      "bytes": 1048,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/raydium-io/raydium-cp-swap",
+      "revision": "59fb845a9e5bb569c8b2f3415f13b0c0ebcc6b92",
+      "path": "programs/cp-swap/src/lib.rs",
+      "url": "https://raw.githubusercontent.com/raydium-io/raydium-cp-swap/59fb845a9e5bb569c8b2f3415f13b0c0ebcc6b92/programs/cp-swap/src/lib.rs",
+      "sha256": "1d754dcb0ecfbedb34c277d8939510fd2b304c00b4af110d23355a0a6f9d2c20",
+      "bytes": 12527,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/raydium-io/raydium-cp-swap",
+      "revision": "59fb845a9e5bb569c8b2f3415f13b0c0ebcc6b92",
+      "path": "programs/cp-swap/src/instructions/initialize.rs",
+      "url": "https://raw.githubusercontent.com/raydium-io/raydium-cp-swap/59fb845a9e5bb569c8b2f3415f13b0c0ebcc6b92/programs/cp-swap/src/instructions/initialize.rs",
+      "sha256": "d198b84c00331774218b43533979443b256089a160f76a4fa9a5e45a51cace20",
+      "bytes": 12913,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/raydium-io/raydium-cp-swap",
+      "revision": "59fb845a9e5bb569c8b2f3415f13b0c0ebcc6b92",
+      "path": "programs/cp-swap/src/curve/fees.rs",
+      "url": "https://raw.githubusercontent.com/raydium-io/raydium-cp-swap/59fb845a9e5bb569c8b2f3415f13b0c0ebcc6b92/programs/cp-swap/src/curve/fees.rs",
+      "sha256": "fe0ed88648aa76a4781412cdca591c4b1a0982db30e017f4ad228f02f3927364",
+      "bytes": 2733,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/raydium-io/raydium-cp-swap",
+      "revision": "59fb845a9e5bb569c8b2f3415f13b0c0ebcc6b92",
+      "path": "programs/cp-swap/src/instructions/withdraw.rs",
+      "url": "https://raw.githubusercontent.com/raydium-io/raydium-cp-swap/59fb845a9e5bb569c8b2f3415f13b0c0ebcc6b92/programs/cp-swap/src/instructions/withdraw.rs",
+      "sha256": "1a8e40f32bb6abd979a6a758b36fed035df99c4fa818d5a7a2a1d3b83d3cd59f",
+      "bytes": 7243,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/raydium-io/raydium-cp-swap",
+      "revision": "59fb845a9e5bb569c8b2f3415f13b0c0ebcc6b92",
+      "path": "LICENSE",
+      "url": "https://raw.githubusercontent.com/raydium-io/raydium-cp-swap/59fb845a9e5bb569c8b2f3415f13b0c0ebcc6b92/LICENSE",
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+      "bytes": 11357,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/raydium-io/raydium-amm",
+      "revision": "d26944bfb76fb5fa8f91e5d440c2050ed358ef81",
+      "path": "program/src/state.rs",
+      "url": "https://raw.githubusercontent.com/raydium-io/raydium-amm/d26944bfb76fb5fa8f91e5d440c2050ed358ef81/program/src/state.rs",
+      "sha256": "52ce5407aa5343d93965c8ab20861e4aaf62dbb84f73f047dc666d73d14998d8",
+      "bytes": 51713,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/raydium-io/raydium-amm",
+      "revision": "d26944bfb76fb5fa8f91e5d440c2050ed358ef81",
+      "path": "program/src/math.rs",
+      "url": "https://raw.githubusercontent.com/raydium-io/raydium-amm/d26944bfb76fb5fa8f91e5d440c2050ed358ef81/program/src/math.rs",
+      "sha256": "3aeb20bb29d36397fa9c0551dc10a3eec8d8baeda87c4eef3c7e7337e6c2984e",
+      "bytes": 17852,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/raydium-io/raydium-amm",
+      "revision": "d26944bfb76fb5fa8f91e5d440c2050ed358ef81",
+      "path": "program/src/lib.rs",
+      "url": "https://raw.githubusercontent.com/raydium-io/raydium-amm/d26944bfb76fb5fa8f91e5d440c2050ed358ef81/program/src/lib.rs",
+      "sha256": "d0f63c766de4898d44043bb4bf69294b5dfdbc5081b284eeb6b40d43ebaa3756",
+      "bytes": 1106,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/raydium-io/raydium-amm",
+      "revision": "d26944bfb76fb5fa8f91e5d440c2050ed358ef81",
+      "path": "program/src/processor.rs",
+      "url": "https://raw.githubusercontent.com/raydium-io/raydium-amm/d26944bfb76fb5fa8f91e5d440c2050ed358ef81/program/src/processor.rs",
+      "sha256": "31eed8ed2736fa2d2ee3a2ad072a4025766ef828bc2ddfbf26a1ec8669c91fe6",
+      "bytes": 130961,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/raydium-io/raydium-amm",
+      "revision": "d26944bfb76fb5fa8f91e5d440c2050ed358ef81",
+      "path": "program/Cargo.toml",
+      "url": "https://raw.githubusercontent.com/raydium-io/raydium-amm/d26944bfb76fb5fa8f91e5d440c2050ed358ef81/program/Cargo.toml",
+      "sha256": "e3dcd7b9d587417b694c5dc7badb1f790c73700f20efea02ffdc8bd716182820",
+      "bytes": 1339,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/raydium-io/raydium-amm",
+      "revision": "d26944bfb76fb5fa8f91e5d440c2050ed358ef81",
+      "path": "LICENSE",
+      "url": "https://raw.githubusercontent.com/raydium-io/raydium-amm/d26944bfb76fb5fa8f91e5d440c2050ed358ef81/LICENSE",
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+      "bytes": 11357,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/openbook-dex/program",
+      "revision": "c85e56deeaead43abbc33b7301058838b9c5136d",
+      "path": "dex/src/state.rs",
+      "url": "https://raw.githubusercontent.com/openbook-dex/program/c85e56deeaead43abbc33b7301058838b9c5136d/dex/src/state.rs",
+      "sha256": "2562894538d382c76e0579c1d1f16dd1aa634ca2710c4f90f80d202041e9227a",
+      "bytes": 121212,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/openbook-dex/program",
+      "revision": "c85e56deeaead43abbc33b7301058838b9c5136d",
+      "path": "dex/src/lib.rs",
+      "url": "https://raw.githubusercontent.com/openbook-dex/program/c85e56deeaead43abbc33b7301058838b9c5136d/dex/src/lib.rs",
+      "sha256": "039999249c14a3cb3f93399523d5867581a070a066d0dc058f41adb7402ac513",
+      "bytes": 1484,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/openbook-dex/program",
+      "revision": "c85e56deeaead43abbc33b7301058838b9c5136d",
+      "path": "LICENSE",
+      "url": "https://raw.githubusercontent.com/openbook-dex/program/c85e56deeaead43abbc33b7301058838b9c5136d/LICENSE",
+      "sha256": "12c7699ae05c42e776548377d7661e80bfd6a8092aa9af23e329eb3527c91a22",
+      "bytes": 11346,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/raydium-io/raydium-amm",
+      "revision": "c613c87c41edbe21112c9b8341774a70009c6d7b",
+      "path": "program/src/math.rs",
+      "url": "https://raw.githubusercontent.com/raydium-io/raydium-amm/c613c87c41edbe21112c9b8341774a70009c6d7b/program/src/math.rs",
+      "sha256": "7605c6908280786aa286980e7b8531666a0b2eca2d81655e4bac280ff4ee9625",
+      "bytes": 21103,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/raydium-io/raydium-amm",
+      "revision": "c613c87c41edbe21112c9b8341774a70009c6d7b",
+      "path": "program/src/processor.rs",
+      "url": "https://raw.githubusercontent.com/raydium-io/raydium-amm/c613c87c41edbe21112c9b8341774a70009c6d7b/program/src/processor.rs",
+      "sha256": "6c27cea98e25d7e6c63fcdb84cad7eeb198e333462e1ac2be28513a01fa081a9",
+      "bytes": 299135,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/raydium-io/raydium-amm",
+      "revision": "c613c87c41edbe21112c9b8341774a70009c6d7b",
+      "path": "program/src/state.rs",
+      "url": "https://raw.githubusercontent.com/raydium-io/raydium-amm/c613c87c41edbe21112c9b8341774a70009c6d7b/program/src/state.rs",
+      "sha256": "f3cc73db7b10bb51a56521e295894283b5aaa274ba8b5385936c5cc53a9f2652",
+      "bytes": 57926,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/raydium-io/raydium-amm",
+      "revision": "c613c87c41edbe21112c9b8341774a70009c6d7b",
+      "path": "program/Cargo.toml",
+      "url": "https://raw.githubusercontent.com/raydium-io/raydium-amm/c613c87c41edbe21112c9b8341774a70009c6d7b/program/Cargo.toml",
+      "sha256": "1a989c7e3d40e7428fc04b95330951901f69e8f4bed22b0e4b3a81e6876b66b4",
+      "bytes": 1495,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/raydium-io/openbook-dex",
+      "revision": "3847088b66f96b70a888c20fbf01e46ec23ad632",
+      "path": "dex/src/state.rs",
+      "url": "https://raw.githubusercontent.com/raydium-io/openbook-dex/3847088b66f96b70a888c20fbf01e46ec23ad632/dex/src/state.rs",
+      "sha256": "0ac4774c1c9f465a26e164995792368fd916364a95c618386a128a1c16493509",
+      "bytes": 128697,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/raydium-io/openbook-dex",
+      "revision": "3847088b66f96b70a888c20fbf01e46ec23ad632",
+      "path": "dex/src/lib.rs",
+      "url": "https://raw.githubusercontent.com/raydium-io/openbook-dex/3847088b66f96b70a888c20fbf01e46ec23ad632/dex/src/lib.rs",
+      "sha256": "039999249c14a3cb3f93399523d5867581a070a066d0dc058f41adb7402ac513",
+      "bytes": 1484,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/raydium-io/openbook-dex",
+      "revision": "3847088b66f96b70a888c20fbf01e46ec23ad632",
+      "path": "README.md",
+      "url": "https://raw.githubusercontent.com/raydium-io/openbook-dex/3847088b66f96b70a888c20fbf01e46ec23ad632/README.md",
+      "sha256": "3b9478104947a38c7c2fd61ff8ca825b3825849e9e3ff6d61acd60818023d53b",
+      "bytes": 2024,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/raydium-io/openbook-dex",
+      "revision": "3847088b66f96b70a888c20fbf01e46ec23ad632",
+      "path": "LICENSE",
+      "url": "https://raw.githubusercontent.com/raydium-io/openbook-dex/3847088b66f96b70a888c20fbf01e46ec23ad632/LICENSE",
+      "sha256": "12c7699ae05c42e776548377d7661e80bfd6a8092aa9af23e329eb3527c91a22",
+      "bytes": 11346,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/raydium-io/raydium-cp-swap",
+      "revision": "59fb845a9e5bb569c8b2f3415f13b0c0ebcc6b92",
+      "path": "programs/cp-swap/src/instructions/admin/create_config.rs",
+      "url": "https://raw.githubusercontent.com/raydium-io/raydium-cp-swap/59fb845a9e5bb569c8b2f3415f13b0c0ebcc6b92/programs/cp-swap/src/instructions/admin/create_config.rs",
+      "sha256": "6f8549ac615657d416f37133cfa9c9e14205632f9df925fb12b476e4b3879e14",
+      "bytes": 1534,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/raydium-io/openbook-dex",
+      "revision": "3847088b66f96b70a888c20fbf01e46ec23ad632",
+      "path": "dex/src/fees.rs",
+      "url": "https://raw.githubusercontent.com/raydium-io/openbook-dex/3847088b66f96b70a888c20fbf01e46ec23ad632/dex/src/fees.rs",
+      "sha256": "ec4fe6be23bcb4b1e6cb06404618bb7e41c0b24537b3a2fdcfacc15b858b17e3",
+      "bytes": 4434,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/raydium-io/raydium-clmm",
+      "revision": "ed7c84a54ced59c55981780546adb0b4583dcf85",
+      "path": "programs/amm/src/lib.rs",
+      "url": "https://raw.githubusercontent.com/raydium-io/raydium-clmm/ed7c84a54ced59c55981780546adb0b4583dcf85/programs/amm/src/lib.rs",
+      "sha256": "21d2f4dd481c9b2f2969a94cc14b13cf1efbf1ca9fb817c583606c16d3119da8",
+      "bytes": 29724,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/raydium-io/raydium-clmm",
+      "revision": "ed7c84a54ced59c55981780546adb0b4583dcf85",
+      "path": "programs/amm/src/states/pool.rs",
+      "url": "https://raw.githubusercontent.com/raydium-io/raydium-clmm/ed7c84a54ced59c55981780546adb0b4583dcf85/programs/amm/src/states/pool.rs",
+      "sha256": "bc4f2c1734f14a1878b4b681508ea3498209d9a0e68ade7c04f6757ee59aae87",
+      "bytes": 91316,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/raydium-io/raydium-clmm",
+      "revision": "ed7c84a54ced59c55981780546adb0b4583dcf85",
+      "path": "programs/amm/src/states/personal_position.rs",
+      "url": "https://raw.githubusercontent.com/raydium-io/raydium-clmm/ed7c84a54ced59c55981780546adb0b4583dcf85/programs/amm/src/states/personal_position.rs",
+      "sha256": "5777139612547b901038319436a6b8b8088f22642b4a98811ba2d1abe62ca2f0",
+      "bytes": 11694,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/raydium-io/raydium-clmm",
+      "revision": "ed7c84a54ced59c55981780546adb0b4583dcf85",
+      "path": "programs/amm/src/states/protocol_position.rs",
+      "url": "https://raw.githubusercontent.com/raydium-io/raydium-clmm/ed7c84a54ced59c55981780546adb0b4583dcf85/programs/amm/src/states/protocol_position.rs",
+      "sha256": "9996446ffd89f50e32e830058a37b5c7c8bbe9985ad1e54b6b3910253781bcea",
+      "bytes": 4378,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/raydium-io/raydium-clmm",
+      "revision": "ed7c84a54ced59c55981780546adb0b4583dcf85",
+      "path": "programs/amm/src/states/tick_array.rs",
+      "url": "https://raw.githubusercontent.com/raydium-io/raydium-clmm/ed7c84a54ced59c55981780546adb0b4583dcf85/programs/amm/src/states/tick_array.rs",
+      "sha256": "fa9aee5a1a4648053e207f65726a4d10f940cf242134e3e8cf9b19a3e6a6f7c7",
+      "bytes": 79977,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/raydium-io/raydium-clmm",
+      "revision": "ed7c84a54ced59c55981780546adb0b4583dcf85",
+      "path": "programs/amm/src/states/config.rs",
+      "url": "https://raw.githubusercontent.com/raydium-io/raydium-clmm/ed7c84a54ced59c55981780546adb0b4583dcf85/programs/amm/src/states/config.rs",
+      "sha256": "1f7b7b7c0c69a66c3ed038121ed0039569e96a7def6ebecfeb33d6a0d22adc65",
+      "bytes": 1580,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/raydium-io/raydium-clmm",
+      "revision": "ed7c84a54ced59c55981780546adb0b4583dcf85",
+      "path": "programs/amm/src/libraries/tick_math.rs",
+      "url": "https://raw.githubusercontent.com/raydium-io/raydium-clmm/ed7c84a54ced59c55981780546adb0b4583dcf85/programs/amm/src/libraries/tick_math.rs",
+      "sha256": "78ef34cd512c3a6395c69042168154d4acd559f49653f490df274da5044b31a7",
+      "bytes": 11512,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/raydium-io/raydium-clmm",
+      "revision": "ed7c84a54ced59c55981780546adb0b4583dcf85",
+      "path": "programs/amm/src/libraries/liquidity_math.rs",
+      "url": "https://raw.githubusercontent.com/raydium-io/raydium-clmm/ed7c84a54ced59c55981780546adb0b4583dcf85/programs/amm/src/libraries/liquidity_math.rs",
+      "sha256": "93823dc137c755cefb9ec431ec686a95813f4187edbf0f87ebc985e806c9e351",
+      "bytes": 15885,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/raydium-io/raydium-clmm",
+      "revision": "ed7c84a54ced59c55981780546adb0b4583dcf85",
+      "path": "programs/amm/src/instructions/open_position.rs",
+      "url": "https://raw.githubusercontent.com/raydium-io/raydium-clmm/ed7c84a54ced59c55981780546adb0b4583dcf85/programs/amm/src/instructions/open_position.rs",
+      "sha256": "a649e7bab97a11dd52a54545a3a1b0719d48513810cf42b094995d59c757e0b4",
+      "bytes": 36097,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/raydium-io/raydium-clmm",
+      "revision": "ed7c84a54ced59c55981780546adb0b4583dcf85",
+      "path": "programs/amm/src/instructions/open_position_with_token22_nft.rs",
+      "url": "https://raw.githubusercontent.com/raydium-io/raydium-clmm/ed7c84a54ced59c55981780546adb0b4583dcf85/programs/amm/src/instructions/open_position_with_token22_nft.rs",
+      "sha256": "52a068b867bebaa715923506b693ea7dd53e1cb96188123d647da6b31a0f6f96",
+      "bytes": 6967,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/raydium-io/raydium-clmm",
+      "revision": "ed7c84a54ced59c55981780546adb0b4583dcf85",
+      "path": "LICENSE",
+      "url": "https://raw.githubusercontent.com/raydium-io/raydium-clmm/ed7c84a54ced59c55981780546adb0b4583dcf85/LICENSE",
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+      "bytes": 11357,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/orca-so/whirlpools",
+      "revision": "408c945fef4c49ab70def4303377cfaf8f0f3c99",
+      "path": "programs/whirlpool/src/lib.rs",
+      "url": "https://raw.githubusercontent.com/orca-so/whirlpools/408c945fef4c49ab70def4303377cfaf8f0f3c99/programs/whirlpool/src/lib.rs",
+      "sha256": "1a9be028bb3d5c0699278dd3fe50aea4b20e91e975280fb69b7f2dcf14418ea0",
+      "bytes": 62738,
+      "license": "Orca License (effective 2025-02-27)"
+    },
+    {
+      "repository": "https://github.com/orca-so/whirlpools",
+      "revision": "408c945fef4c49ab70def4303377cfaf8f0f3c99",
+      "path": "programs/whirlpool/src/state/whirlpool.rs",
+      "url": "https://raw.githubusercontent.com/orca-so/whirlpools/408c945fef4c49ab70def4303377cfaf8f0f3c99/programs/whirlpool/src/state/whirlpool.rs",
+      "sha256": "dc6f34e643416068c21ec0f8bfb58434883d91a5bc54810f4a3a641ce8f046dc",
+      "bytes": 27097,
+      "license": "Orca License (effective 2025-02-27)"
+    },
+    {
+      "repository": "https://github.com/orca-so/whirlpools",
+      "revision": "408c945fef4c49ab70def4303377cfaf8f0f3c99",
+      "path": "programs/whirlpool/src/state/position.rs",
+      "url": "https://raw.githubusercontent.com/orca-so/whirlpools/408c945fef4c49ab70def4303377cfaf8f0f3c99/programs/whirlpool/src/state/position.rs",
+      "sha256": "4d5916e91fe81e5a0e87cbd0ba1fbeab1a048d27126b03a35cad9e51bc93b193",
+      "bytes": 15131,
+      "license": "Orca License (effective 2025-02-27)"
+    },
+    {
+      "repository": "https://github.com/orca-so/whirlpools",
+      "revision": "408c945fef4c49ab70def4303377cfaf8f0f3c99",
+      "path": "programs/whirlpool/src/state/position_bundle.rs",
+      "url": "https://raw.githubusercontent.com/orca-so/whirlpools/408c945fef4c49ab70def4303377cfaf8f0f3c99/programs/whirlpool/src/state/position_bundle.rs",
+      "sha256": "1bc6c09777cefb0815ed961844be9b3f0234bbb1cde9812480248e9fb84ef1f1",
+      "bytes": 10135,
+      "license": "Orca License (effective 2025-02-27)"
+    },
+    {
+      "repository": "https://github.com/orca-so/whirlpools",
+      "revision": "408c945fef4c49ab70def4303377cfaf8f0f3c99",
+      "path": "programs/whirlpool/src/state/tick.rs",
+      "url": "https://raw.githubusercontent.com/orca-so/whirlpools/408c945fef4c49ab70def4303377cfaf8f0f3c99/programs/whirlpool/src/state/tick.rs",
+      "sha256": "5b2d6519f81442ec9ec4bc7f2219a2ac9551dc8f594e80f4823138e761b32ed9",
+      "bytes": 11499,
+      "license": "Orca License (effective 2025-02-27)"
+    },
+    {
+      "repository": "https://github.com/orca-so/whirlpools",
+      "revision": "408c945fef4c49ab70def4303377cfaf8f0f3c99",
+      "path": "programs/whirlpool/src/state/fixed_tick_array.rs",
+      "url": "https://raw.githubusercontent.com/orca-so/whirlpools/408c945fef4c49ab70def4303377cfaf8f0f3c99/programs/whirlpool/src/state/fixed_tick_array.rs",
+      "sha256": "272b9ca9a0e320aa3f16e061bf48533a9eaf8933ed9ddedccb15843f85ed6529",
+      "bytes": 15284,
+      "license": "Orca License (effective 2025-02-27)"
+    },
+    {
+      "repository": "https://github.com/orca-so/whirlpools",
+      "revision": "408c945fef4c49ab70def4303377cfaf8f0f3c99",
+      "path": "programs/whirlpool/src/state/dynamic_tick_array.rs",
+      "url": "https://raw.githubusercontent.com/orca-so/whirlpools/408c945fef4c49ab70def4303377cfaf8f0f3c99/programs/whirlpool/src/state/dynamic_tick_array.rs",
+      "sha256": "68379c7c582fa627f550be4f4b7108904111b19825aa131d2ad55a682de2c83b",
+      "bytes": 39908,
+      "license": "Orca License (effective 2025-02-27)"
+    },
+    {
+      "repository": "https://github.com/orca-so/whirlpools",
+      "revision": "408c945fef4c49ab70def4303377cfaf8f0f3c99",
+      "path": "programs/whirlpool/src/math/tick_math.rs",
+      "url": "https://raw.githubusercontent.com/orca-so/whirlpools/408c945fef4c49ab70def4303377cfaf8f0f3c99/programs/whirlpool/src/math/tick_math.rs",
+      "sha256": "f1cf82a96a67b169b58ea450043081cc44c6c16c511af19c61f951be054bcd72",
+      "bytes": 19043,
+      "license": "Orca License (effective 2025-02-27)"
+    },
+    {
+      "repository": "https://github.com/orca-so/whirlpools",
+      "revision": "408c945fef4c49ab70def4303377cfaf8f0f3c99",
+      "path": "programs/whirlpool/src/math/token_math.rs",
+      "url": "https://raw.githubusercontent.com/orca-so/whirlpools/408c945fef4c49ab70def4303377cfaf8f0f3c99/programs/whirlpool/src/math/token_math.rs",
+      "sha256": "c59e562e7f1964366da1ac5dd9f5bfeca454bbdaea445c62ac24d667156f2a12",
+      "bytes": 25842,
+      "license": "Orca License (effective 2025-02-27)"
+    },
+    {
+      "repository": "https://github.com/orca-so/whirlpools",
+      "revision": "408c945fef4c49ab70def4303377cfaf8f0f3c99",
+      "path": "programs/whirlpool/src/instructions/open_position.rs",
+      "url": "https://raw.githubusercontent.com/orca-so/whirlpools/408c945fef4c49ab70def4303377cfaf8f0f3c99/programs/whirlpool/src/instructions/open_position.rs",
+      "sha256": "524b9ecc6bbf860fa5c0742fc65b3a3ffaaf09fa130ed10df5037ffd58c01d0d",
+      "bytes": 3056,
+      "license": "Orca License (effective 2025-02-27)"
+    },
+    {
+      "repository": "https://github.com/orca-so/whirlpools",
+      "revision": "408c945fef4c49ab70def4303377cfaf8f0f3c99",
+      "path": "programs/whirlpool/src/instructions/open_bundled_position.rs",
+      "url": "https://raw.githubusercontent.com/orca-so/whirlpools/408c945fef4c49ab70def4303377cfaf8f0f3c99/programs/whirlpool/src/instructions/open_bundled_position.rs",
+      "sha256": "683cba2c5737d06861349f8d28cfc98fc2b3390b821775a4b98a6ed90de28155",
+      "bytes": 2802,
+      "license": "Orca License (effective 2025-02-27)"
+    },
+    {
+      "repository": "https://github.com/orca-so/whirlpools",
+      "revision": "408c945fef4c49ab70def4303377cfaf8f0f3c99",
+      "path": "programs/whirlpool/src/instructions/open_position_with_token_extensions.rs",
+      "url": "https://raw.githubusercontent.com/orca-so/whirlpools/408c945fef4c49ab70def4303377cfaf8f0f3c99/programs/whirlpool/src/instructions/open_position_with_token_extensions.rs",
+      "sha256": "0a8024aa13c0bfc600434b219c3c0b6d1080c926d5235555114b1a9c5ea80ecb",
+      "bytes": 4449,
+      "license": "Orca License (effective 2025-02-27)"
+    },
+    {
+      "repository": "https://github.com/orca-so/whirlpools",
+      "revision": "408c945fef4c49ab70def4303377cfaf8f0f3c99",
+      "path": "LICENSE",
+      "url": "https://raw.githubusercontent.com/orca-so/whirlpools/408c945fef4c49ab70def4303377cfaf8f0f3c99/LICENSE",
+      "sha256": "8f54a2e7a06244dfb6a780885ef12ab6c96bb66c3482b35137143c4f0eadc489",
+      "bytes": 8306,
+      "license": "Orca License (effective 2025-02-27)"
+    },
+    {
+      "repository": "https://github.com/orca-so/whirlpools",
+      "revision": "408c945fef4c49ab70def4303377cfaf8f0f3c99",
+      "path": "programs/whirlpool/src/state/config.rs",
+      "url": "https://raw.githubusercontent.com/orca-so/whirlpools/408c945fef4c49ab70def4303377cfaf8f0f3c99/programs/whirlpool/src/state/config.rs",
+      "sha256": "251c0743999dc1c6542406ad4503ab974d074977ffa3993654fb1a4956b58969",
+      "bytes": 5814,
+      "license": "Orca License (effective 2025-02-27)"
+    },
+    {
+      "repository": "https://github.com/orca-so/whirlpools",
+      "revision": "e528dd23bb41571f92cfdb49a2f15d4fa0b01bec",
+      "path": "LICENSE",
+      "url": "https://raw.githubusercontent.com/orca-so/whirlpools/e528dd23bb41571f92cfdb49a2f15d4fa0b01bec/LICENSE",
+      "sha256": "674f864c69aa854f030fd8bd3ceff5b0611faa139c4f88cf8e450b5ad809c826",
+      "bytes": 561,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/orca-so/whirlpools",
+      "revision": "e528dd23bb41571f92cfdb49a2f15d4fa0b01bec",
+      "path": "programs/whirlpool/src/math/tick_math.rs",
+      "url": "https://raw.githubusercontent.com/orca-so/whirlpools/e528dd23bb41571f92cfdb49a2f15d4fa0b01bec/programs/whirlpool/src/math/tick_math.rs",
+      "sha256": "3a263c0f84bd0aa978af8e767951fc6169eec0ad238ef62c4f3693bd48253c6e",
+      "bytes": 19047,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/https://github.com/MeteoraAg/dlmm-sdk",
+      "revision": "576919e3e4368e542c402f000b4264724f7f23ec",
+      "path": "idls/dlmm.json",
+      "url": "https://raw.githubusercontent.com/MeteoraAg/dlmm-sdk/576919e3e4368e542c402f000b4264724f7f23ec/idls/dlmm.json",
+      "sha256": "045c0f4af044be046b6a14b350077e4242e8ac026b64a855803dab30fcdd8b35",
+      "bytes": 210551,
+      "license": "ts-client package declares ISC; root license not present in pinned tree"
+    },
+    {
+      "repository": "https://github.com/https://github.com/MeteoraAg/dlmm-sdk",
+      "revision": "576919e3e4368e542c402f000b4264724f7f23ec",
+      "path": "commons/src/pda.rs",
+      "url": "https://raw.githubusercontent.com/MeteoraAg/dlmm-sdk/576919e3e4368e542c402f000b4264724f7f23ec/commons/src/pda.rs",
+      "sha256": "1f9dccb193e78e333b9af34ff6e0596707ff83ad9fac234b033454f4d3081363",
+      "bytes": 4524,
+      "license": "ts-client package declares ISC; root license not present in pinned tree"
+    },
+    {
+      "repository": "https://github.com/https://github.com/MeteoraAg/dlmm-sdk",
+      "revision": "576919e3e4368e542c402f000b4264724f7f23ec",
+      "path": "commons/src/constants.rs",
+      "url": "https://raw.githubusercontent.com/MeteoraAg/dlmm-sdk/576919e3e4368e542c402f000b4264724f7f23ec/commons/src/constants.rs",
+      "sha256": "1ca19a52e356b370b720a4eae141d3594da45be48e8067e6d1e2938e3a54cdc1",
+      "bytes": 2293,
+      "license": "ts-client package declares ISC; root license not present in pinned tree"
+    },
+    {
+      "repository": "https://github.com/https://github.com/MeteoraAg/dlmm-sdk",
+      "revision": "576919e3e4368e542c402f000b4264724f7f23ec",
+      "path": "commons/src/extensions/bin.rs",
+      "url": "https://raw.githubusercontent.com/MeteoraAg/dlmm-sdk/576919e3e4368e542c402f000b4264724f7f23ec/commons/src/extensions/bin.rs",
+      "sha256": "0031a26a92f299077b16bb956a369f473be72338b294b832e911be72115aedeb",
+      "bytes": 6996,
+      "license": "ts-client package declares ISC; root license not present in pinned tree"
+    },
+    {
+      "repository": "https://github.com/https://github.com/MeteoraAg/dlmm-sdk",
+      "revision": "576919e3e4368e542c402f000b4264724f7f23ec",
+      "path": "commons/src/extensions/bin_array.rs",
+      "url": "https://raw.githubusercontent.com/MeteoraAg/dlmm-sdk/576919e3e4368e542c402f000b4264724f7f23ec/commons/src/extensions/bin_array.rs",
+      "sha256": "27911c3284ecd27536a45a70ea03cb564363b9820deecb69bf051f373d13f709",
+      "bytes": 3707,
+      "license": "ts-client package declares ISC; root license not present in pinned tree"
+    },
+    {
+      "repository": "https://github.com/https://github.com/MeteoraAg/dlmm-sdk",
+      "revision": "576919e3e4368e542c402f000b4264724f7f23ec",
+      "path": "ts-client/src/dlmm/index.ts",
+      "url": "https://raw.githubusercontent.com/MeteoraAg/dlmm-sdk/576919e3e4368e542c402f000b4264724f7f23ec/ts-client/src/dlmm/index.ts",
+      "sha256": "35fea3a4b0c132fb88571d5f6207a7f9e177c829cb48fc97b481596af5d75fc7",
+      "bytes": 296734,
+      "license": "ts-client package declares ISC; root license not present in pinned tree"
+    },
+    {
+      "repository": "https://github.com/https://github.com/MeteoraAg/dlmm-sdk",
+      "revision": "576919e3e4368e542c402f000b4264724f7f23ec",
+      "path": "ts-client/src/dlmm/helpers/lbPair.ts",
+      "url": "https://raw.githubusercontent.com/MeteoraAg/dlmm-sdk/576919e3e4368e542c402f000b4264724f7f23ec/ts-client/src/dlmm/helpers/lbPair.ts",
+      "sha256": "5f876a78f45b48d6255a29a2a20d1acbe8288de722a00fe932d4722695678a17",
+      "bytes": 2669,
+      "license": "ts-client package declares ISC; root license not present in pinned tree"
+    },
+    {
+      "repository": "https://github.com/https://github.com/MeteoraAg/dlmm-sdk",
+      "revision": "576919e3e4368e542c402f000b4264724f7f23ec",
+      "path": "ts-client/package.json",
+      "url": "https://raw.githubusercontent.com/MeteoraAg/dlmm-sdk/576919e3e4368e542c402f000b4264724f7f23ec/ts-client/package.json",
+      "sha256": "fb754445ba304b45a13071218a8ff1bcab10a7bb2793d8ba28efbc3c519a488a",
+      "bytes": 1721,
+      "license": "ts-client package declares ISC; root license not present in pinned tree"
+    },
+    {
+      "repository": "https://github.com/https://github.com/MeteoraAg/dlmm-sdk",
+      "revision": "576919e3e4368e542c402f000b4264724f7f23ec",
+      "path": "README.md",
+      "url": "https://raw.githubusercontent.com/MeteoraAg/dlmm-sdk/576919e3e4368e542c402f000b4264724f7f23ec/README.md",
+      "sha256": "2ba1b18775c7e6eaf6ad4eaa4f78bb475f39c8168d8dc272279eda4e1116acc9",
+      "bytes": 175,
+      "license": "ts-client package declares ISC; root license not present in pinned tree"
+    },
+    {
+      "repository": "https://github.com/https://github.com/MeteoraAg/damm-v2",
+      "revision": "a85c926607433f23f0ea60f4ca7b1ae92f4156cb",
+      "path": "license.md",
+      "url": "https://raw.githubusercontent.com/MeteoraAg/damm-v2/a85c926607433f23f0ea60f4ca7b1ae92f4156cb/license.md",
+      "sha256": "f5fd01dfb4f78c449fbec7d1fccb3c428a05254c1799287735fba643147ea015",
+      "bytes": 4673,
+      "license": "Meteora Noncommercial Licence; interface/math research only, upstream software not installed or vendored"
+    },
+    {
+      "repository": "https://github.com/https://github.com/MeteoraAg/damm-v2",
+      "revision": "a85c926607433f23f0ea60f4ca7b1ae92f4156cb",
+      "path": "programs/cp-amm/src/lib.rs",
+      "url": "https://raw.githubusercontent.com/MeteoraAg/damm-v2/a85c926607433f23f0ea60f4ca7b1ae92f4156cb/programs/cp-amm/src/lib.rs",
+      "sha256": "df7ae103d5d2f7cbe77de0d2b0d1c3b10b5e811c8117a6d90bbb3b2121922be8",
+      "bytes": 11643,
+      "license": "Meteora Noncommercial Licence; interface/math research only, upstream software not installed or vendored"
+    },
+    {
+      "repository": "https://github.com/https://github.com/MeteoraAg/damm-v2",
+      "revision": "a85c926607433f23f0ea60f4ca7b1ae92f4156cb",
+      "path": "programs/cp-amm/src/constants.rs",
+      "url": "https://raw.githubusercontent.com/MeteoraAg/damm-v2/a85c926607433f23f0ea60f4ca7b1ae92f4156cb/programs/cp-amm/src/constants.rs",
+      "sha256": "caed4458c4103b5eaa788c2d1e3477df107a7eb6f93dce9453c9f276c348c276",
+      "bytes": 6580,
+      "license": "Meteora Noncommercial Licence; interface/math research only, upstream software not installed or vendored"
+    },
+    {
+      "repository": "https://github.com/https://github.com/MeteoraAg/damm-v2",
+      "revision": "a85c926607433f23f0ea60f4ca7b1ae92f4156cb",
+      "path": "programs/cp-amm/src/const_pda.rs",
+      "url": "https://raw.githubusercontent.com/MeteoraAg/damm-v2/a85c926607433f23f0ea60f4ca7b1ae92f4156cb/programs/cp-amm/src/const_pda.rs",
+      "sha256": "c9f654043511cd690bc51284aaeafe0b87bc7ec4319ba81bcacc9b2a4f8a7215",
+      "bytes": 1207,
+      "license": "Meteora Noncommercial Licence; interface/math research only, upstream software not installed or vendored"
+    },
+    {
+      "repository": "https://github.com/https://github.com/MeteoraAg/damm-v2",
+      "revision": "a85c926607433f23f0ea60f4ca7b1ae92f4156cb",
+      "path": "programs/cp-amm/src/state/pool.rs",
+      "url": "https://raw.githubusercontent.com/MeteoraAg/damm-v2/a85c926607433f23f0ea60f4ca7b1ae92f4156cb/programs/cp-amm/src/state/pool.rs",
+      "sha256": "ddcc405e154a78a1de6daf5ce697fc1e8bb1b54ca06ca0fe50b40997a272ba7a",
+      "bytes": 47215,
+      "license": "Meteora Noncommercial Licence; interface/math research only, upstream software not installed or vendored"
+    },
+    {
+      "repository": "https://github.com/https://github.com/MeteoraAg/damm-v2",
+      "revision": "a85c926607433f23f0ea60f4ca7b1ae92f4156cb",
+      "path": "programs/cp-amm/src/state/position.rs",
+      "url": "https://raw.githubusercontent.com/MeteoraAg/damm-v2/a85c926607433f23f0ea60f4ca7b1ae92f4156cb/programs/cp-amm/src/state/position.rs",
+      "sha256": "bb8526c16d3a582ea03ee9844facaac9ff187ad3c5e532c83b53385b450d99a5",
+      "bytes": 20753,
+      "license": "Meteora Noncommercial Licence; interface/math research only, upstream software not installed or vendored"
+    },
+    {
+      "repository": "https://github.com/https://github.com/MeteoraAg/damm-v2",
+      "revision": "a85c926607433f23f0ea60f4ca7b1ae92f4156cb",
+      "path": "programs/cp-amm/src/state/vesting.rs",
+      "url": "https://raw.githubusercontent.com/MeteoraAg/damm-v2/a85c926607433f23f0ea60f4ca7b1ae92f4156cb/programs/cp-amm/src/state/vesting.rs",
+      "sha256": "592fd28514f222f3460b4919a9c17c4c5bdf5a44eb294c56cecc2fa505be245b",
+      "bytes": 3538,
+      "license": "Meteora Noncommercial Licence; interface/math research only, upstream software not installed or vendored"
+    },
+    {
+      "repository": "https://github.com/https://github.com/MeteoraAg/damm-v2",
+      "revision": "a85c926607433f23f0ea60f4ca7b1ae92f4156cb",
+      "path": "programs/cp-amm/src/state/config.rs",
+      "url": "https://raw.githubusercontent.com/MeteoraAg/damm-v2/a85c926607433f23f0ea60f4ca7b1ae92f4156cb/programs/cp-amm/src/state/config.rs",
+      "sha256": "2d3b2ae5e15d85c050e53a6778b18c3bd45ab6677e510ad644d2d13cbfb15b66",
+      "bytes": 11068,
+      "license": "Meteora Noncommercial Licence; interface/math research only, upstream software not installed or vendored"
+    },
+    {
+      "repository": "https://github.com/https://github.com/MeteoraAg/damm-v2",
+      "revision": "a85c926607433f23f0ea60f4ca7b1ae92f4156cb",
+      "path": "programs/cp-amm/src/state/fee.rs",
+      "url": "https://raw.githubusercontent.com/MeteoraAg/damm-v2/a85c926607433f23f0ea60f4ca7b1ae92f4156cb/programs/cp-amm/src/state/fee.rs",
+      "sha256": "6682301ab0e0b05d53c3cfa8ab6f5883bfb684d5b0b8ca0e6055f6d7bef0a048",
+      "bytes": 14191,
+      "license": "Meteora Noncommercial Licence; interface/math research only, upstream software not installed or vendored"
+    },
+    {
+      "repository": "https://github.com/https://github.com/MeteoraAg/damm-v2",
+      "revision": "a85c926607433f23f0ea60f4ca7b1ae92f4156cb",
+      "path": "programs/cp-amm/src/liquidity_handler/concentrated_liquidity.rs",
+      "url": "https://raw.githubusercontent.com/MeteoraAg/damm-v2/a85c926607433f23f0ea60f4ca7b1ae92f4156cb/programs/cp-amm/src/liquidity_handler/concentrated_liquidity.rs",
+      "sha256": "f769e6026237ef9ef9b853dd92a223494125392986ce0c137e4a352872cf31f2",
+      "bytes": 15739,
+      "license": "Meteora Noncommercial Licence; interface/math research only, upstream software not installed or vendored"
+    },
+    {
+      "repository": "https://github.com/https://github.com/MeteoraAg/damm-v2",
+      "revision": "a85c926607433f23f0ea60f4ca7b1ae92f4156cb",
+      "path": "programs/cp-amm/src/liquidity_handler/compounding_liquidity.rs",
+      "url": "https://raw.githubusercontent.com/MeteoraAg/damm-v2/a85c926607433f23f0ea60f4ca7b1ae92f4156cb/programs/cp-amm/src/liquidity_handler/compounding_liquidity.rs",
+      "sha256": "b38ffbccedb2a5b9738efb9e67c0b87542b9aee7c1b0a628a220f61c3428c5f0",
+      "bytes": 6546,
+      "license": "Meteora Noncommercial Licence; interface/math research only, upstream software not installed or vendored"
+    },
+    {
+      "repository": "https://github.com/https://github.com/MeteoraAg/damm-v2",
+      "revision": "a85c926607433f23f0ea60f4ca7b1ae92f4156cb",
+      "path": "programs/cp-amm/src/liquidity_handler/mod.rs",
+      "url": "https://raw.githubusercontent.com/MeteoraAg/damm-v2/a85c926607433f23f0ea60f4ca7b1ae92f4156cb/programs/cp-amm/src/liquidity_handler/mod.rs",
+      "sha256": "634f675d262ade121b601cdc7be3e9bac97549cd549af38dfb5b00a0ef7ed665",
+      "bytes": 2667,
+      "license": "Meteora Noncommercial Licence; interface/math research only, upstream software not installed or vendored"
+    },
+    {
+      "repository": "https://github.com/https://github.com/MeteoraAg/damm-v2",
+      "revision": "a85c926607433f23f0ea60f4ca7b1ae92f4156cb",
+      "path": "programs/cp-amm/src/instructions/ix_lock_position.rs",
+      "url": "https://raw.githubusercontent.com/MeteoraAg/damm-v2/a85c926607433f23f0ea60f4ca7b1ae92f4156cb/programs/cp-amm/src/instructions/ix_lock_position.rs",
+      "sha256": "aa53f9e280b6f92f77d7259805b4b6645400e2605cb8a89085abbfd297d6837c",
+      "bytes": 5579,
+      "license": "Meteora Noncommercial Licence; interface/math research only, upstream software not installed or vendored"
+    },
+    {
+      "repository": "https://github.com/https://github.com/MeteoraAg/damm-v2",
+      "revision": "a85c926607433f23f0ea60f4ca7b1ae92f4156cb",
+      "path": "programs/cp-amm/src/instructions/ix_permanent_lock_position.rs",
+      "url": "https://raw.githubusercontent.com/MeteoraAg/damm-v2/a85c926607433f23f0ea60f4ca7b1ae92f4156cb/programs/cp-amm/src/instructions/ix_permanent_lock_position.rs",
+      "sha256": "85e0d5aec1dd4c41e80fbde5a65a2d79433fd2952c8b30bac1cf5aa4a0209976",
+      "bytes": 2148,
+      "license": "Meteora Noncommercial Licence; interface/math research only, upstream software not installed or vendored"
+    },
+    {
+      "repository": "https://github.com/https://github.com/MeteoraAg/damm-v2",
+      "revision": "a85c926607433f23f0ea60f4ca7b1ae92f4156cb",
+      "path": "programs/cp-amm/src/instructions/ix_remove_liquidity.rs",
+      "url": "https://raw.githubusercontent.com/MeteoraAg/damm-v2/a85c926607433f23f0ea60f4ca7b1ae92f4156cb/programs/cp-amm/src/instructions/ix_remove_liquidity.rs",
+      "sha256": "9046051b6f7a6ebd7421d27849c8a21ff954e86bcc4cba0fa34bb7d5abb62419",
+      "bytes": 6721,
+      "license": "Meteora Noncommercial Licence; interface/math research only, upstream software not installed or vendored"
+    },
+    {
+      "repository": "https://github.com/https://github.com/MeteoraAg/damm-v2",
+      "revision": "a85c926607433f23f0ea60f4ca7b1ae92f4156cb",
+      "path": "programs/cp-amm/src/instructions/ix_refresh_vesting.rs",
+      "url": "https://raw.githubusercontent.com/MeteoraAg/damm-v2/a85c926607433f23f0ea60f4ca7b1ae92f4156cb/programs/cp-amm/src/instructions/ix_refresh_vesting.rs",
+      "sha256": "3e7cac82f894e35c33d474ab4324a18b4e72f983455c67c85198f23b1d69db67",
+      "bytes": 2945,
+      "license": "Meteora Noncommercial Licence; interface/math research only, upstream software not installed or vendored"
+    },
+    {
+      "repository": "https://github.com/https://github.com/MeteoraAg/damm-v2",
+      "revision": "a85c926607433f23f0ea60f4ca7b1ae92f4156cb",
+      "path": "README.md",
+      "url": "https://raw.githubusercontent.com/MeteoraAg/damm-v2/a85c926607433f23f0ea60f4ca7b1ae92f4156cb/README.md",
+      "sha256": "b423fff8132d3e729a9d518d4b7cfe14ccd1cacc37b691f3220970c61fec7fe6",
+      "bytes": 4286,
+      "license": "Meteora Noncommercial Licence; interface/math research only, upstream software not installed or vendored"
+    },
+    {
+      "repository": "https://github.com/MeteoraAg/dlmm-sdk",
+      "revision": "576919e3e4368e542c402f000b4264724f7f23ec",
+      "path": "ts-client/src/dlmm/constants/index.ts",
+      "url": "https://raw.githubusercontent.com/MeteoraAg/dlmm-sdk/576919e3e4368e542c402f000b4264724f7f23ec/ts-client/src/dlmm/constants/index.ts",
+      "sha256": "4e5c7077f0580acd9c998058f6a818d7409a99bdae3179fa3ad80371d991a027",
+      "bytes": 4539,
+      "license": "ts-client package declares ISC; root license not present in pinned tree"
+    },
+    {
+      "repository": "https://github.com/MeteoraAg/dlmm-sdk",
+      "revision": "576919e3e4368e542c402f000b4264724f7f23ec",
+      "path": "ts-client/src/dlmm/helpers/positions/wrapper.ts",
+      "url": "https://raw.githubusercontent.com/MeteoraAg/dlmm-sdk/576919e3e4368e542c402f000b4264724f7f23ec/ts-client/src/dlmm/helpers/positions/wrapper.ts",
+      "sha256": "2ca4bd8b2ba7d7b74c9f87efe84eea81227afc892180dc36ef5bfcc44e706ad3",
+      "bytes": 4694,
+      "license": "ts-client package declares ISC; root license not present in pinned tree"
+    },
+    {
+      "repository": "https://github.com/MeteoraAg/dlmm-sdk",
+      "revision": "576919e3e4368e542c402f000b4264724f7f23ec",
+      "path": "commons/src/extensions/position.rs",
+      "url": "https://raw.githubusercontent.com/MeteoraAg/dlmm-sdk/576919e3e4368e542c402f000b4264724f7f23ec/commons/src/extensions/position.rs",
+      "sha256": "a16bbf203d46d94e7a956ed7ac5478c4daa3ab0f19865ceab725bc90c45ce2fc",
+      "bytes": 3284,
+      "license": "ts-client package declares ISC; root license not present in pinned tree"
+    },
+    {
+      "repository": "https://github.com/MeteoraAg/damm-v2",
+      "revision": "a85c926607433f23f0ea60f4ca7b1ae92f4156cb",
+      "path": "programs/cp-amm/src/instructions/ix_create_position.rs",
+      "url": "https://raw.githubusercontent.com/MeteoraAg/damm-v2/a85c926607433f23f0ea60f4ca7b1ae92f4156cb/programs/cp-amm/src/instructions/ix_create_position.rs",
+      "sha256": "f118aa2d29a53f62efc6a1380058c90606b7de0e17fe0811c31f3e1229d03bb7",
+      "bytes": 5255,
+      "license": "Meteora Noncommercial Licence; interface/math research only, upstream software not installed or vendored"
+    },
+    {
+      "repository": "https://github.com/MeteoraAg/damm-v2",
+      "revision": "a85c926607433f23f0ea60f4ca7b1ae92f4156cb",
+      "path": "programs/cp-amm/src/instructions/initialize_pool/ix_initialize_pool.rs",
+      "url": "https://raw.githubusercontent.com/MeteoraAg/damm-v2/a85c926607433f23f0ea60f4ca7b1ae92f4156cb/programs/cp-amm/src/instructions/initialize_pool/ix_initialize_pool.rs",
+      "sha256": "e028d38034bf95d63017af2b7bf11f422a8a692ad388d844f338b39ad4a46d2f",
+      "bytes": 11408,
+      "license": "Meteora Noncommercial Licence; interface/math research only, upstream software not installed or vendored"
+    },
+    {
+      "repository": "https://github.com/MeteoraAg/damm-v2",
+      "revision": "a85c926607433f23f0ea60f4ca7b1ae92f4156cb",
+      "path": "programs/cp-amm/src/utils/activation_handler.rs",
+      "url": "https://raw.githubusercontent.com/MeteoraAg/damm-v2/a85c926607433f23f0ea60f4ca7b1ae92f4156cb/programs/cp-amm/src/utils/activation_handler.rs",
+      "sha256": "dcf728b52e0c895fea5b31ea4665f35958d19ed8874cf63995b57d17a7f5c546",
+      "bytes": 3392,
+      "license": "Meteora Noncommercial Licence; interface/math research only, upstream software not installed or vendored"
+    },
+    {
+      "repository": "https://github.com/MeteoraAg/damm-v2",
+      "revision": "a85c926607433f23f0ea60f4ca7b1ae92f4156cb",
+      "path": "programs/cp-amm/src/utils/token.rs",
+      "url": "https://raw.githubusercontent.com/MeteoraAg/damm-v2/a85c926607433f23f0ea60f4ca7b1ae92f4156cb/programs/cp-amm/src/utils/token.rs",
+      "sha256": "2c82b61d44c7ab15504c4c27d71f8d22a0a28fbf3328fa60fa57cdf559dbae72",
+      "bytes": 10714,
+      "license": "Meteora Noncommercial Licence; interface/math research only, upstream software not installed or vendored"
+    },
+    {
+      "repository": "https://github.com/MeteoraAg/damm-v2",
+      "revision": "a85c926607433f23f0ea60f4ca7b1ae92f4156cb",
+      "path": "programs/cp-amm/src/base_fee/mod.rs",
+      "url": "https://raw.githubusercontent.com/MeteoraAg/damm-v2/a85c926607433f23f0ea60f4ca7b1ae92f4156cb/programs/cp-amm/src/base_fee/mod.rs",
+      "sha256": "ab853074a4fc0ec8acce28f0574d85d804e03d0b3a6a1bb799d70814c93a7363",
+      "bytes": 1269,
+      "license": "Meteora Noncommercial Licence; interface/math research only, upstream software not installed or vendored"
+    },
+    {
+      "repository": "https://github.com/MeteoraAg/damm-v2",
+      "revision": "a85c926607433f23f0ea60f4ca7b1ae92f4156cb",
+      "path": "programs/cp-amm/src/base_fee/base_fee_serde.rs",
+      "url": "https://raw.githubusercontent.com/MeteoraAg/damm-v2/a85c926607433f23f0ea60f4ca7b1ae92f4156cb/programs/cp-amm/src/base_fee/base_fee_serde.rs",
+      "sha256": "7487652f59bc813249fae89321b24fda719fdd604b2603d64fec07b7cc5f06bb",
+      "bytes": 6981,
+      "license": "Meteora Noncommercial Licence; interface/math research only, upstream software not installed or vendored"
+    },
+    {
+      "repository": "https://github.com/MeteoraAg/damm-v2",
+      "revision": "a85c926607433f23f0ea60f4ca7b1ae92f4156cb",
+      "path": "programs/cp-amm/src/base_fee/fee_time_scheduler.rs",
+      "url": "https://raw.githubusercontent.com/MeteoraAg/damm-v2/a85c926607433f23f0ea60f4ca7b1ae92f4156cb/programs/cp-amm/src/base_fee/fee_time_scheduler.rs",
+      "sha256": "be06c96f5ea29c254c05f26bc88a93976aa21f47bd1a58ecde96c1abc2f0cea2",
+      "bytes": 7119,
+      "license": "Meteora Noncommercial Licence; interface/math research only, upstream software not installed or vendored"
+    },
+    {
+      "repository": "https://github.com/MeteoraAg/damm-v2",
+      "revision": "a85c926607433f23f0ea60f4ca7b1ae92f4156cb",
+      "path": "programs/cp-amm/src/base_fee/fee_market_cap_scheduler.rs",
+      "url": "https://raw.githubusercontent.com/MeteoraAg/damm-v2/a85c926607433f23f0ea60f4ca7b1ae92f4156cb/programs/cp-amm/src/base_fee/fee_market_cap_scheduler.rs",
+      "sha256": "8fd6c95136cd0b2956266ed8c122ab0f74d52a8205464ff3db981acfc835fd21",
+      "bytes": 8960,
+      "license": "Meteora Noncommercial Licence; interface/math research only, upstream software not installed or vendored"
+    },
+    {
+      "repository": "https://github.com/MeteoraAg/damm-v2",
+      "revision": "a85c926607433f23f0ea60f4ca7b1ae92f4156cb",
+      "path": "programs/cp-amm/src/base_fee/fee_rate_limiter.rs",
+      "url": "https://raw.githubusercontent.com/MeteoraAg/damm-v2/a85c926607433f23f0ea60f4ca7b1ae92f4156cb/programs/cp-amm/src/base_fee/fee_rate_limiter.rs",
+      "sha256": "77484da9a2cb386ea8c21bad9099e268fe9849c6040e54db1fe27efc79fe377a",
+      "bytes": 18594,
+      "license": "Meteora Noncommercial Licence; interface/math research only, upstream software not installed or vendored"
+    },
+    {
+      "repository": "https://github.com/raydium-io/raydium-cp-swap",
+      "revision": "59fb845a9e5bb569c8b2f3415f13b0c0ebcc6b92",
+      "path": "programs/cp-swap/src/instructions/swap_base_input.rs",
+      "url": "https://raw.githubusercontent.com/raydium-io/raydium-cp-swap/59fb845a9e5bb569c8b2f3415f13b0c0ebcc6b92/programs/cp-swap/src/instructions/swap_base_input.rs",
+      "sha256": "5878ed09654745b5725030c5d84a8794a07088e836330890cbae2b0d7d7b1349",
+      "bytes": 7746,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/raydium-io/raydium-cp-swap",
+      "revision": "59fb845a9e5bb569c8b2f3415f13b0c0ebcc6b92",
+      "path": "programs/cp-swap/src/curve/calculator.rs",
+      "url": "https://raw.githubusercontent.com/raydium-io/raydium-cp-swap/59fb845a9e5bb569c8b2f3415f13b0c0ebcc6b92/programs/cp-swap/src/curve/calculator.rs",
+      "sha256": "aee16991f81d755a72eae70cdf929816fc9571144cf8570f5049f42af0e7f7f8",
+      "bytes": 15175,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/raydium-io/raydium-clmm",
+      "revision": "ed7c84a54ced59c55981780546adb0b4583dcf85",
+      "path": "programs/amm/src/instructions/swap_v2.rs",
+      "url": "https://raw.githubusercontent.com/raydium-io/raydium-clmm/ed7c84a54ced59c55981780546adb0b4583dcf85/programs/amm/src/instructions/swap_v2.rs",
+      "sha256": "708b05d131c49322b8739822138477f5974b629e370be20a617f3da52d9096fe",
+      "bytes": 12935,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/orca-so/whirlpools",
+      "revision": "408c945fef4c49ab70def4303377cfaf8f0f3c99",
+      "path": "programs/whirlpool/src/instructions/v2/swap.rs",
+      "url": "https://raw.githubusercontent.com/orca-so/whirlpools/408c945fef4c49ab70def4303377cfaf8f0f3c99/programs/whirlpool/src/instructions/v2/swap.rs",
+      "sha256": "0ee94b1a24c60dc8f2a472f8037fc72eeaecf7b6d128f173eae230098830530e",
+      "bytes": 11666,
+      "license": "Orca License"
+    },
+    {
+      "repository": "https://github.com/MeteoraAg/damm-v2",
+      "revision": "a85c926607433f23f0ea60f4ca7b1ae92f4156cb",
+      "path": "programs/cp-amm/src/instructions/swap/ix_swap.rs",
+      "url": "https://raw.githubusercontent.com/MeteoraAg/damm-v2/a85c926607433f23f0ea60f4ca7b1ae92f4156cb/programs/cp-amm/src/instructions/swap/ix_swap.rs",
+      "sha256": "19b6299c3b63acd9bb88094de7f9048e5ef5e2ecae9a3f6837884dafa8792578",
+      "bytes": 6437,
+      "license": "Noncommercial Licence"
+    },
+    {
+      "repository": "https://github.com/solana-program/token-2022",
+      "revision": "a3e696e42a9fbf87dea68af1443d354fc4054a9b",
+      "path": "interface/src/instruction.rs",
+      "url": "https://raw.githubusercontent.com/solana-program/token-2022/a3e696e42a9fbf87dea68af1443d354fc4054a9b/interface/src/instruction.rs",
+      "sha256": "672b3890cb58e5700a67f202491069ed44dffcbfa0e7d0b83a0cfbbb05b3a287",
+      "bytes": 102176,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/raydium-io/raydium-amm",
+      "revision": "d26944bfb76fb5fa8f91e5d440c2050ed358ef81",
+      "path": "program/src/instruction.rs",
+      "url": "https://raw.githubusercontent.com/raydium-io/raydium-amm/d26944bfb76fb5fa8f91e5d440c2050ed358ef81/program/src/instruction.rs",
+      "sha256": "499a331b01a1142975dece9ca7258a937ae0598422c33ec516c2f3e4883e0818",
+      "bytes": 42997,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/raydium-io/raydium-cp-swap",
+      "revision": "59fb845a9e5bb569c8b2f3415f13b0c0ebcc6b92",
+      "path": "programs/cp-swap/src/curve/constant_product.rs",
+      "url": "https://raw.githubusercontent.com/raydium-io/raydium-cp-swap/59fb845a9e5bb569c8b2f3415f13b0c0ebcc6b92/programs/cp-swap/src/curve/constant_product.rs",
+      "sha256": "5a6ab835ba35e872df53d12df58f98f0b5919592450872eb25e273ce18255077",
+      "bytes": 10645,
+      "license": "Apache-2.0"
+    },
+    {
+      "repository": "https://github.com/MeteoraAg/damm-v2",
+      "revision": "a85c926607433f23f0ea60f4ca7b1ae92f4156cb",
+      "path": "programs/cp-amm/src/entrypoint.rs",
+      "url": "https://raw.githubusercontent.com/MeteoraAg/damm-v2/a85c926607433f23f0ea60f4ca7b1ae92f4156cb/programs/cp-amm/src/entrypoint.rs",
+      "sha256": "277f21c22ba478d3e66ee4f6df1a375044b20e5a797cda720a982269d59d2861",
+      "bytes": 4649,
+      "license": "Noncommercial Licence"
+    },
+    {
+      "repository": "https://github.com/MeteoraAg/damm-v2",
+      "revision": "a85c926607433f23f0ea60f4ca7b1ae92f4156cb",
+      "path": "programs/cp-amm/src/instructions/swap/ix_p_swap.rs",
+      "url": "https://raw.githubusercontent.com/MeteoraAg/damm-v2/a85c926607433f23f0ea60f4ca7b1ae92f4156cb/programs/cp-amm/src/instructions/swap/ix_p_swap.rs",
+      "sha256": "63dab65f28b9cb48f6b04b737936f572a1a790be827dee35ba4846b04b9b6602",
+      "bytes": 12952,
+      "license": "Noncommercial Licence"
+    },
+    {
+      "repository": "https://github.com/pump-fun/pump-public-docs",
+      "revision": "9c82f61cb711b044a17f770ab8ce9f9bdf78f333",
+      "path": "idl/pump.json",
+      "url": "https://raw.githubusercontent.com/pump-fun/pump-public-docs/9c82f61cb711b044a17f770ab8ce9f9bdf78f333/idl/pump.json",
+      "sha256": "b90bc471327f671449271d5d1d42354d1fae6f5a06502f5834459a3108138e49",
+      "bytes": 169632,
+      "license": "No LICENSE file in pinned public-docs tree; interface facts only, no SDK or executable upstream code vendored"
+    },
+    {
+      "repository": "https://github.com/pump-fun/pump-public-docs",
+      "revision": "9c82f61cb711b044a17f770ab8ce9f9bdf78f333",
+      "path": "idl/pump_amm.json",
+      "url": "https://raw.githubusercontent.com/pump-fun/pump-public-docs/9c82f61cb711b044a17f770ab8ce9f9bdf78f333/idl/pump_amm.json",
+      "sha256": "6b5c7ec4e5ef9742fa99dc57b0d75b1031b379bba02a7e1b3c5a4cad68d77e56",
+      "bytes": 154301,
+      "license": "No LICENSE file in pinned public-docs tree; interface facts only, no SDK or executable upstream code vendored"
+    },
+    {
+      "repository": "https://github.com/pump-fun/pump-public-docs",
+      "revision": "9c82f61cb711b044a17f770ab8ce9f9bdf78f333",
+      "path": "idl/pump_fees.json",
+      "url": "https://raw.githubusercontent.com/pump-fun/pump-public-docs/9c82f61cb711b044a17f770ab8ce9f9bdf78f333/idl/pump_fees.json",
+      "sha256": "ea2fb5dae0252375513ff8072a111affe83a0fd4db7a2e8840b3b39bace5ec83",
+      "bytes": 147906,
+      "license": "No LICENSE file in pinned public-docs tree; interface facts only, no SDK or executable upstream code vendored"
+    },
+    {
+      "repository": "https://github.com/pump-fun/pump-public-docs",
+      "revision": "9c82f61cb711b044a17f770ab8ce9f9bdf78f333",
+      "path": "README.md",
+      "url": "https://raw.githubusercontent.com/pump-fun/pump-public-docs/9c82f61cb711b044a17f770ab8ce9f9bdf78f333/README.md",
+      "sha256": "7609341176750cd2c78a74e8b3eab052053d71cecabd0252ef9c4d8e356e8cca",
+      "bytes": 5541,
+      "license": "No LICENSE file in pinned public-docs tree; interface facts only, no SDK or executable upstream code vendored"
+    },
+    {
+      "repository": "https://github.com/pump-fun/pump-public-docs",
+      "revision": "9c82f61cb711b044a17f770ab8ce9f9bdf78f333",
+      "path": "docs/PUMP_SWAP_CREATOR_FEE_README.md",
+      "url": "https://raw.githubusercontent.com/pump-fun/pump-public-docs/9c82f61cb711b044a17f770ab8ce9f9bdf78f333/docs/PUMP_SWAP_CREATOR_FEE_README.md",
+      "sha256": "ac9e4390e602e7a48af27b867ea0cae13c4fa619fce3917e6d175ce99e27b961",
+      "bytes": 4725,
+      "license": "No LICENSE file in pinned public-docs tree; interface facts only, no SDK or executable upstream code vendored"
+    },
+    {
+      "repository": "https://github.com/pump-fun/pump-public-docs",
+      "revision": "9c82f61cb711b044a17f770ab8ce9f9bdf78f333",
+      "path": "docs/PUMP_SWAP_README.md",
+      "url": "https://raw.githubusercontent.com/pump-fun/pump-public-docs/9c82f61cb711b044a17f770ab8ce9f9bdf78f333/docs/PUMP_SWAP_README.md",
+      "sha256": "3ac4a835604d7fd3855d66531d109c0547e006bd314b5e5d6cb27b1e20d27abc",
+      "bytes": 14632,
+      "license": "No LICENSE file in pinned public-docs tree; interface facts only, no SDK or executable upstream code vendored"
+    },
+    {
+      "repository": "https://github.com/pump-fun/pump-public-docs",
+      "revision": "9c82f61cb711b044a17f770ab8ce9f9bdf78f333",
+      "path": "docs/FEE_PROGRAM_README.md",
+      "url": "https://raw.githubusercontent.com/pump-fun/pump-public-docs/9c82f61cb711b044a17f770ab8ce9f9bdf78f333/docs/FEE_PROGRAM_README.md",
+      "sha256": "c03c0cc79970456f9af1a54283d56bf8f752667dd95511640f42a4fb743cd72d",
+      "bytes": 5043,
+      "license": "No LICENSE file in pinned public-docs tree; interface facts only, no SDK or executable upstream code vendored"
+    },
+    {
+      "repository": "https://github.com/pump-fun/pump-public-docs",
+      "revision": "9c82f61cb711b044a17f770ab8ce9f9bdf78f333",
+      "path": "docs/instructions/COIN_CREATION.md",
+      "url": "https://raw.githubusercontent.com/pump-fun/pump-public-docs/9c82f61cb711b044a17f770ab8ce9f9bdf78f333/docs/instructions/COIN_CREATION.md",
+      "sha256": "310f4560d0c95d8a196a4d3193399de87407de7f90218949290d4b03ec874536",
+      "bytes": 11258,
+      "license": "No LICENSE file in pinned public-docs tree; interface facts only, no SDK or executable upstream code vendored"
+    },
+    {
+      "repository": "https://github.com/pump-fun/pump-public-docs",
+      "revision": "9c82f61cb711b044a17f770ab8ce9f9bdf78f333",
+      "path": "docs/instructions/SELL.md",
+      "url": "https://raw.githubusercontent.com/pump-fun/pump-public-docs/9c82f61cb711b044a17f770ab8ce9f9bdf78f333/docs/instructions/SELL.md",
+      "sha256": "02037217c2fb0b83c70380888535107d8649116719f504646a5cc200765d1910",
+      "bytes": 12540,
+      "license": "No LICENSE file in pinned public-docs tree; interface facts only, no SDK or executable upstream code vendored"
+    }
+  ],
+  "token_2022_account_extension_types": [
+    2,
+    5,
+    7,
+    8,
+    11,
+    13,
+    15,
+    17,
+    27
+  ],
+  "token_2022_mint_extension_max_known": 28,
+  "supported_account_extensions": [
+    2,
+    7,
+    8,
+    11,
+    13,
+    15,
+    17,
+    27
+  ],
+  "unsupported_confidential_balance_quantities": "Encrypted amounts remain unknown; unsupported layout hashes are retained.",
+  "pda_semantics": "SDK SHA-256 seeds/program/ProgramDerivedAddress; Edwards decompression rejection; 255 down to 1 bump search; ATA seeds include the exact token program.",
+  "controller_layouts": {
+    "spl_multisig": {
+      "length": 355,
+      "max_signers": 11
+    },
+    "squads_v4": {
+      "program": "SQDS4ep65T869zMMBKyuUq6aD6EgTu8psMjkvj52pCf",
+      "revision": "af94153ff77a28b6effe46b9c94baaa93742b48c",
+      "decoder_member_bound": 256,
+      "source_usage": "Independent binary-layout decoder and factual authorization relationships; no AGPL implementation is imported, copied or executed."
+    },
+    "loader_variants": [
+      "upgradeable_v3",
+      "nonupgradeable_v2",
+      "runtime_managed_native"
+    ],
+    "unknown_loader_behavior": "unresolved"
+  }
+}

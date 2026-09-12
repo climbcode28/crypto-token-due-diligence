@@ -1,0 +1,1 @@
+{"captured_at_utc": "2026-09-11T19:41:58.948212+00:00", "request": {"id": "genesis_recheck", "jsonrpc": "2.0", "method": "getGenesisHash", "params": []}, "response": {"id": "genesis_recheck", "jsonrpc": "2.0", "result": "8qbHbw2BbbTHBW1sbeqakYXVKRQM8Ne7pLK7m6CVfeR"}, "status": "ok"}

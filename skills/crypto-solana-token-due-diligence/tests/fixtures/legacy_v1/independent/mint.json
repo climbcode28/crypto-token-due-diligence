@@ -1,0 +1,32 @@
+{
+  "request": {
+    "id": "mint",
+    "jsonrpc": "2.0",
+    "method": "getAccountInfo",
+    "params": [
+      "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi",
+      {
+        "commitment": "finalized",
+        "encoding": "base64"
+      }
+    ]
+  },
+  "response": {
+    "id": "mint",
+    "jsonrpc": "2.0",
+    "result": {
+      "context": {
+        "slot": 100
+      },
+      "value": {
+        "data": [
+          "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABQAAAAAAAIAJAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+          "base64"
+        ],
+        "executable": false,
+        "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        "space": 82
+      }
+    }
+  }
+}

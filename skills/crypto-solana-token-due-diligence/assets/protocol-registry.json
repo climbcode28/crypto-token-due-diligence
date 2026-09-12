@@ -1,0 +1,277 @@
+{
+  "schema_version": 1,
+  "version": "1.5.0",
+  "sources": [
+    {
+      "id": "dexscreener",
+      "base": "https://api.dexscreener.com",
+      "documentation": "https://docs.dexscreener.com/api/reference",
+      "checked_at": "2026-09-11",
+      "access": "anonymous_public_documented",
+      "key_required": false,
+      "status": "documentation_checked_live_not_tested",
+      "documented_limit": [
+        300,
+        60
+      ],
+      "supported_schemas": [
+        "token-pairs-v1"
+      ],
+      "role": "primary_pool_discovery",
+      "execution": "read_only_no_wallet_no_transaction_build_or_send"
+    },
+    {
+      "id": "geckoterminal",
+      "base": "https://api.geckoterminal.com/api/v2",
+      "documentation": "https://api.geckoterminal.com/docs/index.html",
+      "checked_at": "2026-09-11",
+      "access": "anonymous_public_documented",
+      "key_required": false,
+      "status": "documentation_checked_live_not_tested",
+      "documented_limit": [
+        10,
+        60
+      ],
+      "supported_schemas": [
+        "jsonapi-token-pools-v2"
+      ],
+      "role": "alternate_pool_discovery",
+      "execution": "read_only_no_wallet_no_transaction_build_or_send"
+    },
+    {
+      "id": "github",
+      "base": "https://api.github.com",
+      "documentation": "https://docs.github.com/en/rest/git/trees",
+      "checked_at": "2026-09-11",
+      "access": "anonymous_public_documented",
+      "key_required": false,
+      "status": "documentation_checked_live_not_tested",
+      "documented_limit": [
+        60,
+        3600
+      ],
+      "supported_schemas": [
+        "repository-metadata",
+        "commit-root-tree",
+        "recursive-tree"
+      ],
+      "role": "project_repository",
+      "execution": "read_only_no_wallet_no_transaction_build_or_send",
+      "rate_documentation": "https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api"
+    },
+    {
+      "id": "program_idl",
+      "base": "https://idl-one.vercel.app",
+      "documentation": "https://idl.solana.com/docs",
+      "checked_at": "2026-09-11",
+      "access": "anonymous_public_documented",
+      "key_required": false,
+      "status": "documentation_checked_live_not_tested",
+      "documented_limit": null,
+      "supported_schemas": [
+        "raw-json-capture"
+      ],
+      "role": "program_metadata_optional",
+      "execution": "read_only_no_wallet_no_transaction_build_or_send"
+    },
+    {
+      "id": "otter_verified",
+      "base": "https://verify.osec.io",
+      "documentation": "https://github.com/otter-sec/solana-verified-programs-api",
+      "checked_at": "2026-09-11",
+      "access": "anonymous_public_documented",
+      "key_required": false,
+      "status": "documentation_checked_live_not_tested",
+      "documented_limit": null,
+      "supported_schemas": [
+        "raw-json-capture"
+      ],
+      "role": "third_party_verification_optional",
+      "execution": "read_only_no_wallet_no_transaction_build_or_send"
+    },
+    {
+      "id": "jupiter_v2",
+      "base": "https://api.jup.ag",
+      "documentation": "https://developers.jup.ag/docs/api-reference/swap/order",
+      "checked_at": "2026-09-11",
+      "access": "anonymous_public_documented",
+      "key_required": false,
+      "status": "documentation_checked_live_not_tested",
+      "documented_limit": [
+        30,
+        60
+      ],
+      "supported_schemas": [
+        "swap-v2-order-without-taker"
+      ],
+      "role": "optional_read_only_quote",
+      "execution": "read_only_no_wallet_no_transaction_build_or_send"
+    },
+    {
+      "id": "raydium_quote",
+      "base": "https://transaction-v1.raydium.io",
+      "documentation": "https://docs.raydium.io/sdk-api/trade-api",
+      "checked_at": "2026-09-11",
+      "access": "anonymous_public_documented",
+      "key_required": false,
+      "status": "documentation_checked_live_not_tested",
+      "documented_limit": [
+        120,
+        60
+      ],
+      "supported_schemas": [
+        "compute-swap-base-in-V1"
+      ],
+      "role": "optional_read_only_quote",
+      "execution": "read_only_no_wallet_no_transaction_build_or_send"
+    },
+    {
+      "id": "orca_index",
+      "base": "https://api.orca.so/v2/solana",
+      "documentation": "https://docs.orca.so/developers/api/overview",
+      "checked_at": "2026-09-11",
+      "access": "anonymous_public_documented",
+      "key_required": false,
+      "status": "documentation_checked_live_not_tested",
+      "documented_limit": null,
+      "supported_schemas": [],
+      "role": "position_discovery_phase8",
+      "execution": "read_only_no_wallet_no_transaction_build_or_send"
+    },
+    {
+      "id": "meteora_index",
+      "base": "https://dlmm.datapi.meteora.ag",
+      "documentation": "https://docs.meteora.ag/developer-guides/dlmm/api-reference/overview",
+      "checked_at": "2026-09-11",
+      "access": "anonymous_public_documented",
+      "key_required": false,
+      "status": "documentation_checked_live_not_tested",
+      "documented_limit": [
+        30,
+        1
+      ],
+      "supported_schemas": [],
+      "role": "position_discovery_phase9",
+      "execution": "read_only_no_wallet_no_transaction_build_or_send"
+    }
+  ],
+  "protocols": [
+    {
+      "id": "raydium_cpmm",
+      "genesis_hash": "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d",
+      "program": "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C",
+      "enabled": true,
+      "release_gate_phase": 7,
+      "status": "tested_scoped_account_adapter",
+      "adapter_version": "1.1.0",
+      "capability": "scripts/adapters/raydium_cpmm.py:CAPABILITY",
+      "live_deployment_correspondence": "not_asserted",
+      "historical_execution": "tested_direct_swap_instruction_roles; sale requires historical SPL movements and ownership",
+      "local_quote": "conditional_same-bank_SPL_fee-and-Clock_state"
+    },
+    {
+      "id": "raydium_amm_v4",
+      "genesis_hash": "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d",
+      "program": "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8",
+      "enabled": true,
+      "release_gate_phase": 7,
+      "status": "tested_scoped_account_adapter",
+      "adapter_version": "1.0.0",
+      "capability": "scripts/adapters/raydium_amm_v4.py:CAPABILITY",
+      "live_deployment_correspondence": "not_asserted",
+      "historical_execution": "tested_direct_swap_instruction_roles; sale requires historical SPL movements and ownership"
+    },
+    {
+      "id": "raydium_clmm",
+      "genesis_hash": "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d",
+      "program": "CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK",
+      "enabled": true,
+      "release_gate_phase": 8,
+      "status": "tested_scoped_account_adapter",
+      "adapter_version": "1.0.0",
+      "capability": "scripts/adapters/raydium_clmm.py:CAPABILITY",
+      "live_deployment_correspondence": "not_asserted",
+      "historical_execution": "tested_direct_swap_instruction_roles; sale requires historical SPL movements and ownership"
+    },
+    {
+      "id": "orca_whirlpool",
+      "genesis_hash": "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d",
+      "program": "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc",
+      "enabled": true,
+      "release_gate_phase": 8,
+      "status": "tested_scoped_account_adapter",
+      "adapter_version": "1.0.0",
+      "capability": "scripts/adapters/orca_whirlpool.py:CAPABILITY",
+      "live_deployment_correspondence": "not_asserted",
+      "historical_execution": "tested_direct_swap_instruction_roles; sale requires historical SPL movements and ownership"
+    },
+    {
+      "id": "meteora_dlmm",
+      "genesis_hash": "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d",
+      "program": "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo",
+      "enabled": true,
+      "release_gate_phase": 9,
+      "status": "tested_scoped_account_adapter",
+      "adapter_version": "1.0.0",
+      "capability": "scripts/adapters/meteora_dlmm.py:CAPABILITY",
+      "live_deployment_correspondence": "not_asserted",
+      "unsupported_neighbor_products": [
+        "meteora_damm_v1",
+        "meteora_dbc"
+      ],
+      "historical_execution": "tested_direct_swap_instruction_roles; sale requires historical SPL movements and ownership"
+    },
+    {
+      "id": "meteora_damm_v2",
+      "genesis_hash": "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d",
+      "program": "cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG",
+      "enabled": true,
+      "release_gate_phase": 9,
+      "status": "tested_scoped_account_adapter",
+      "adapter_version": "1.0.0",
+      "capability": "scripts/adapters/meteora_damm_v2.py:CAPABILITY",
+      "live_deployment_correspondence": "not_asserted",
+      "unsupported_neighbor_products": [
+        "meteora_damm_v1",
+        "meteora_dbc"
+      ],
+      "historical_execution": "tested_direct_swap_instruction_roles; sale requires historical SPL movements and ownership"
+    },
+    {
+      "id": "pump_curve",
+      "genesis_hash": "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d",
+      "program": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+      "enabled": true,
+      "release_gate_phase": 11,
+      "status": "tested_scoped_account_adapter",
+      "adapter_version": "1.1.0",
+      "capability": "scripts/adapters/pump_curve.py:CAPABILITY",
+      "live_deployment_correspondence": "not_asserted",
+      "unsupported_neighbor_products": [
+        "raydium_launchlab",
+        "meteora_dbc"
+      ]
+    },
+    {
+      "id": "pumpswap",
+      "genesis_hash": "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d",
+      "program": "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+      "enabled": true,
+      "release_gate_phase": 11,
+      "status": "tested_scoped_account_adapter",
+      "adapter_version": "1.1.0",
+      "capability": "scripts/adapters/pump_swap.py:CAPABILITY",
+      "live_deployment_correspondence": "not_asserted",
+      "unsupported_neighbor_products": [
+        "raydium_launchlab",
+        "meteora_dbc"
+      ]
+    }
+  ],
+  "rules": [
+    "At most one primary and one permitted alternate per fact.",
+    "Registry labels are discovery leads, not protocol recognition or live provider success.",
+    "Unimplemented adapter gates cannot be reported complete.",
+    "Blocked or unsupported sources are access/capability statuses, never factual zeros."
+  ]
+}

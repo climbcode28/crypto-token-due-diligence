@@ -1,0 +1,653 @@
+{
+  "all_handled_within_600_seconds": true,
+  "cases": [
+    {
+      "account_reads": 9,
+      "action_count_basis": "Root task function/custom tool calls from initiating start call through freeze; includes orchestration and case-time bookkeeping, excludes lane internals. Proxy for model-facing steps, not user turns.",
+      "case": "usdc",
+      "collection_cutoff": "2026-09-12T00:43:57.866779+00:00",
+      "completed_attempts": 28,
+      "coordinator_tool_actions": 12,
+      "coverage": [
+        {
+          "dimension": "token_controls",
+          "pending_work": [
+            "Complete the standard surface checklist."
+          ],
+          "standard_scope_complete": false,
+          "status": "partial"
+        },
+        {
+          "dimension": "canonical_lp_principal_custody",
+          "pending_work": [
+            "Complete the standard surface checklist."
+          ],
+          "standard_scope_complete": false,
+          "status": "not_checked"
+        },
+        {
+          "dimension": "side_pool_removal_risk",
+          "pending_work": [
+            "Complete the standard surface checklist."
+          ],
+          "standard_scope_complete": false,
+          "status": "not_checked"
+        },
+        {
+          "dimension": "sellability_exit_depth",
+          "pending_work": [
+            "Complete the standard surface checklist."
+          ],
+          "standard_scope_complete": false,
+          "status": "partial"
+        },
+        {
+          "dimension": "current_concentration",
+          "pending_work": [
+            "Complete the standard surface checklist."
+          ],
+          "standard_scope_complete": false,
+          "status": "not_checked"
+        },
+        {
+          "dimension": "historical_launch_integrity",
+          "pending_work": [
+            "Complete the standard surface checklist."
+          ],
+          "standard_scope_complete": false,
+          "status": "not_checked"
+        },
+        {
+          "dimension": "admin_treasury_reward_custody",
+          "pending_work": [
+            "Complete the standard surface checklist."
+          ],
+          "standard_scope_complete": false,
+          "status": "not_checked"
+        },
+        {
+          "dimension": "reward_accounting_liveness",
+          "pending_work": [
+            "Complete the standard surface checklist."
+          ],
+          "standard_scope_complete": false,
+          "status": "not_checked"
+        },
+        {
+          "dimension": "utility_redemption_rights",
+          "pending_work": [
+            "Complete the standard surface checklist."
+          ],
+          "standard_scope_complete": false,
+          "status": "not_checked"
+        },
+        {
+          "dimension": "external_dependencies",
+          "pending_work": [
+            "Complete the standard surface checklist."
+          ],
+          "standard_scope_complete": false,
+          "status": "not_checked"
+        },
+        {
+          "dimension": "development_disclosure",
+          "pending_work": [
+            "Complete the standard surface checklist."
+          ],
+          "standard_scope_complete": false,
+          "status": "partial"
+        }
+      ],
+      "critical_initial_samples": 2,
+      "critical_recheck_samples": 1,
+      "deadline_at": "2026-09-12T00:45:57.866779+00:00",
+      "delivery_status": "checkpoint",
+      "elapsed_seconds": 393.626382,
+      "freeze_time_basis": "Original delivery.json filesystem mtime on the acceptance host, before later code repairs.",
+      "frozen_at": "2026-09-12T00:42:31.493161+00:00",
+      "frozen_integrity_valid": true,
+      "helper_stages": [
+        {
+          "details": {
+            "attempts": 12,
+            "error": null,
+            "response_bytes": 676138,
+            "started_at": "2026-09-12T00:35:58.024420+00:00",
+            "state": "finished",
+            "stopped_at": "2026-09-12T00:36:00.422776+00:00"
+          },
+          "phase": "identity_discovery",
+          "seconds": 2.3983559608459473
+        },
+        {
+          "details": {
+            "attempts": 0,
+            "error": null,
+            "response_bytes": 0,
+            "started_at": "2026-09-12T00:36:00.514693+00:00",
+            "state": "finished",
+            "stopped_at": "2026-09-12T00:36:00.544501+00:00"
+          },
+          "phase": "final_consistency_checks",
+          "seconds": 0.02980804443359375
+        },
+        {
+          "details": {
+            "attempts": 14,
+            "error": null,
+            "response_bytes": 5016,
+            "started_at": "2026-09-12T00:37:18.831099+00:00",
+            "state": "finished",
+            "stopped_at": "2026-09-12T00:37:21.355256+00:00"
+          },
+          "phase": "preset_controls1",
+          "seconds": 2.5241570472717285
+        }
+      ],
+      "http_attempts": 16,
+      "lane_cutoff": "2026-09-12T00:39:57.866779+00:00",
+      "lane_timing": {
+        "liquidity": {
+          "cutoff_at": "2026-09-12T00:39:57.866779+00:00",
+          "started_at": "2026-09-12T00:36:33+00:00",
+          "stopped_at": "2026-09-12T00:39:45.987206+00:00"
+        },
+        "project": {
+          "absolute_cutoff": "2026-09-12T00:39:57.866779+00:00",
+          "start_basis": "First explicit clock observation after brief/facts reads; initial brief read occurred just before this timestamp.",
+          "started_at": "2026-09-12T00:36:51+00:00",
+          "stopped_at": "2026-09-12T00:39:48.028180+00:00"
+        }
+      },
+      "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "model": "gpt-6-astra",
+      "network_requests_by_audit": 0,
+      "observations": 29,
+      "pinned_samples": 2,
+      "position_or_lp_ownership_samples": 0,
+      "received_at": "2026-09-12T00:35:57.866779+00:00",
+      "research_status": "partial",
+      "response_bytes": 681154,
+      "rich_case_parity_pass": false,
+      "rpc_attempts": 12,
+      "start_helper_seconds": 2.677722,
+      "started_attempts": 28,
+      "statuses": {
+        "http_429": 1,
+        "ok": 18,
+        "redirect": 1,
+        "transport_failure": 8
+      },
+      "tool_names": [
+        "exec",
+        "exec",
+        "spawn_agent",
+        "spawn_agent",
+        "exec",
+        "exec",
+        "exec",
+        "exec",
+        "followup_task",
+        "exec",
+        "exec",
+        "exec"
+      ],
+      "verified_sale_receipts": 0,
+      "wire_attempt_interval_seconds_sum": 9.095889,
+      "wire_time_basis": "Sum of durable per-attempt start/completion intervals; includes processing and overlaps concurrent calls, not elapsed wall time."
+    },
+    {
+      "account_reads": 29,
+      "action_count_basis": "Root task function/custom tool calls from initiating start call through freeze; includes orchestration and case-time bookkeeping, excludes lane internals. Proxy for model-facing steps, not user turns.",
+      "case": "pyusd",
+      "collection_cutoff": "2026-09-12T00:54:23+00:00",
+      "completed_attempts": 43,
+      "coordinator_tool_actions": 17,
+      "coverage": [
+        {
+          "dimension": "token_controls",
+          "pending_work": [
+            "Complete the standard surface checklist."
+          ],
+          "standard_scope_complete": false,
+          "status": "partial"
+        },
+        {
+          "dimension": "canonical_lp_principal_custody",
+          "pending_work": [
+            "Complete the standard surface checklist."
+          ],
+          "standard_scope_complete": false,
+          "status": "not_checked"
+        },
+        {
+          "dimension": "side_pool_removal_risk",
+          "pending_work": [
+            "Complete the standard surface checklist."
+          ],
+          "standard_scope_complete": false,
+          "status": "not_checked"
+        },
+        {
+          "dimension": "sellability_exit_depth",
+          "pending_work": [
+            "Complete the standard surface checklist."
+          ],
+          "standard_scope_complete": false,
+          "status": "partial"
+        },
+        {
+          "dimension": "current_concentration",
+          "pending_work": [
+            "Complete the standard surface checklist."
+          ],
+          "standard_scope_complete": false,
+          "status": "not_checked"
+        },
+        {
+          "dimension": "historical_launch_integrity",
+          "pending_work": [
+            "Complete the standard surface checklist."
+          ],
+          "standard_scope_complete": false,
+          "status": "not_checked"
+        },
+        {
+          "dimension": "admin_treasury_reward_custody",
+          "pending_work": [
+            "Complete the standard surface checklist."
+          ],
+          "standard_scope_complete": false,
+          "status": "not_checked"
+        },
+        {
+          "dimension": "reward_accounting_liveness",
+          "pending_work": [
+            "Complete the standard surface checklist."
+          ],
+          "standard_scope_complete": false,
+          "status": "not_checked"
+        },
+        {
+          "dimension": "utility_redemption_rights",
+          "pending_work": [
+            "Complete the standard surface checklist."
+          ],
+          "standard_scope_complete": false,
+          "status": "not_checked"
+        },
+        {
+          "dimension": "external_dependencies",
+          "pending_work": [
+            "Complete the standard surface checklist."
+          ],
+          "standard_scope_complete": false,
+          "status": "partial"
+        },
+        {
+          "dimension": "development_disclosure",
+          "pending_work": [
+            "Complete the standard surface checklist."
+          ],
+          "standard_scope_complete": false,
+          "status": "partial"
+        }
+      ],
+      "critical_initial_samples": 4,
+      "critical_recheck_samples": 3,
+      "deadline_at": "2026-09-12T00:56:23+00:00",
+      "delivery_status": "checkpoint",
+      "elapsed_seconds": 269.367908,
+      "freeze_time_basis": "Original delivery.json filesystem mtime on the acceptance host, before later code repairs.",
+      "frozen_at": "2026-09-12T00:50:52.367908+00:00",
+      "frozen_integrity_valid": true,
+      "helper_stages": [
+        {
+          "details": {
+            "attempts": 10,
+            "error": null,
+            "response_bytes": 692732,
+            "started_at": "2026-09-12T00:46:23.135806+00:00",
+            "state": "finished",
+            "stopped_at": "2026-09-12T00:46:25.786223+00:00"
+          },
+          "phase": "identity_discovery",
+          "seconds": 2.650416851043701
+        },
+        {
+          "details": {
+            "attempts": 0,
+            "error": null,
+            "response_bytes": 0,
+            "started_at": "2026-09-12T00:46:25.857372+00:00",
+            "state": "finished",
+            "stopped_at": "2026-09-12T00:46:25.890193+00:00"
+          },
+          "phase": "final_consistency_checks",
+          "seconds": 0.032820940017700195
+        },
+        {
+          "details": {
+            "attempts": 8,
+            "error": null,
+            "response_bytes": 6122,
+            "started_at": "2026-09-12T00:47:22.506098+00:00",
+            "state": "finished",
+            "stopped_at": "2026-09-12T00:47:23.738354+00:00"
+          },
+          "phase": "preset_controls1",
+          "seconds": 1.2322559356689453
+        },
+        {
+          "details": {
+            "attempts": 16,
+            "error": null,
+            "response_bytes": 15472,
+            "started_at": "2026-09-12T00:47:46.605369+00:00",
+            "state": "finished",
+            "stopped_at": "2026-09-12T00:47:49.055867+00:00"
+          },
+          "phase": "preset_custody1",
+          "seconds": 2.45049786567688
+        }
+      ],
+      "http_attempts": 15,
+      "lane_cutoff": "2026-09-12T00:50:23+00:00",
+      "lane_timing": {
+        "liquidity": {
+          "cutoff_at": "2026-09-12T00:50:23+00:00",
+          "started_at": "2026-09-12T00:46:45+00:00",
+          "stopped_at": "2026-09-12T00:49:23.924431+00:00"
+        },
+        "project": {
+          "absolute_cutoff": "2026-09-12T00:50:23+00:00",
+          "repair_times": [
+            {
+              "at": "2026-09-12T00:50:14.074625+00:00",
+              "reason": "Updated controller gap to coordinator-refreshed facts before original cutoff; no new network collection."
+            },
+            {
+              "at": "2026-09-12T00:50:44.230581+00:00",
+              "reason": "Offline coordinator-requested checklist correction: grant-cap audit work marked pending rather than external_limit; original research stop and findings preserved."
+            }
+          ],
+          "research_stopped_at": "2026-09-12T00:50:14.074625+00:00",
+          "start_basis": "First clock observation immediately after brief read.",
+          "started_at": "2026-09-12T00:46:52+00:00"
+        }
+      },
+      "mint": "2b1kV6DkPAnxd5ixfnxCpjxmKwqjjaYmCZfHsFu24GXo",
+      "model": "gpt-6-astra",
+      "network_requests_by_audit": 0,
+      "observations": 50,
+      "pinned_samples": 4,
+      "position_or_lp_ownership_samples": 0,
+      "received_at": "2026-09-12T00:46:23+00:00",
+      "research_status": "partial",
+      "response_bytes": 3818803,
+      "rich_case_parity_pass": false,
+      "rpc_attempts": 28,
+      "start_helper_seconds": 2.890193,
+      "started_attempts": 43,
+      "statuses": {
+        "http_404": 1,
+        "http_429": 3,
+        "ok": 35,
+        "redirect": 3,
+        "response_limit": 1
+      },
+      "tool_names": [
+        "exec",
+        "exec",
+        "followup_task",
+        "followup_task",
+        "exec",
+        "exec",
+        "exec",
+        "exec",
+        "send_message",
+        "exec",
+        "send_message",
+        "exec",
+        "exec",
+        "exec",
+        "followup_task",
+        "exec",
+        "exec"
+      ],
+      "verified_sale_receipts": 0,
+      "wire_attempt_interval_seconds_sum": 14.34232,
+      "wire_time_basis": "Sum of durable per-attempt start/completion intervals; includes processing and overlaps concurrent calls, not elapsed wall time."
+    },
+    {
+      "account_reads": 9,
+      "action_count_basis": "Root task function/custom tool calls from initiating start call through freeze; includes orchestration and case-time bookkeeping, excludes lane internals. Proxy for model-facing steps, not user turns.",
+      "case": "pump",
+      "collection_cutoff": "2026-09-12T01:02:18+00:00",
+      "completed_attempts": 31,
+      "coordinator_tool_actions": 21,
+      "coverage": [
+        {
+          "dimension": "token_controls",
+          "pending_work": [
+            "Complete the standard surface checklist."
+          ],
+          "standard_scope_complete": false,
+          "status": "partial"
+        },
+        {
+          "dimension": "canonical_lp_principal_custody",
+          "pending_work": [
+            "Complete the standard surface checklist."
+          ],
+          "standard_scope_complete": false,
+          "status": "not_checked"
+        },
+        {
+          "dimension": "side_pool_removal_risk",
+          "pending_work": [
+            "Complete the standard surface checklist."
+          ],
+          "standard_scope_complete": false,
+          "status": "not_checked"
+        },
+        {
+          "dimension": "sellability_exit_depth",
+          "pending_work": [
+            "Complete the standard surface checklist."
+          ],
+          "standard_scope_complete": false,
+          "status": "partial"
+        },
+        {
+          "dimension": "current_concentration",
+          "pending_work": [
+            "Complete the standard surface checklist."
+          ],
+          "standard_scope_complete": false,
+          "status": "not_checked"
+        },
+        {
+          "dimension": "historical_launch_integrity",
+          "pending_work": [
+            "Complete the standard surface checklist."
+          ],
+          "standard_scope_complete": false,
+          "status": "not_checked"
+        },
+        {
+          "dimension": "admin_treasury_reward_custody",
+          "pending_work": [
+            "Complete the standard surface checklist."
+          ],
+          "standard_scope_complete": false,
+          "status": "not_checked"
+        },
+        {
+          "dimension": "reward_accounting_liveness",
+          "pending_work": [
+            "Complete the standard surface checklist."
+          ],
+          "standard_scope_complete": false,
+          "status": "not_checked"
+        },
+        {
+          "dimension": "utility_redemption_rights",
+          "pending_work": [
+            "Complete the standard surface checklist."
+          ],
+          "standard_scope_complete": false,
+          "status": "not_checked"
+        },
+        {
+          "dimension": "external_dependencies",
+          "pending_work": [
+            "Complete the standard surface checklist."
+          ],
+          "standard_scope_complete": false,
+          "status": "partial"
+        },
+        {
+          "dimension": "development_disclosure",
+          "pending_work": [
+            "Complete the standard surface checklist."
+          ],
+          "standard_scope_complete": false,
+          "status": "partial"
+        }
+      ],
+      "critical_initial_samples": 3,
+      "critical_recheck_samples": 2,
+      "deadline_at": "2026-09-12T01:04:18+00:00",
+      "delivery_status": "checkpoint",
+      "elapsed_seconds": 250.526074,
+      "freeze_time_basis": "Original delivery.json filesystem mtime on the acceptance host, before later code repairs.",
+      "frozen_at": "2026-09-12T00:58:28.526074+00:00",
+      "frozen_integrity_valid": true,
+      "helper_stages": [
+        {
+          "details": {
+            "attempts": 9,
+            "error": null,
+            "response_bytes": 1288283,
+            "started_at": "2026-09-12T00:54:18.690012+00:00",
+            "state": "finished",
+            "stopped_at": "2026-09-12T00:54:22.109738+00:00"
+          },
+          "phase": "identity_discovery",
+          "seconds": 3.4197261333465576
+        },
+        {
+          "details": {
+            "attempts": 0,
+            "error": null,
+            "response_bytes": 0,
+            "started_at": "2026-09-12T00:54:22.170128+00:00",
+            "state": "finished",
+            "stopped_at": "2026-09-12T00:54:22.192937+00:00"
+          },
+          "phase": "final_consistency_checks",
+          "seconds": 0.02280879020690918
+        },
+        {
+          "details": {
+            "attempts": 9,
+            "error": {
+              "category": "ValueError",
+              "reason": "unsupported Pump account layout length"
+            },
+            "response_bytes": 5887,
+            "started_at": "2026-09-12T00:55:08.595628+00:00",
+            "state": "partial",
+            "stopped_at": "2026-09-12T00:55:12.015901+00:00"
+          },
+          "phase": "preset_custody1",
+          "seconds": 3.4202730655670166
+        },
+        {
+          "details": {
+            "attempts": 8,
+            "error": {
+              "category": "ValueError",
+              "reason": "unsupported Pump account layout length"
+            },
+            "response_bytes": 3596,
+            "started_at": "2026-09-12T00:55:27.795427+00:00",
+            "state": "partial",
+            "stopped_at": "2026-09-12T00:55:31.254835+00:00"
+          },
+          "phase": "preset_stage1",
+          "seconds": 3.4594078063964844
+        }
+      ],
+      "http_attempts": 11,
+      "lane_cutoff": "2026-09-12T00:58:18+00:00",
+      "lane_timing": {
+        "liquidity": {
+          "cutoff_at": "2026-09-12T00:58:18+00:00",
+          "started_at": "2026-09-12T00:54:38+00:00",
+          "stopped_at": "2026-09-12T00:57:31.228131+00:00"
+        },
+        "project": {
+          "absolute_cutoff": "2026-09-12T00:58:18+00:00",
+          "repair_times": [],
+          "research_stopped_at": "2026-09-12T00:57:48.401486+00:00",
+          "start_basis": "First clock observation immediately after brief read.",
+          "started_at": "2026-09-12T00:54:45+00:00"
+        }
+      },
+      "mint": "2fRDA5f353VXLs2PeLJNqqHqTMhrjJunAXmWWpLkpump",
+      "model": "gpt-6-astra",
+      "network_requests_by_audit": 0,
+      "observations": 36,
+      "pinned_samples": 4,
+      "position_or_lp_ownership_samples": 0,
+      "received_at": "2026-09-12T00:54:18+00:00",
+      "research_status": "partial",
+      "response_bytes": 1314015,
+      "rich_case_parity_pass": false,
+      "rpc_attempts": 20,
+      "start_helper_seconds": 4.192937,
+      "started_attempts": 31,
+      "statuses": {
+        "http_404": 1,
+        "http_429": 1,
+        "ok": 28,
+        "response_limit": 1
+      },
+      "tool_names": [
+        "exec",
+        "exec",
+        "followup_task",
+        "followup_task",
+        "exec",
+        "exec",
+        "exec",
+        "exec",
+        "send_message",
+        "send_message",
+        "exec",
+        "exec",
+        "send_message",
+        "send_message",
+        "exec",
+        "send_message",
+        "exec",
+        "exec",
+        "exec",
+        "exec",
+        "exec"
+      ],
+      "verified_sale_receipts": 0,
+      "wire_attempt_interval_seconds_sum": 19.244478,
+      "wire_time_basis": "Sum of durable per-attempt start/completion intervals; includes processing and overlaps concurrent calls, not elapsed wall time."
+    }
+  ],
+  "host": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+  "median_partial_handling_seconds": 269.367908,
+  "python": "3.14.7 (main, Aug  5 2026, 10:29:49) [Clang 21.0.0 (clang-2100.1.1.101)]",
+  "reason": "All cases are substantive partial checkpoints; no completed broad live case, verified sale sample or principal-ownership sample.",
+  "rich_case_live_parity": "unmet",
+  "round_attempts": 102,
+  "schema_version": 1
+}

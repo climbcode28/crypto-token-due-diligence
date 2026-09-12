@@ -1,0 +1,147 @@
+{
+  "change_evidence": "Resolve the listed coverage gaps.",
+  "findings": [],
+  "manifest_sha256": "ff63580f3c01e880aec12960dcf85708a332764ca34ded1d3e54d8ccfd58afad",
+  "question": "Broad token diligence",
+  "ratings": [
+    {
+      "basis": "Not yet investigated.",
+      "confidence": "low",
+      "coverage": "unknown",
+      "dimension": "token_controls",
+      "evidence_ids": [],
+      "likelihood": "unknown",
+      "severity": "unknown",
+      "status": "unknown",
+      "time_basis": "unresolved"
+    },
+    {
+      "basis": "Not yet investigated.",
+      "confidence": "low",
+      "coverage": "unknown",
+      "dimension": "canonical_lp_principal_custody",
+      "evidence_ids": [],
+      "likelihood": "unknown",
+      "severity": "unknown",
+      "status": "unknown",
+      "time_basis": "unresolved"
+    },
+    {
+      "basis": "Not yet investigated.",
+      "confidence": "low",
+      "coverage": "unknown",
+      "dimension": "side_pool_removal_risk",
+      "evidence_ids": [],
+      "likelihood": "unknown",
+      "severity": "unknown",
+      "status": "unknown",
+      "time_basis": "unresolved"
+    },
+    {
+      "basis": "Not yet investigated.",
+      "confidence": "low",
+      "coverage": "unknown",
+      "dimension": "sellability_exit_depth",
+      "evidence_ids": [],
+      "likelihood": "unknown",
+      "severity": "unknown",
+      "status": "unknown",
+      "time_basis": "unresolved"
+    },
+    {
+      "basis": "Not yet investigated.",
+      "confidence": "low",
+      "coverage": "unknown",
+      "dimension": "current_concentration",
+      "evidence_ids": [],
+      "likelihood": "unknown",
+      "severity": "unknown",
+      "status": "unknown",
+      "time_basis": "unresolved"
+    },
+    {
+      "basis": "Not yet investigated.",
+      "confidence": "low",
+      "coverage": "unknown",
+      "dimension": "historical_launch_integrity",
+      "evidence_ids": [],
+      "likelihood": "unknown",
+      "severity": "unknown",
+      "status": "unknown",
+      "time_basis": "unresolved"
+    },
+    {
+      "basis": "Not yet investigated.",
+      "confidence": "low",
+      "coverage": "unknown",
+      "dimension": "admin_treasury_reward_custody",
+      "evidence_ids": [],
+      "likelihood": "unknown",
+      "severity": "unknown",
+      "status": "unknown",
+      "time_basis": "unresolved"
+    },
+    {
+      "basis": "Not yet investigated.",
+      "confidence": "low",
+      "coverage": "unknown",
+      "dimension": "reward_accounting_liveness",
+      "evidence_ids": [],
+      "likelihood": "unknown",
+      "severity": "unknown",
+      "status": "unknown",
+      "time_basis": "unresolved"
+    },
+    {
+      "basis": "Not yet investigated.",
+      "confidence": "low",
+      "coverage": "unknown",
+      "dimension": "utility_redemption_rights",
+      "evidence_ids": [],
+      "likelihood": "unknown",
+      "severity": "unknown",
+      "status": "unknown",
+      "time_basis": "unresolved"
+    },
+    {
+      "basis": "Not yet investigated.",
+      "confidence": "low",
+      "coverage": "unknown",
+      "dimension": "external_dependencies",
+      "evidence_ids": [],
+      "likelihood": "unknown",
+      "severity": "unknown",
+      "status": "unknown",
+      "time_basis": "unresolved"
+    },
+    {
+      "basis": "Not yet investigated.",
+      "confidence": "low",
+      "coverage": "unknown",
+      "dimension": "development_disclosure",
+      "evidence_ids": [],
+      "likelihood": "unknown",
+      "severity": "unknown",
+      "status": "unknown",
+      "time_basis": "unresolved"
+    }
+  ],
+  "safety": {
+    "no_broadcast": true,
+    "no_real_keys": true,
+    "no_real_signing": true
+  },
+  "schema_version": 1,
+  "status": "partial",
+  "strongest_contrary_evidence": "Not yet investigated.",
+  "synthetic": true,
+  "target": {
+    "family": "solana",
+    "genesis_hash": "8qbHbw2BbbTHBW1sbeqakYXVKRQM8Ne7pLK7m6CVfeR",
+    "mint": "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi"
+  },
+  "unresolved_questions": [
+    "All broad dimensions require review."
+  ],
+  "verdict": "Insufficient evidence; initialized packet is not completed diligence."
+}

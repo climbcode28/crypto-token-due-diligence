@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "target": {"chain_id": null, "address": null},
+  "pins": [{"id": "current", "number": null}, {"id": "launch", "number": null}],
+  "queries": [
+    {"id": "current-code", "pin_id": "current", "method": "eth_getCode", "params": [null]},
+    {"id": "launch-receipt", "pin_id": "launch", "method": "eth_getTransactionReceipt", "params": [null]},
+    {"id": "launch-supply", "pin_id": "launch", "method": "eth_call", "params": [{"to": null, "data": "0x18160ddd"}]}
+  ],
+  "log_ranges": []
+}

@@ -1,0 +1,38 @@
+{
+  "reporting_engine_version": "2.6.2",
+  "date": "2026-09-11",
+  "bundle_schema_version": 1,
+  "summary_extension": "Required for completed strict reports; internal checkpoints may lack analyst-selected summary and decision; historical replay remains frozen",
+  "changes": [
+    "Per-finding native source links (client-rendered company/product icons where available, no emoji substitutes) reused from existing evidence in the current render/read/answer step; local frozen-evidence fallback. No added network requests, tool calls, agent turns, research steps or budget changes.",
+    "Production review: bounded retry/redirect/restart accounting, exact same-pool sale matching, missing-data and authority wording, and reliable internal checkpoints. No added research steps, tool calls or agent turns.",
+    "Target completed broad research in 10–15 minutes through early dependency checks, concurrent lanes and incremental report assembly",
+    "Remove mandatory follow-up actions; new completed reports reject deferred investigation actions while retaining explicit unavailable evidence",
+    "Add read-only multi-error draft preflight and exact collector-alias resolution to prevent late assembly repair loops",
+    "Support unchanged unreachable literal tails before terminal source metadata, while retaining strict jump-target and byte-equality checks",
+    "Preserve legacy decision/source-comparison versions, evidence snapshots, identity, pin, provider and adverse-finding gates"
+  ],
+  "regression_suites": [
+    "tests/test_completion_review.py",
+    "tests/test_decision_review.py",
+    "tests/test_stopping_review.py",
+    "tests/test_assessment_reporting.py",
+    "tests/test_reporting.py",
+    "tests/test_strict_profile.py",
+    "tests/test_research_helpers.py",
+    "tests/test_report_replay.py",
+    "tests/test_assembly_preflight.py",
+    "tests/test_production_assembly.py",
+    "tests/test_finding_citations.py"
+  ],
+  "reasoning_scenarios": "references/reporting-scenarios.md",
+  "validation_scope": "Offline citation routing and safety regressions; all four README suites and mirrored Claude EVM suite. Research call sequence and budgets unchanged; no live latency guarantee.",
+  "previous_reporting_engine_version": "2.6.1",
+  "review_record": "../../../plans/evm-citation-presentation-2026-09-11.md",
+  "validation_profile": "evm-evidence-v2",
+  "legacy_profile": "legacy-v1",
+  "reporting_snapshot_schema_version": 1,
+  "decision_review_version": 2,
+  "completion_review_version": 2,
+  "source_comparison_version": "1.1.0"
+}

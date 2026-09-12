@@ -1,0 +1,20 @@
+{
+  "note_version": 1,
+  "profile": "solana-evidence-v2",
+  "owner": "coordinator",
+  "investigation_id": "TODO-investigation-id",
+  "target": null,
+  "question": "TODO-exact-user-request",
+  "focus": [],
+  "research_status": "partial",
+  "findings": [],
+  "signal_assignments": {},
+  "overrides": [],
+  "coverage": [],
+  "summary_ids": [],
+  "decision": null,
+  "limitations": [],
+  "urls": [],
+  "imports": [],
+  "conflict_resolutions": []
+}

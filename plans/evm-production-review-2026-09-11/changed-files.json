@@ -1,0 +1,282 @@
+[
+  {
+    "path": "skills/crypto-evm-token-due-diligence/SKILL.md",
+    "before_sha256": "217912b99f5a5cf54f69781f663ca1e8a05a6506bb7dd82e8d1ee67fdbaf51e3",
+    "after_sha256": "d9809cddaa3d9bdac7aa9d49a96fe5f82543375bd332c9fc7dac701e1ab97856"
+  },
+  {
+    "path": "skills/crypto-evm-token-due-diligence/assets/backend-release.json",
+    "before_sha256": "7accf461783cdc06479e8283f0da7610c3d36a4fd980615cb4c712536d2ddea5",
+    "after_sha256": "9729f66920fdb357ae67ba56c27f8cc6e5001362ddb97f0a643d0060b9397be4"
+  },
+  {
+    "path": "skills/crypto-evm-token-due-diligence/assets/lane-brief-liquidity.md",
+    "before_sha256": "4482bc97b203faf176e7c34db8614873fcbfbe09d3283fe0de6d15e8987280e3",
+    "after_sha256": "f623b23ff058b824ce1e4be6cc7bb1855bd0c65cd80d5aa98226353575a2e80e"
+  },
+  {
+    "path": "skills/crypto-evm-token-due-diligence/assets/lane-brief-project.md",
+    "before_sha256": "956758590aaf89cf87560aa47e8bc871515216d7769746438ad3e50c5bf13ff3",
+    "after_sha256": "d19ce247c3cc62f062eb67e734a66c604434c038ac537ad77b6fbe9bc1f3e27f"
+  },
+  {
+    "path": "skills/crypto-evm-token-due-diligence/assets/reporting-release.json",
+    "before_sha256": "a898b92d8db8852c95bb02b6a132033437074e000b24b049bfea100066dcda61",
+    "after_sha256": "d4025c1e13edc6c681e1f38dedf9a864522b323ae4d842d2f21393e989d0570c"
+  },
+  {
+    "path": "skills/crypto-evm-token-due-diligence/assets/workflow-release.json",
+    "before_sha256": "5ca8db7f32042a0666f367d42de21a457f8aa08c1c6cf71bb90f469a4a3483e5",
+    "after_sha256": "e8204a90244bc4b890a97a657bd16d326232e9738e9882257d05f1125aafeb67"
+  },
+  {
+    "path": "skills/crypto-evm-token-due-diligence/references/runbook.md",
+    "before_sha256": "32a58d779bf0ae8f9ba7ac0b69b3f7ee20f7915908613ecaff3c93e9bd9fbb62",
+    "after_sha256": "2e2c8acf49ecc0c9153e2db9567d3e0c092605628aeca50b6c7b888376c64c6f"
+  },
+  {
+    "path": "skills/crypto-evm-token-due-diligence/scripts/backend_common.py",
+    "before_sha256": "fc808bd885a6d18464c710577d0b0bb02f7ae6fad531b64b8efd919c69e0f9e9",
+    "after_sha256": "0ba4ccef424cbc43b1a5a6cd6d907273ef5ade1906035a3887d52aa0d6cb1a0d"
+  },
+  {
+    "path": "skills/crypto-evm-token-due-diligence/scripts/broad_collect.py",
+    "before_sha256": "c2860089b7245a9c51004c2e76caddf36d17fc199816f58c349c750c22a805ac",
+    "after_sha256": "86c253fe15e2cab873053e9f1ab25871b1ae2701817630b03713bda291027f83"
+  },
+  {
+    "path": "skills/crypto-evm-token-due-diligence/scripts/bundle_assemble.py",
+    "before_sha256": "e79de40a7ee21d0493524e5f7e36aeda7317380808fcd453109f740791bcd4b4",
+    "after_sha256": "8300fed6ecc3d5e87b62ed90a8614efd28a3584a39cf9ee959260b6297cff607"
+  },
+  {
+    "path": "skills/crypto-evm-token-due-diligence/scripts/facts.py",
+    "before_sha256": "034177ac18f2737bae35fee9cfb5b5c14c63c0b6ca79aee59a901b7acf17d94e",
+    "after_sha256": "40a9823423e66abe204706b040c6a059ed85ffbe0cde108a447cb0db14498fb9"
+  },
+  {
+    "path": "skills/crypto-evm-token-due-diligence/scripts/pipeline_note.py",
+    "before_sha256": "d06048c6535b17eae82b15b846940fc437443f4d3cae56ca41ab883161265fed",
+    "after_sha256": "3b69d9ee14e250d0937bb219c90a1cef4acb7e32b08a75e3821270264fcee50a"
+  },
+  {
+    "path": "skills/crypto-evm-token-due-diligence/scripts/render_report.py",
+    "before_sha256": "a31ec0279c4939a65359b96817a19714affebecf12c1c18eace4329921802548",
+    "after_sha256": "8a3799f106f54143f862945e6e48256a482d865a9ba8eda533ef6bf9e8d3b35f"
+  },
+  {
+    "path": "skills/crypto-evm-token-due-diligence/scripts/report_profile.py",
+    "before_sha256": "74270c3d47f9a65a8b20d3443fa4bcadc7ea3deb1573e281df6f41e497e57553",
+    "after_sha256": "5c8e170c9dfe98c37996fb9b2a3381a6b3f3d723e6f4456f801689323ef13ee4"
+  },
+  {
+    "path": "skills/crypto-evm-token-due-diligence/scripts/rpc_collect.py",
+    "before_sha256": "92ca2a601cbceb7712ee88fbec290ad0e1a7ea206dbf04331dbacb9a9b2395e5",
+    "after_sha256": "69634080eeb14c45dfc5c56add212ed6e11976c83a721ce4f88ac3693d16137a"
+  },
+  {
+    "path": "skills/crypto-evm-token-due-diligence/scripts/sale_decode.py",
+    "before_sha256": null,
+    "after_sha256": "9dda35d406f2acf0ac7b4ca006b773c6993f6255a7fe19baab1fa01ebdb55d72"
+  },
+  {
+    "path": "skills/crypto-evm-token-due-diligence/scripts/scaffold.py",
+    "before_sha256": "c3ddd434c4120aa1ef76f2662c97b6b17075d67503d09be682db16c05a8bce31",
+    "after_sha256": "658da8c2a99211a9a2e291c623cfb181bfaee62dda5aae988271767bbf6051fb"
+  },
+  {
+    "path": "skills/crypto-evm-token-due-diligence/scripts/validate_bundle.py",
+    "before_sha256": "86aaad46bd25aa30649565f670b17236edf7da3eebaa8c5ea85e0e9305f13da0",
+    "after_sha256": "ca2f614a1ac570869ea401e854516be5e893cd0a400351ae8d4c96687e701704"
+  },
+  {
+    "path": "skills/crypto-evm-token-due-diligence/scripts/web_capture.py",
+    "before_sha256": "aeb0d561ff066a6b5c72c44787f86143bfd0e51439879a9ff9a2f1aeabb9a416",
+    "after_sha256": "1e420c0dcb822a61a7748419e2831ff24b033ff35c49f4b3fdc467d74114c952"
+  },
+  {
+    "path": "skills/crypto-evm-token-due-diligence/tests/test_broad_collect.py",
+    "before_sha256": "45678bb555abde321aa00778cc60f9f0f3c15acbd9c59c24c85e98554227cfd7",
+    "after_sha256": "3cb5c2db29efd227da4fec6c40fd616ec260ea9ebe7d87c9fe4c803ef3e2bb9b"
+  },
+  {
+    "path": "skills/crypto-evm-token-due-diligence/tests/test_decision_review.py",
+    "before_sha256": "cd9c0782ba2f63f9177ea896050a8ee6812734267150113da78aad85c0c43ad4",
+    "after_sha256": "6d6acb84c88658298903c2edc993ce823fb6a391e1e6ecee38e6a420211470e7"
+  },
+  {
+    "path": "skills/crypto-evm-token-due-diligence/tests/test_evidence_edges.py",
+    "before_sha256": null,
+    "after_sha256": "739958a7a6ee96ebda97c86dc145b9881f40f4e1b0ec3e4323e737cc0757150b"
+  },
+  {
+    "path": "skills/crypto-evm-token-due-diligence/tests/test_production_assembly.py",
+    "before_sha256": null,
+    "after_sha256": "3bf01352386a5ebebcca0fcd7212b8f26b5e10a413af55f6521e1ab9937b33fd"
+  },
+  {
+    "path": "skills/crypto-evm-token-due-diligence/tests/test_production_runtime.py",
+    "before_sha256": null,
+    "after_sha256": "dd47ba38dfa86e7b0057be0d24fa5bfe4f17e327788cf56d401abcc189ff83f0"
+  },
+  {
+    "path": "skills/crypto-evm-token-due-diligence/tests/test_retry_budget.py",
+    "before_sha256": null,
+    "after_sha256": "3b41464cb550312a4e68a453ad46f70f68ea3c36158539ca0125e0681b14a763"
+  },
+  {
+    "path": "skills/crypto-evm-token-due-diligence/tests/test_run_hygiene.py",
+    "before_sha256": "62d1ba9672aa283c95a4c34e75defab0e7c8a44e2d37f48fc7ac53a2f9e2c54e",
+    "after_sha256": "7a02b510b49898a4a98a4cad8004eaf031dade5d346377dd9c00b42eabae99d6"
+  },
+  {
+    "path": "skills/crypto-evm-token-due-diligence/tests/test_stopping_review.py",
+    "before_sha256": "4239b628106084d0ab605f0502ce65567529177562f821208e8450ef85a958e7",
+    "after_sha256": "7e9278075536c7b67840f185a8d29da153c5092d2d7c6252856cce97c42c39a9"
+  },
+  {
+    "path": ".claude/skills/crypto-evm-token-due-diligence/CLAUDE-CODE-PORT.md",
+    "before_sha256": "3396fff75d396ba768d1e8fa5ed7a7343b10f8fbfffb62b097a80ac881a85e44",
+    "after_sha256": "8b66b7cd7afe19c202be20093c81cc4aa7c98add1d1d04a7ee033131930d527d"
+  },
+  {
+    "path": ".claude/skills/crypto-evm-token-due-diligence/SKILL.md",
+    "before_sha256": "d0a518df4d81520d48859b42e4fb84403293fef484a86aa6d17fb7eecffe14ef",
+    "after_sha256": "e2dc0ae2ec3518942b7a98d799ac9a5c20523e5b9da10d9f7ce734b414e7e90a"
+  },
+  {
+    "path": ".claude/skills/crypto-evm-token-due-diligence/assets/backend-release.json",
+    "before_sha256": "5476efeecbd720e2783863e87cbed778fccb9f9c29cd86d4c1f6e6a4f4ad2d74",
+    "after_sha256": "d9008edc3a67c1190f26b29a9c93754edb77ba5b3f7bbbc27361d87e1f776494"
+  },
+  {
+    "path": ".claude/skills/crypto-evm-token-due-diligence/assets/lane-brief-liquidity.md",
+    "before_sha256": "4482bc97b203faf176e7c34db8614873fcbfbe09d3283fe0de6d15e8987280e3",
+    "after_sha256": "f623b23ff058b824ce1e4be6cc7bb1855bd0c65cd80d5aa98226353575a2e80e"
+  },
+  {
+    "path": ".claude/skills/crypto-evm-token-due-diligence/assets/lane-brief-project.md",
+    "before_sha256": "956758590aaf89cf87560aa47e8bc871515216d7769746438ad3e50c5bf13ff3",
+    "after_sha256": "d19ce247c3cc62f062eb67e734a66c604434c038ac537ad77b6fbe9bc1f3e27f"
+  },
+  {
+    "path": ".claude/skills/crypto-evm-token-due-diligence/assets/reporting-release.json",
+    "before_sha256": "0656b26176fbe06478ae6af58cd15234b106b556f72388a9f3b1b43225619194",
+    "after_sha256": "1e276735f7a9ee809d350c6af6e606869ebfd7878e2858bbe149272e7ce9ff53"
+  },
+  {
+    "path": ".claude/skills/crypto-evm-token-due-diligence/assets/workflow-release.json",
+    "before_sha256": "372b20f76148de99fac03bbd08cec6f0ae3772744fa40f112c150166837ca918",
+    "after_sha256": "4b3399bbc71da296cd44a64fadce6e223ce9864629a923de2b34086951a4270f"
+  },
+  {
+    "path": ".claude/skills/crypto-evm-token-due-diligence/references/runbook.md",
+    "before_sha256": "32a58d779bf0ae8f9ba7ac0b69b3f7ee20f7915908613ecaff3c93e9bd9fbb62",
+    "after_sha256": "2e2c8acf49ecc0c9153e2db9567d3e0c092605628aeca50b6c7b888376c64c6f"
+  },
+  {
+    "path": ".claude/skills/crypto-evm-token-due-diligence/scripts/backend_common.py",
+    "before_sha256": "fc808bd885a6d18464c710577d0b0bb02f7ae6fad531b64b8efd919c69e0f9e9",
+    "after_sha256": "0ba4ccef424cbc43b1a5a6cd6d907273ef5ade1906035a3887d52aa0d6cb1a0d"
+  },
+  {
+    "path": ".claude/skills/crypto-evm-token-due-diligence/scripts/broad_collect.py",
+    "before_sha256": "c2860089b7245a9c51004c2e76caddf36d17fc199816f58c349c750c22a805ac",
+    "after_sha256": "86c253fe15e2cab873053e9f1ab25871b1ae2701817630b03713bda291027f83"
+  },
+  {
+    "path": ".claude/skills/crypto-evm-token-due-diligence/scripts/bundle_assemble.py",
+    "before_sha256": "e79de40a7ee21d0493524e5f7e36aeda7317380808fcd453109f740791bcd4b4",
+    "after_sha256": "8300fed6ecc3d5e87b62ed90a8614efd28a3584a39cf9ee959260b6297cff607"
+  },
+  {
+    "path": ".claude/skills/crypto-evm-token-due-diligence/scripts/facts.py",
+    "before_sha256": "034177ac18f2737bae35fee9cfb5b5c14c63c0b6ca79aee59a901b7acf17d94e",
+    "after_sha256": "40a9823423e66abe204706b040c6a059ed85ffbe0cde108a447cb0db14498fb9"
+  },
+  {
+    "path": ".claude/skills/crypto-evm-token-due-diligence/scripts/pipeline_note.py",
+    "before_sha256": "d06048c6535b17eae82b15b846940fc437443f4d3cae56ca41ab883161265fed",
+    "after_sha256": "3b69d9ee14e250d0937bb219c90a1cef4acb7e32b08a75e3821270264fcee50a"
+  },
+  {
+    "path": ".claude/skills/crypto-evm-token-due-diligence/scripts/render_report.py",
+    "before_sha256": "a31ec0279c4939a65359b96817a19714affebecf12c1c18eace4329921802548",
+    "after_sha256": "8a3799f106f54143f862945e6e48256a482d865a9ba8eda533ef6bf9e8d3b35f"
+  },
+  {
+    "path": ".claude/skills/crypto-evm-token-due-diligence/scripts/report_profile.py",
+    "before_sha256": "74270c3d47f9a65a8b20d3443fa4bcadc7ea3deb1573e281df6f41e497e57553",
+    "after_sha256": "5c8e170c9dfe98c37996fb9b2a3381a6b3f3d723e6f4456f801689323ef13ee4"
+  },
+  {
+    "path": ".claude/skills/crypto-evm-token-due-diligence/scripts/rpc_collect.py",
+    "before_sha256": "92ca2a601cbceb7712ee88fbec290ad0e1a7ea206dbf04331dbacb9a9b2395e5",
+    "after_sha256": "69634080eeb14c45dfc5c56add212ed6e11976c83a721ce4f88ac3693d16137a"
+  },
+  {
+    "path": ".claude/skills/crypto-evm-token-due-diligence/scripts/sale_decode.py",
+    "before_sha256": null,
+    "after_sha256": "9dda35d406f2acf0ac7b4ca006b773c6993f6255a7fe19baab1fa01ebdb55d72"
+  },
+  {
+    "path": ".claude/skills/crypto-evm-token-due-diligence/scripts/scaffold.py",
+    "before_sha256": "c3ddd434c4120aa1ef76f2662c97b6b17075d67503d09be682db16c05a8bce31",
+    "after_sha256": "658da8c2a99211a9a2e291c623cfb181bfaee62dda5aae988271767bbf6051fb"
+  },
+  {
+    "path": ".claude/skills/crypto-evm-token-due-diligence/scripts/validate_bundle.py",
+    "before_sha256": "86aaad46bd25aa30649565f670b17236edf7da3eebaa8c5ea85e0e9305f13da0",
+    "after_sha256": "ca2f614a1ac570869ea401e854516be5e893cd0a400351ae8d4c96687e701704"
+  },
+  {
+    "path": ".claude/skills/crypto-evm-token-due-diligence/scripts/web_capture.py",
+    "before_sha256": "aeb0d561ff066a6b5c72c44787f86143bfd0e51439879a9ff9a2f1aeabb9a416",
+    "after_sha256": "1e420c0dcb822a61a7748419e2831ff24b033ff35c49f4b3fdc467d74114c952"
+  },
+  {
+    "path": ".claude/skills/crypto-evm-token-due-diligence/tests/test_broad_collect.py",
+    "before_sha256": "45678bb555abde321aa00778cc60f9f0f3c15acbd9c59c24c85e98554227cfd7",
+    "after_sha256": "3cb5c2db29efd227da4fec6c40fd616ec260ea9ebe7d87c9fe4c803ef3e2bb9b"
+  },
+  {
+    "path": ".claude/skills/crypto-evm-token-due-diligence/tests/test_decision_review.py",
+    "before_sha256": "cd9c0782ba2f63f9177ea896050a8ee6812734267150113da78aad85c0c43ad4",
+    "after_sha256": "6d6acb84c88658298903c2edc993ce823fb6a391e1e6ecee38e6a420211470e7"
+  },
+  {
+    "path": ".claude/skills/crypto-evm-token-due-diligence/tests/test_evidence_edges.py",
+    "before_sha256": null,
+    "after_sha256": "739958a7a6ee96ebda97c86dc145b9881f40f4e1b0ec3e4323e737cc0757150b"
+  },
+  {
+    "path": ".claude/skills/crypto-evm-token-due-diligence/tests/test_production_assembly.py",
+    "before_sha256": null,
+    "after_sha256": "3bf01352386a5ebebcca0fcd7212b8f26b5e10a413af55f6521e1ab9937b33fd"
+  },
+  {
+    "path": ".claude/skills/crypto-evm-token-due-diligence/tests/test_production_runtime.py",
+    "before_sha256": null,
+    "after_sha256": "dd47ba38dfa86e7b0057be0d24fa5bfe4f17e327788cf56d401abcc189ff83f0"
+  },
+  {
+    "path": ".claude/skills/crypto-evm-token-due-diligence/tests/test_retry_budget.py",
+    "before_sha256": null,
+    "after_sha256": "3b41464cb550312a4e68a453ad46f70f68ea3c36158539ca0125e0681b14a763"
+  },
+  {
+    "path": ".claude/skills/crypto-evm-token-due-diligence/tests/test_run_hygiene.py",
+    "before_sha256": "62d1ba9672aa283c95a4c34e75defab0e7c8a44e2d37f48fc7ac53a2f9e2c54e",
+    "after_sha256": "7a02b510b49898a4a98a4cad8004eaf031dade5d346377dd9c00b42eabae99d6"
+  },
+  {
+    "path": ".claude/skills/crypto-evm-token-due-diligence/tests/test_stopping_review.py",
+    "before_sha256": "4239b628106084d0ab605f0502ce65567529177562f821208e8450ef85a958e7",
+    "after_sha256": "7e9278075536c7b67840f185a8d29da153c5092d2d7c6252856cce97c42c39a9"
+  },
+  {
+    "path": "README.md",
+    "before_sha256": "78c878561df56bdcf670c502834c00e7a5fe291126612449ad4e5359f55478cb",
+    "after_sha256": "e3cda2fa3fcb92f9a24fea7ae3519d4b1cbca15c234524ede129f7ef0e3b4be0"
+  }
+]

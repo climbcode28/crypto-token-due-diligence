@@ -1,0 +1,30 @@
+{
+  "workflow_version": "3.2.7",
+  "backend_engine_version": "3.4.2",
+  "reporting_engine_version": "2.6.2",
+  "date": "2026-09-11",
+  "changes": [
+    "Accept lossless crypto-token-due-diligence handoffs and preserve the original absolute deadline in collector scheduling; retire native-asset routing to crypto-research.",
+    "Distinguish market activity from the receipt-verification sample; lead with evidenced trading activity, acknowledge user-reported execution, and describe untested size-dependent costs as research limits rather than implied selling difficulty.",
+    "User asks beyond the address (--focus) and user links (--url, at most six, credential-free) are stored in intake.json and rendered into both lane briefs as 'What the user asked'; the project lane captures the links first, each ask ends as an inference finding or a coverage attempt, and the scaffold echoes user_focus so the verdict answers it",
+    "Use declared host network policy before the first collector and lane capture call; request per-command execution permission when required, preserve budgets and honor denial. No global permission changes or additional network probes.",
+    "Per-finding native source links (client-rendered company/product icons where available, no emoji substitutes) reused from existing evidence in the current render/read/answer step; local frozen-evidence fallback. No added network requests, tool calls, agent turns, research steps or budget changes.",
+    "Production review: bounded retry/redirect/restart accounting, exact same-pool sale matching, missing-data and authority wording, and reliable internal checkpoints. No added research steps, tool calls or agent turns.",
+    "Exact unique-address holder aggregates from atomic RPC balances, runtime-shape classification and explicit sample exclusions; existing delivery response preserves coverage beyond optional summary signals. No added network requests, tool calls or agent turns.",
+    "Depth without turns: a 6.7-minute live run on 3.1.0 completed with five findings and three Unverified rows because Cloudflare blocked the explorer and the creation transaction was never found; 3.2.0 fixes access and moves the factual half of the report into the pipeline",
+    "The pipeline note (eight to ten strongly supported findings from pinned evidence: controls, launch receipt, custodian and Safe, pool depth and quotes, receipt-verified sales, top holders, admin authority, dependencies, maturity) is composed by start; the coordinator assigns topic/signal through `signals`",
+    "Report standard: at least eight summary rows, every pipeline-observed dimension rated from observations, a maturity row; Unverified reserved for what pipeline, lanes and presets could not establish",
+    "Lane briefs drop the tool-call cap, document the explorer JSON endpoints that answer the fetcher, and point lanes at pipeline-captured holders, transfers and signer activity",
+    "Retained from 3.1.0: structured start diagnostics with in-place restart, brief files with pointer prompts, lane compose --check, scaffold, presets and composes chained in one call",
+    "Chat delivery renders the four conclusions (technical exposure, credibility and maturity, token economics, research confidence) as four bullets, never one paragraph"
+  ],
+  "validation_scope": "Offline router and canonical/mirrored EVM regression suites; instruction-level deadline handoff. Collector engines, evidence schemas and provider gates unchanged; no live latency claim.",
+  "previous_workflow_version": "3.2.6",
+  "review_record": "../../../plans/token-diligence-router-2026-09-11.md",
+  "completion_review_version": 2,
+  "decision_review_version": 2,
+  "source_comparison_version": "1.1.0",
+  "pipeline_version": "1.0.2",
+  "note_schema_version": 1,
+  "investigation_schema_version": 3
+}

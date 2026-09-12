@@ -1,0 +1,20 @@
+{
+  "schema_version":1,
+  "authorship":"Independent constants from raw fixture balances, ranges, bins and permission bits; not generated from adapter outputs.",
+  "products":{
+    "raydium_cpmm":{"reserves_atomic":["9860","19740"],"reserved_fees_atomic":["140","260"],"lp_custody.observed_atomic":"450","all_principal_locked":null},
+    "raydium_amm_v4":{"reserves_atomic":["9900","19800"],"lp_custody.observed_atomic":"450","all_principal_locked":null},
+    "raydium_clmm":{"positions.0.principal.amounts_atomic":["4987","4987"],"positions.0.fees_owed_checkpoint_atomic":["17","23"],"positions.0.whole_pool_principal_share":null,"all_principal_locked":null},
+    "orca_whirlpool":{"positions.0.principal.amounts_atomic":["4987","4987"],"positions.0.fees_owed_checkpoint_atomic":["17","23"],"positions.0.whole_pool_principal_share":null,"all_principal_locked":null},
+    "meteora_dlmm":{"positions.0.principal.amounts_atomic":["750","1000"],"reserves_atomic":null,"positions.0.whole_pool_principal_share":null,"all_principal_locked":null},
+    "meteora_damm_v2":{"positions.0.principal.amounts_atomic":["500","500"],"positions.0.stored_unlocked_principal.amounts_atomic":["250","250"],"positions.0.permanent_locked_principal.amounts_atomic":["50","50"],"all_principal_locked":null},
+    "pump_curve":{"stage":"pre_migration_curve","reserves_atomic":["500","1000"],"virtual_reserves_atomic":["1000","2000"],"migration":null,"all_principal_locked":null},
+    "pumpswap":{"reserves_atomic":["10000","20000"],"lp_custody.observed_atomic":"450","lp_custody.mint_supply_atomic":"900","lp_custody.pool_accounting_supply_atomic":"1000","all_principal_locked":null}
+  },
+  "holder_sample":{"owner_aggregate_atomic":"576460752303423589","observed_atomic":"576460752303423596","supply_atomic":"1152921504606846993","percent_display":"50.0000","beneficial_owner_claim":false},
+  "sample_sale":{"input_atomic":"1000","output_atomic":"500","profit":null,"maximum_sample":2,"indexed_total":null},
+  "quote":{"input_atomic":"1000","output_atomic":"1812","execution_observed":false},
+  "out_of_range":{"principal_atomic":["0","9999"],"active_liquidity_atomic":"0","whole_pool_share":null},
+  "squads":{"threshold":2,"members":3,"configuration_bypass":true,"timelock_seconds":3600},
+  "judgments":{"retained_material_control":"potential_risk","missing_quote":"unverified","all_gaps_verdict":"insufficient_evidence","incomplete_delivery":"checkpoint"}
+}

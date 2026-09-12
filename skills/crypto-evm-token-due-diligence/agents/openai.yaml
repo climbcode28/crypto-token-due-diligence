@@ -1,0 +1,4 @@
+interface:
+  display_name: "Crypto EVM Token Due Diligence"
+  short_description: "Evidence-bound broad or focused diligence on an exact EVM token"
+  default_prompt: "Use $crypto-evm-token-due-diligence for broad diligence on chain <chain ID>, token <exact address>: run the standard pipeline, two lanes, and deliver the validated report."

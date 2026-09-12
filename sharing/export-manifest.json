@@ -1,0 +1,1030 @@
+{
+  "reviewed_on": "2026-09-10",
+  "files": [
+    {
+      "source": "skills/crypto-evm-token-due-diligence/SKILL.md",
+      "destination": "skills/crypto-evm-token-due-diligence/SKILL.md",
+      "sha256": "0a7b7a68db31e10cde14b0f07be188ed45cb2771c3b63f017e35e49ab85d4dda"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/agents/openai.yaml",
+      "destination": "skills/crypto-evm-token-due-diligence/agents/openai.yaml",
+      "sha256": "fb5ed1b74086f285eccf4ddf05b6b7aadb9008abe30223225baeff3c4cb2a688"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/assets/backend-release.json",
+      "destination": "skills/crypto-evm-token-due-diligence/assets/backend-release.json",
+      "sha256": "c5972d1c8cf87c009f3bb87ae2407640dedce58ef5ea4a525080765d2eeef9e5"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/assets/chain-registry.json",
+      "destination": "skills/crypto-evm-token-due-diligence/assets/chain-registry.json",
+      "sha256": "13b53b4ff3d91d2017c2fc5a17a1a4ba59a649d8454ea2336939d207ccfd3649"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/assets/collector-plan.template.json",
+      "destination": "skills/crypto-evm-token-due-diligence/assets/collector-plan.template.json",
+      "sha256": "8a347a601b03b43edda81a58a392e3b4f36387cfb7d67737f17524a23a139f0e"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/assets/detector-case.template.json",
+      "destination": "skills/crypto-evm-token-due-diligence/assets/detector-case.template.json",
+      "sha256": "c9867dce1e7757375f20caeab635f0fee69d11cc59e7d14e888922ef5fc5c5ed"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/assets/lane-brief-liquidity.md",
+      "destination": "skills/crypto-evm-token-due-diligence/assets/lane-brief-liquidity.md",
+      "sha256": "1589ac34bee47c61b462b249d05891824888010c43eb98900ebad7b5a1dd9a31"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/assets/lane-brief-project.md",
+      "destination": "skills/crypto-evm-token-due-diligence/assets/lane-brief-project.md",
+      "sha256": "4437f3e2b5d526285988469c6b29580e25d65b30f0fe2d1ca4d3584dd701d637"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/assets/manifest.template.json",
+      "destination": "skills/crypto-evm-token-due-diligence/assets/manifest.template.json",
+      "sha256": "cebd04a3985f2a56ff757e8370d48bc08ea562ef29f28dbe7458c305b657549e"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/assets/report.template.json",
+      "destination": "skills/crypto-evm-token-due-diligence/assets/report.template.json",
+      "sha256": "8dc8910ee9042f124d6c4afea6d09823244f085e922b17fd2300e245554ec219"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/assets/reporting-release.json",
+      "destination": "skills/crypto-evm-token-due-diligence/assets/reporting-release.json",
+      "sha256": "a898b92d8db8852c95bb02b6a132033437074e000b24b049bfea100066dcda61"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/assets/work-plan.template.json",
+      "destination": "skills/crypto-evm-token-due-diligence/assets/work-plan.template.json",
+      "sha256": "6cfc772b5fc896796cf6716c2b633661c010754479868c2329d3be568fd27cca"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/assets/workflow-release.json",
+      "destination": "skills/crypto-evm-token-due-diligence/assets/workflow-release.json",
+      "sha256": "09ad61eea02bc6a82a514162da62383acff02bed02735c9a9d4b48426756976e"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/memories.md",
+      "destination": "skills/crypto-evm-token-due-diligence/memories.md",
+      "sha256": "9079355c489e1f30fd501ab392182c1f6eea5a72c046f0144ab8e69a46ff7992"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/references/adoption-and-assessment.md",
+      "destination": "skills/crypto-evm-token-due-diligence/references/adoption-and-assessment.md",
+      "sha256": "69ca80af06c30fa5f57a81da17cf6481b8552b90ca82be50fe429df7baad4ea1"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/references/bundle-format.md",
+      "destination": "skills/crypto-evm-token-due-diligence/references/bundle-format.md",
+      "sha256": "11aab9ddb2aacbbf35ff05e9f87590d5fa64ea511b80eed0f1483374a0071cdc"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/references/completion-and-delivery.md",
+      "destination": "skills/crypto-evm-token-due-diligence/references/completion-and-delivery.md",
+      "sha256": "892b29bab47e0eb2c31d946d8c9c1c72b567026594ff1591b9ca2e8a15dcbbac"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/references/compose.md",
+      "destination": "skills/crypto-evm-token-due-diligence/references/compose.md",
+      "sha256": "efffa01914ea3ef901b953c17b36fd1edcd76d68f797efca774faac645acbfdb"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/references/core-surfaces.md",
+      "destination": "skills/crypto-evm-token-due-diligence/references/core-surfaces.md",
+      "sha256": "04af0ee8993e8eea36e365e76ea0be0ee563721008c53a15b871196cd60a3286"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/references/decision-review.md",
+      "destination": "skills/crypto-evm-token-due-diligence/references/decision-review.md",
+      "sha256": "41a517a2e7274971174cad0e753796f34ecc5a0b5bc2d90d5892e979f8a32399"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/references/dependencies-redemption.md",
+      "destination": "skills/crypto-evm-token-due-diligence/references/dependencies-redemption.md",
+      "sha256": "af14e15b8313df7f5acadf6d77231275e71ddc537a9b7283e98d3c7cadee9a69"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/references/deterministic-backend.md",
+      "destination": "skills/crypto-evm-token-due-diligence/references/deterministic-backend.md",
+      "sha256": "a5d78540658866c2418b5947fcada43ee8b97dcda1211e901a71499fa8f3e609"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/references/evidence-and-output.md",
+      "destination": "skills/crypto-evm-token-due-diligence/references/evidence-and-output.md",
+      "sha256": "ff42169afe488f4b8da7f97944e59e0b12ec56f5dba72e8a7d194249af55ea64"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/references/examples.md",
+      "destination": "skills/crypto-evm-token-due-diligence/references/examples.md",
+      "sha256": "59cadd55fb44a1c9fc45c0e8c1ddefda532898701dbe6f0d321857d59c66c7db"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/references/fees-and-proceeds.md",
+      "destination": "skills/crypto-evm-token-due-diligence/references/fees-and-proceeds.md",
+      "sha256": "98b51f4e9810ae384a4484d769ab365ebb91804822a28aeb7e0d838dc34085a7"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/references/holder-replay.md",
+      "destination": "skills/crypto-evm-token-due-diligence/references/holder-replay.md",
+      "sha256": "fa92d75a8376c29bee6f5c1008a4d3eef26fa4c599e67b26ded6c3db6b27497f"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/references/improvement-loop.md",
+      "destination": "skills/crypto-evm-token-due-diligence/references/improvement-loop.md",
+      "sha256": "26314149e6c47763678c7b7ed67d04c7e33ee7650094029a46a676c4ccaea813"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/references/launch-cohort.md",
+      "destination": "skills/crypto-evm-token-due-diligence/references/launch-cohort.md",
+      "sha256": "012e1acc00721e4fedc091d81c25eb2ea253da32bde8d0ae5b2aa265a7e9ce5f"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/references/operational-attribution.md",
+      "destination": "skills/crypto-evm-token-due-diligence/references/operational-attribution.md",
+      "sha256": "58130475da2b2f8a9bd2af10fff1da85fec78c76f985f85c62ae2ffde3e0d88f"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/references/platforms.md",
+      "destination": "skills/crypto-evm-token-due-diligence/references/platforms.md",
+      "sha256": "b8915f8cb22c762a1071e3f3efcfef55652ba0aceef78558351c7263c9c1a1aa"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/references/pool-history.md",
+      "destination": "skills/crypto-evm-token-due-diligence/references/pool-history.md",
+      "sha256": "558d53de066ba903a662b3311601f3db5a2f392cdc7cf4e2f100e8098154c878"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/references/project-credibility.md",
+      "destination": "skills/crypto-evm-token-due-diligence/references/project-credibility.md",
+      "sha256": "325f3ba69f96821df205ee6aaf1745a3e45d095096f20f6143725da134e2b803"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/references/proxy-bytecode.md",
+      "destination": "skills/crypto-evm-token-due-diligence/references/proxy-bytecode.md",
+      "sha256": "eb7c7db29f92f2bc2994996042e6713c43554c2e9b2f138e824e401224b9c968"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/references/report-replay.md",
+      "destination": "skills/crypto-evm-token-due-diligence/references/report-replay.md",
+      "sha256": "f9197aa87e9e836a2ef0c3bbe78cb6af894b62e92b764aa0264f98343138c2e7"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/references/reporting-scenarios.md",
+      "destination": "skills/crypto-evm-token-due-diligence/references/reporting-scenarios.md",
+      "sha256": "662fadc3044087848780d7a1ca3feaf33d59b4020395ff8c347f1ce9131cdbb9"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/references/reward-accounting.md",
+      "destination": "skills/crypto-evm-token-due-diligence/references/reward-accounting.md",
+      "sha256": "fa6068cb6f951979c4935f289c0bde315277027ff8b8503436e3807053e02b16"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/references/runbook.md",
+      "destination": "skills/crypto-evm-token-due-diligence/references/runbook.md",
+      "sha256": "a5fe6dda98be1108ef97104252a91b7c53d1e9d9e2672a2628a686b8e44b445b"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/references/simulation.md",
+      "destination": "skills/crypto-evm-token-due-diligence/references/simulation.md",
+      "sha256": "dbcdd999445900f008dc58c1c5de4d3e48fa29ca913cadc4d113dc34216aa8dc"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/references/source-routing-and-execution.md",
+      "destination": "skills/crypto-evm-token-due-diligence/references/source-routing-and-execution.md",
+      "sha256": "a744b1419bf8dac6df6cf20a9045e9d9b97f97fb05f447b5fefb5ef17bc0c15b"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/references/stopping-and-escalation.md",
+      "destination": "skills/crypto-evm-token-due-diligence/references/stopping-and-escalation.md",
+      "sha256": "86e492fbd265eb83778e2947caa8fa85d352b23c25a46ada91b86ab68c47c0f8"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/references/strict-report-profile.md",
+      "destination": "skills/crypto-evm-token-due-diligence/references/strict-report-profile.md",
+      "sha256": "67f382ecadefe128b3b962cb198e991e50ed2538804a054b75f4f39de3f669f6"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/references/supported-research-flow.md",
+      "destination": "skills/crypto-evm-token-due-diligence/references/supported-research-flow.md",
+      "sha256": "a1f11305393b5bfb0f346657ffa7b9fe2e232de1596fd6fea8064695bea8c7e6"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/scripts/backend_common.py",
+      "destination": "skills/crypto-evm-token-due-diligence/scripts/backend_common.py",
+      "sha256": "e2dd15b7cad90aeea1567705f9547d4fc8e70ef1cf33e92f731b997dd211ea73"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/scripts/bootstrap.py",
+      "destination": "skills/crypto-evm-token-due-diligence/scripts/bootstrap.py",
+      "sha256": "a5146a4bf85f64c10c48a1eea4fa45c81bf6c9d312da07f758db5e42e6e340ed"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/scripts/broad_collect.py",
+      "destination": "skills/crypto-evm-token-due-diligence/scripts/broad_collect.py",
+      "sha256": "be8ee9490487296e82fa9db8f36a84b79721ef86eb5e7bca18034fd57fe1c444"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/scripts/bundle_assemble.py",
+      "destination": "skills/crypto-evm-token-due-diligence/scripts/bundle_assemble.py",
+      "sha256": "4c454ea1e7113a5c53bb72cff5544d086eff024a1551ed71f39dddc82f709a5c"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/scripts/compose.py",
+      "destination": "skills/crypto-evm-token-due-diligence/scripts/compose.py",
+      "sha256": "95922d8edb9ac530efba766dc82863c37aa41aa5f86923a8b8419785e093223b"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/scripts/detect.py",
+      "destination": "skills/crypto-evm-token-due-diligence/scripts/detect.py",
+      "sha256": "8b6b8f411faa374ce25fb6cfffafb8ada112b2e9890f03d494f03a2f26082703"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/scripts/evm_decode.py",
+      "destination": "skills/crypto-evm-token-due-diligence/scripts/evm_decode.py",
+      "sha256": "7de8b718b7c00b78ca5e506a1cef237f459247ffc37359a613e2b64bec1caa55"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/scripts/facts.py",
+      "destination": "skills/crypto-evm-token-due-diligence/scripts/facts.py",
+      "sha256": "fe52265c72ecbc2b610173f60cc7ebf91ab874b85af06918a2c1d1b2ebdb9559"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/scripts/investigation.py",
+      "destination": "skills/crypto-evm-token-due-diligence/scripts/investigation.py",
+      "sha256": "25cc74fd7ca6879c1638ff95ff42d2e89d9abd933d198684f1baf88c9346f9f3"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/scripts/keccak.py",
+      "destination": "skills/crypto-evm-token-due-diligence/scripts/keccak.py",
+      "sha256": "9a7d92741274f8be90e19eee6b7e9886ae1b73ace61f5f78237967efbb3ee483"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/scripts/maintain.py",
+      "destination": "skills/crypto-evm-token-due-diligence/scripts/maintain.py",
+      "sha256": "cfb02bc12d1c9d4526f81fe3b36768f8dc0babe900caa917dd0d18a91ce252e7"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/scripts/operations.py",
+      "destination": "skills/crypto-evm-token-due-diligence/scripts/operations.py",
+      "sha256": "f850fd3a6777b707852ad95aac2034b68e0bbce83c059430a4f56ff9122375ba"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/scripts/presets.py",
+      "destination": "skills/crypto-evm-token-due-diligence/scripts/presets.py",
+      "sha256": "690ab1f9404ac9093cedb794dffe0e224ace21e2a7cbb1d33ec5b995ced62ba5"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/scripts/provider_context.py",
+      "destination": "skills/crypto-evm-token-due-diligence/scripts/provider_context.py",
+      "sha256": "1ac21dbae3f17a689f94bae09df9483c1a52dcc2d584fdb60402e53a0f649b09"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/scripts/render_legacy_v1.py",
+      "destination": "skills/crypto-evm-token-due-diligence/scripts/render_legacy_v1.py",
+      "sha256": "f41e1aa6e64e161d5ed8ae4bf0c16bbc04640c0d3972c4344dc6069f6e98c275"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/scripts/render_report.py",
+      "destination": "skills/crypto-evm-token-due-diligence/scripts/render_report.py",
+      "sha256": "a31ec0279c4939a65359b96817a19714affebecf12c1c18eace4329921802548"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/scripts/report_profile.py",
+      "destination": "skills/crypto-evm-token-due-diligence/scripts/report_profile.py",
+      "sha256": "a439f69d314779dd923921f80d310dd6b1e634981f953d03005abbc315e8508c"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/scripts/report_replay.py",
+      "destination": "skills/crypto-evm-token-due-diligence/scripts/report_replay.py",
+      "sha256": "f050a4d3658c7da9abd141e2d2ad7d17e54955291ee3446b84e255d3a36b0b5b"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/scripts/rpc_collect.py",
+      "destination": "skills/crypto-evm-token-due-diligence/scripts/rpc_collect.py",
+      "sha256": "763472992dad332fb885fa3730631eb957f7bdeb43186a1c70475144a5228fe9"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/scripts/rpc_wire.py",
+      "destination": "skills/crypto-evm-token-due-diligence/scripts/rpc_wire.py",
+      "sha256": "f8a96900e3f1298c4f8900c4e2bcd101a8ec645ac73ad805ca5aae67a7a3f159"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/scripts/source_lookup.py",
+      "destination": "skills/crypto-evm-token-due-diligence/scripts/source_lookup.py",
+      "sha256": "dc22e6be4334b5530518b496d3478822982136381b95e876890f9165e6c1ffa1"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/scripts/validate_bundle.py",
+      "destination": "skills/crypto-evm-token-due-diligence/scripts/validate_bundle.py",
+      "sha256": "86aaad46bd25aa30649565f670b17236edf7da3eebaa8c5ea85e0e9305f13da0"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/scripts/web_capture.py",
+      "destination": "skills/crypto-evm-token-due-diligence/scripts/web_capture.py",
+      "sha256": "52a4bd6056ffb28ccc22cbb7db8da19e5b09ed3c9e4d276d5f5c15373c85aa5b"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/tests/backend_fixtures.py",
+      "destination": "skills/crypto-evm-token-due-diligence/tests/backend_fixtures.py",
+      "sha256": "35079208dff788241f744dfbadd349edf77c7df86bd3936a813648cabe88da86"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/tests/benchmark_scheduler.py",
+      "destination": "skills/crypto-evm-token-due-diligence/tests/benchmark_scheduler.py",
+      "sha256": "74e846de18b9f112016dbb54bdd89299de45fbcc9880597c65de15aea8882026"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/tests/decision_fixtures.py",
+      "destination": "skills/crypto-evm-token-due-diligence/tests/decision_fixtures.py",
+      "sha256": "2edbf45cace0f689466395830f1553b001658512141654a6f0896fc3bd38ecf0"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/tests/fixtures.py",
+      "destination": "skills/crypto-evm-token-due-diligence/tests/fixtures.py",
+      "sha256": "1f19e5db87f28f0ac5c6bae64d8ae06359fa20ac41ee3874fb152bfb65ccf0c4"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/tests/test_assembly_preflight.py",
+      "destination": "skills/crypto-evm-token-due-diligence/tests/test_assembly_preflight.py",
+      "sha256": "cf0027e2c3664a4308ce5c9474fbdf733823a829754a5bc02d474da84841eb8a"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/tests/test_assessment_reporting.py",
+      "destination": "skills/crypto-evm-token-due-diligence/tests/test_assessment_reporting.py",
+      "sha256": "9f98abe7bb81400939c1d119b52def1195010b9c16d68a784405a13f0bad5af1"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/tests/test_backend.py",
+      "destination": "skills/crypto-evm-token-due-diligence/tests/test_backend.py",
+      "sha256": "259d490fdda22f14298f6918539941e1e53f966b399379c837e9f12b931ae85c"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/tests/test_broad_collect.py",
+      "destination": "skills/crypto-evm-token-due-diligence/tests/test_broad_collect.py",
+      "sha256": "825b779428e3aa17f2535d3475808e366dd5f81d4f26e8a89642fcb77cd692a6"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/tests/test_budget_replanning.py",
+      "destination": "skills/crypto-evm-token-due-diligence/tests/test_budget_replanning.py",
+      "sha256": "488bdff3d50a7a7cfa6c9ea6a8b238f92a88a9c937c171fdaf3dfe5e9bec140f"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/tests/test_bundle.py",
+      "destination": "skills/crypto-evm-token-due-diligence/tests/test_bundle.py",
+      "sha256": "5f9bbd8ab63c4c55bd3f9883ade235768da75cfeddbd4a7f3688f435fb8e05b2"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/tests/test_collector_runtime.py",
+      "destination": "skills/crypto-evm-token-due-diligence/tests/test_collector_runtime.py",
+      "sha256": "632d39b10d884558ac27bc7c02adf0da6e25491bbe8fbd9bd3e1071eecc1334c"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/tests/test_completion_review.py",
+      "destination": "skills/crypto-evm-token-due-diligence/tests/test_completion_review.py",
+      "sha256": "b575861be4a5bef71798631b85561f9713eb1f148c8af77a1e70105cd157d41f"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/tests/test_compose.py",
+      "destination": "skills/crypto-evm-token-due-diligence/tests/test_compose.py",
+      "sha256": "04f2d3031dcc2afea25e2d1c07d2e242c87c7a9663f040ca7c7dec60842f8e05"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/tests/test_decision_review.py",
+      "destination": "skills/crypto-evm-token-due-diligence/tests/test_decision_review.py",
+      "sha256": "cd9c0782ba2f63f9177ea896050a8ee6812734267150113da78aad85c0c43ad4"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/tests/test_investigation.py",
+      "destination": "skills/crypto-evm-token-due-diligence/tests/test_investigation.py",
+      "sha256": "ead72585850cc112e807f3d95adc483153bf20168cc7c805c9d707757af99fa3"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/tests/test_keccak.py",
+      "destination": "skills/crypto-evm-token-due-diligence/tests/test_keccak.py",
+      "sha256": "d6624e0f8896526fef38c6391fd9230c6fc1fb071afaeb8bddd48f011ce850f5"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/tests/test_operations.py",
+      "destination": "skills/crypto-evm-token-due-diligence/tests/test_operations.py",
+      "sha256": "f30dbb9c84c9bf93d213a23dddf93969fc075faebb59836e026c8b4514b72b0f"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/tests/test_optional_rpc.py",
+      "destination": "skills/crypto-evm-token-due-diligence/tests/test_optional_rpc.py",
+      "sha256": "e95a9032d8c9f6558ff9b10073d30efefc4224887fc8c518c86584451a5d4ba1"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/tests/test_pipeline_helpers.py",
+      "destination": "skills/crypto-evm-token-due-diligence/tests/test_pipeline_helpers.py",
+      "sha256": "ea6c465c61ac4b30da5812a66d41ddf29adc88ce1aac1f70f2873e7d54780025"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/tests/test_provider_context.py",
+      "destination": "skills/crypto-evm-token-due-diligence/tests/test_provider_context.py",
+      "sha256": "7601f338d30b9d2e820a19a1aaf1c668b06d0429a012c12f9f82933b476e77db"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/tests/test_report_replay.py",
+      "destination": "skills/crypto-evm-token-due-diligence/tests/test_report_replay.py",
+      "sha256": "a90f14cf70d91f0c0dc279d5a9b216e0f5d476d62854a52f01e4cfa69a382965"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/tests/test_reporting.py",
+      "destination": "skills/crypto-evm-token-due-diligence/tests/test_reporting.py",
+      "sha256": "98b935a62a10a0a9425e325b90004f07f9c1c05b308baf15ae01a716c28e7c52"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/tests/test_research_helpers.py",
+      "destination": "skills/crypto-evm-token-due-diligence/tests/test_research_helpers.py",
+      "sha256": "70f01219f41f59bd77e23dad22343ca49aad98b1c4dffcde5426df67025ade87"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/tests/test_review_regressions.py",
+      "destination": "skills/crypto-evm-token-due-diligence/tests/test_review_regressions.py",
+      "sha256": "a8759d8186bda3ef70d519623bb54d47dfdd0b1c853723c31ebd858f1642dfb4"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/tests/test_rpc_wire.py",
+      "destination": "skills/crypto-evm-token-due-diligence/tests/test_rpc_wire.py",
+      "sha256": "f41bedf921dabf261526c265548dcd1548aafe178f4172812ca69c9eef8f111d"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/tests/test_stopping_review.py",
+      "destination": "skills/crypto-evm-token-due-diligence/tests/test_stopping_review.py",
+      "sha256": "4239b628106084d0ab605f0502ce65567529177562f821208e8450ef85a958e7"
+    },
+    {
+      "source": "skills/crypto-evm-token-due-diligence/tests/test_strict_profile.py",
+      "destination": "skills/crypto-evm-token-due-diligence/tests/test_strict_profile.py",
+      "sha256": "62899035d2a721973e98ef6713b4acb349b6ec1fb58b8dab5fea8d5d8133895f"
+    },
+    {
+      "source": "skills/crypto-solana-token-due-diligence/SKILL.md",
+      "destination": "skills/crypto-solana-token-due-diligence/SKILL.md",
+      "sha256": "858309335cff6f43b476ad7170d1ee4868a00e70ec8ceb7f595495777d8203a9"
+    },
+    {
+      "source": "skills/crypto-solana-token-due-diligence/agents/openai.yaml",
+      "destination": "skills/crypto-solana-token-due-diligence/agents/openai.yaml",
+      "sha256": "fd70038678afb48c56b593f9647ae73b2a2161b9b99f03bdfab155bb44f53fa0"
+    },
+    {
+      "source": "skills/crypto-solana-token-due-diligence/assets/release.json",
+      "destination": "skills/crypto-solana-token-due-diligence/assets/release.json",
+      "sha256": "add4fca580c9688b102daffbd33a23bbc28dbda90386c805a46fd6c4ac192e95"
+    },
+    {
+      "source": "skills/crypto-solana-token-due-diligence/references/evidence-and-tools.md",
+      "destination": "skills/crypto-solana-token-due-diligence/references/evidence-and-tools.md",
+      "sha256": "446e1b2546f4e1466c788832cd3e55183b741b645642e1c0808db0b7186d5da9"
+    },
+    {
+      "source": "skills/crypto-solana-token-due-diligence/references/surfaces.md",
+      "destination": "skills/crypto-solana-token-due-diligence/references/surfaces.md",
+      "sha256": "a320b0992cb99a05dfe34dcd33454e7fc53ecd1ba571ad2c6c764e988b5ac8b8"
+    },
+    {
+      "source": "skills/crypto-solana-token-due-diligence/scripts/solana_bundle.py",
+      "destination": "skills/crypto-solana-token-due-diligence/scripts/solana_bundle.py",
+      "sha256": "4f658b6610a5315ab12b80f53ebb4811796f55d1053faed49ccea555bd958e73"
+    },
+    {
+      "source": "skills/crypto-solana-token-due-diligence/scripts/solana_collect.py",
+      "destination": "skills/crypto-solana-token-due-diligence/scripts/solana_collect.py",
+      "sha256": "aed536c52ec8a12f88e538d46af178dcd084fd9a605a8d30824406ab8b0f6870"
+    },
+    {
+      "source": "skills/crypto-solana-token-due-diligence/scripts/solana_common.py",
+      "destination": "skills/crypto-solana-token-due-diligence/scripts/solana_common.py",
+      "sha256": "466839e35022b42f1b0331c92cf684000f8c09bc7568463fb5e5260359b84586"
+    },
+    {
+      "source": "skills/crypto-solana-token-due-diligence/tests/test_solana.py",
+      "destination": "skills/crypto-solana-token-due-diligence/tests/test_solana.py",
+      "sha256": "be15a7494aa5a9a190f4d00fe7b2ae3d4def862729e759d213d55a9947647376"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/CLAUDE-CODE-PORT.md",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/CLAUDE-CODE-PORT.md",
+      "sha256": "958d78cc28076ee07d87913334f19f6b7fb95594593805c7ca3d7da98cb22a37"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/SKILL.md",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/SKILL.md",
+      "sha256": "ba442658585ef9a85340ee1e43403d4b328f91b59e9542320ef2080bf89d4e99"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/assets/backend-release.json",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/assets/backend-release.json",
+      "sha256": "5ce088f51d73c3e97118db418ca1aeb7db562d28deee4275077df1adc2cf10c8"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/assets/chain-registry.json",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/assets/chain-registry.json",
+      "sha256": "13b53b4ff3d91d2017c2fc5a17a1a4ba59a649d8454ea2336939d207ccfd3649"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/assets/collector-plan.template.json",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/assets/collector-plan.template.json",
+      "sha256": "8a347a601b03b43edda81a58a392e3b4f36387cfb7d67737f17524a23a139f0e"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/assets/detector-case.template.json",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/assets/detector-case.template.json",
+      "sha256": "c9867dce1e7757375f20caeab635f0fee69d11cc59e7d14e888922ef5fc5c5ed"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/assets/lane-brief-liquidity.md",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/assets/lane-brief-liquidity.md",
+      "sha256": "1589ac34bee47c61b462b249d05891824888010c43eb98900ebad7b5a1dd9a31"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/assets/lane-brief-project.md",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/assets/lane-brief-project.md",
+      "sha256": "4437f3e2b5d526285988469c6b29580e25d65b30f0fe2d1ca4d3584dd701d637"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/assets/manifest.template.json",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/assets/manifest.template.json",
+      "sha256": "cebd04a3985f2a56ff757e8370d48bc08ea562ef29f28dbe7458c305b657549e"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/assets/report.template.json",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/assets/report.template.json",
+      "sha256": "8dc8910ee9042f124d6c4afea6d09823244f085e922b17fd2300e245554ec219"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/assets/reporting-release.json",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/assets/reporting-release.json",
+      "sha256": "0656b26176fbe06478ae6af58cd15234b106b556f72388a9f3b1b43225619194"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/assets/work-plan.template.json",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/assets/work-plan.template.json",
+      "sha256": "6cfc772b5fc896796cf6716c2b633661c010754479868c2329d3be568fd27cca"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/assets/workflow-release.json",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/assets/workflow-release.json",
+      "sha256": "7a1af4e61f975e22e482174c86c5bacfb5ef14ee4ba67e3471a82c6512b53c29"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/memories.md",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/memories.md",
+      "sha256": "9079355c489e1f30fd501ab392182c1f6eea5a72c046f0144ab8e69a46ff7992"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/references/adoption-and-assessment.md",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/references/adoption-and-assessment.md",
+      "sha256": "69ca80af06c30fa5f57a81da17cf6481b8552b90ca82be50fe429df7baad4ea1"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/references/bundle-format.md",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/references/bundle-format.md",
+      "sha256": "11aab9ddb2aacbbf35ff05e9f87590d5fa64ea511b80eed0f1483374a0071cdc"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/references/completion-and-delivery.md",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/references/completion-and-delivery.md",
+      "sha256": "892b29bab47e0eb2c31d946d8c9c1c72b567026594ff1591b9ca2e8a15dcbbac"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/references/compose.md",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/references/compose.md",
+      "sha256": "efffa01914ea3ef901b953c17b36fd1edcd76d68f797efca774faac645acbfdb"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/references/core-surfaces.md",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/references/core-surfaces.md",
+      "sha256": "04af0ee8993e8eea36e365e76ea0be0ee563721008c53a15b871196cd60a3286"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/references/decision-review.md",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/references/decision-review.md",
+      "sha256": "41a517a2e7274971174cad0e753796f34ecc5a0b5bc2d90d5892e979f8a32399"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/references/dependencies-redemption.md",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/references/dependencies-redemption.md",
+      "sha256": "af14e15b8313df7f5acadf6d77231275e71ddc537a9b7283e98d3c7cadee9a69"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/references/deterministic-backend.md",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/references/deterministic-backend.md",
+      "sha256": "a5d78540658866c2418b5947fcada43ee8b97dcda1211e901a71499fa8f3e609"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/references/evidence-and-output.md",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/references/evidence-and-output.md",
+      "sha256": "ff42169afe488f4b8da7f97944e59e0b12ec56f5dba72e8a7d194249af55ea64"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/references/examples.md",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/references/examples.md",
+      "sha256": "59cadd55fb44a1c9fc45c0e8c1ddefda532898701dbe6f0d321857d59c66c7db"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/references/fees-and-proceeds.md",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/references/fees-and-proceeds.md",
+      "sha256": "98b51f4e9810ae384a4484d769ab365ebb91804822a28aeb7e0d838dc34085a7"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/references/holder-replay.md",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/references/holder-replay.md",
+      "sha256": "fa92d75a8376c29bee6f5c1008a4d3eef26fa4c599e67b26ded6c3db6b27497f"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/references/improvement-loop.md",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/references/improvement-loop.md",
+      "sha256": "26314149e6c47763678c7b7ed67d04c7e33ee7650094029a46a676c4ccaea813"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/references/launch-cohort.md",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/references/launch-cohort.md",
+      "sha256": "012e1acc00721e4fedc091d81c25eb2ea253da32bde8d0ae5b2aa265a7e9ce5f"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/references/operational-attribution.md",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/references/operational-attribution.md",
+      "sha256": "58130475da2b2f8a9bd2af10fff1da85fec78c76f985f85c62ae2ffde3e0d88f"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/references/platforms.md",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/references/platforms.md",
+      "sha256": "b8915f8cb22c762a1071e3f3efcfef55652ba0aceef78558351c7263c9c1a1aa"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/references/pool-history.md",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/references/pool-history.md",
+      "sha256": "558d53de066ba903a662b3311601f3db5a2f392cdc7cf4e2f100e8098154c878"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/references/project-credibility.md",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/references/project-credibility.md",
+      "sha256": "325f3ba69f96821df205ee6aaf1745a3e45d095096f20f6143725da134e2b803"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/references/proxy-bytecode.md",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/references/proxy-bytecode.md",
+      "sha256": "eb7c7db29f92f2bc2994996042e6713c43554c2e9b2f138e824e401224b9c968"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/references/report-replay.md",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/references/report-replay.md",
+      "sha256": "f9197aa87e9e836a2ef0c3bbe78cb6af894b62e92b764aa0264f98343138c2e7"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/references/reporting-scenarios.md",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/references/reporting-scenarios.md",
+      "sha256": "662fadc3044087848780d7a1ca3feaf33d59b4020395ff8c347f1ce9131cdbb9"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/references/reward-accounting.md",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/references/reward-accounting.md",
+      "sha256": "fa6068cb6f951979c4935f289c0bde315277027ff8b8503436e3807053e02b16"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/references/runbook.md",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/references/runbook.md",
+      "sha256": "a5fe6dda98be1108ef97104252a91b7c53d1e9d9e2672a2628a686b8e44b445b"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/references/simulation.md",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/references/simulation.md",
+      "sha256": "dbcdd999445900f008dc58c1c5de4d3e48fa29ca913cadc4d113dc34216aa8dc"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/references/source-routing-and-execution.md",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/references/source-routing-and-execution.md",
+      "sha256": "5dfb185783bbac0493493d13c9fdc35073857e4317765053af7a20bb83e85806"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/references/stopping-and-escalation.md",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/references/stopping-and-escalation.md",
+      "sha256": "86e492fbd265eb83778e2947caa8fa85d352b23c25a46ada91b86ab68c47c0f8"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/references/strict-report-profile.md",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/references/strict-report-profile.md",
+      "sha256": "67f382ecadefe128b3b962cb198e991e50ed2538804a054b75f4f39de3f669f6"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/references/supported-research-flow.md",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/references/supported-research-flow.md",
+      "sha256": "a1f11305393b5bfb0f346657ffa7b9fe2e232de1596fd6fea8064695bea8c7e6"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/scripts/backend_common.py",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/scripts/backend_common.py",
+      "sha256": "e2dd15b7cad90aeea1567705f9547d4fc8e70ef1cf33e92f731b997dd211ea73"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/scripts/bootstrap.py",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/scripts/bootstrap.py",
+      "sha256": "a5146a4bf85f64c10c48a1eea4fa45c81bf6c9d312da07f758db5e42e6e340ed"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/scripts/broad_collect.py",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/scripts/broad_collect.py",
+      "sha256": "be8ee9490487296e82fa9db8f36a84b79721ef86eb5e7bca18034fd57fe1c444"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/scripts/bundle_assemble.py",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/scripts/bundle_assemble.py",
+      "sha256": "4c454ea1e7113a5c53bb72cff5544d086eff024a1551ed71f39dddc82f709a5c"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/scripts/compose.py",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/scripts/compose.py",
+      "sha256": "95922d8edb9ac530efba766dc82863c37aa41aa5f86923a8b8419785e093223b"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/scripts/detect.py",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/scripts/detect.py",
+      "sha256": "8b6b8f411faa374ce25fb6cfffafb8ada112b2e9890f03d494f03a2f26082703"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/scripts/evm_decode.py",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/scripts/evm_decode.py",
+      "sha256": "7de8b718b7c00b78ca5e506a1cef237f459247ffc37359a613e2b64bec1caa55"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/scripts/facts.py",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/scripts/facts.py",
+      "sha256": "fe52265c72ecbc2b610173f60cc7ebf91ab874b85af06918a2c1d1b2ebdb9559"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/scripts/investigation.py",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/scripts/investigation.py",
+      "sha256": "25cc74fd7ca6879c1638ff95ff42d2e89d9abd933d198684f1baf88c9346f9f3"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/scripts/keccak.py",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/scripts/keccak.py",
+      "sha256": "9a7d92741274f8be90e19eee6b7e9886ae1b73ace61f5f78237967efbb3ee483"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/scripts/maintain.py",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/scripts/maintain.py",
+      "sha256": "cfb02bc12d1c9d4526f81fe3b36768f8dc0babe900caa917dd0d18a91ce252e7"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/scripts/operations.py",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/scripts/operations.py",
+      "sha256": "f850fd3a6777b707852ad95aac2034b68e0bbce83c059430a4f56ff9122375ba"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/scripts/presets.py",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/scripts/presets.py",
+      "sha256": "690ab1f9404ac9093cedb794dffe0e224ace21e2a7cbb1d33ec5b995ced62ba5"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/scripts/provider_context.py",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/scripts/provider_context.py",
+      "sha256": "1ac21dbae3f17a689f94bae09df9483c1a52dcc2d584fdb60402e53a0f649b09"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/scripts/render_legacy_v1.py",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/scripts/render_legacy_v1.py",
+      "sha256": "f41e1aa6e64e161d5ed8ae4bf0c16bbc04640c0d3972c4344dc6069f6e98c275"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/scripts/render_report.py",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/scripts/render_report.py",
+      "sha256": "a31ec0279c4939a65359b96817a19714affebecf12c1c18eace4329921802548"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/scripts/report_profile.py",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/scripts/report_profile.py",
+      "sha256": "a439f69d314779dd923921f80d310dd6b1e634981f953d03005abbc315e8508c"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/scripts/report_replay.py",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/scripts/report_replay.py",
+      "sha256": "f050a4d3658c7da9abd141e2d2ad7d17e54955291ee3446b84e255d3a36b0b5b"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/scripts/rpc_collect.py",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/scripts/rpc_collect.py",
+      "sha256": "763472992dad332fb885fa3730631eb957f7bdeb43186a1c70475144a5228fe9"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/scripts/rpc_wire.py",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/scripts/rpc_wire.py",
+      "sha256": "f8a96900e3f1298c4f8900c4e2bcd101a8ec645ac73ad805ca5aae67a7a3f159"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/scripts/source_lookup.py",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/scripts/source_lookup.py",
+      "sha256": "dc22e6be4334b5530518b496d3478822982136381b95e876890f9165e6c1ffa1"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/scripts/validate_bundle.py",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/scripts/validate_bundle.py",
+      "sha256": "86aaad46bd25aa30649565f670b17236edf7da3eebaa8c5ea85e0e9305f13da0"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/scripts/web_capture.py",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/scripts/web_capture.py",
+      "sha256": "52a4bd6056ffb28ccc22cbb7db8da19e5b09ed3c9e4d276d5f5c15373c85aa5b"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/tests/backend_fixtures.py",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/tests/backend_fixtures.py",
+      "sha256": "35079208dff788241f744dfbadd349edf77c7df86bd3936a813648cabe88da86"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/tests/benchmark_scheduler.py",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/tests/benchmark_scheduler.py",
+      "sha256": "74e846de18b9f112016dbb54bdd89299de45fbcc9880597c65de15aea8882026"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/tests/decision_fixtures.py",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/tests/decision_fixtures.py",
+      "sha256": "2edbf45cace0f689466395830f1553b001658512141654a6f0896fc3bd38ecf0"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/tests/fixtures.py",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/tests/fixtures.py",
+      "sha256": "1f19e5db87f28f0ac5c6bae64d8ae06359fa20ac41ee3874fb152bfb65ccf0c4"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/tests/test_assembly_preflight.py",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/tests/test_assembly_preflight.py",
+      "sha256": "cf0027e2c3664a4308ce5c9474fbdf733823a829754a5bc02d474da84841eb8a"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/tests/test_assessment_reporting.py",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/tests/test_assessment_reporting.py",
+      "sha256": "9f98abe7bb81400939c1d119b52def1195010b9c16d68a784405a13f0bad5af1"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/tests/test_backend.py",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/tests/test_backend.py",
+      "sha256": "259d490fdda22f14298f6918539941e1e53f966b399379c837e9f12b931ae85c"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/tests/test_broad_collect.py",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/tests/test_broad_collect.py",
+      "sha256": "825b779428e3aa17f2535d3475808e366dd5f81d4f26e8a89642fcb77cd692a6"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/tests/test_budget_replanning.py",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/tests/test_budget_replanning.py",
+      "sha256": "488bdff3d50a7a7cfa6c9ea6a8b238f92a88a9c937c171fdaf3dfe5e9bec140f"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/tests/test_bundle.py",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/tests/test_bundle.py",
+      "sha256": "5f9bbd8ab63c4c55bd3f9883ade235768da75cfeddbd4a7f3688f435fb8e05b2"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/tests/test_collector_runtime.py",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/tests/test_collector_runtime.py",
+      "sha256": "632d39b10d884558ac27bc7c02adf0da6e25491bbe8fbd9bd3e1071eecc1334c"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/tests/test_completion_review.py",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/tests/test_completion_review.py",
+      "sha256": "b575861be4a5bef71798631b85561f9713eb1f148c8af77a1e70105cd157d41f"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/tests/test_compose.py",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/tests/test_compose.py",
+      "sha256": "04f2d3031dcc2afea25e2d1c07d2e242c87c7a9663f040ca7c7dec60842f8e05"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/tests/test_decision_review.py",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/tests/test_decision_review.py",
+      "sha256": "cd9c0782ba2f63f9177ea896050a8ee6812734267150113da78aad85c0c43ad4"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/tests/test_investigation.py",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/tests/test_investigation.py",
+      "sha256": "ead72585850cc112e807f3d95adc483153bf20168cc7c805c9d707757af99fa3"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/tests/test_keccak.py",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/tests/test_keccak.py",
+      "sha256": "d6624e0f8896526fef38c6391fd9230c6fc1fb071afaeb8bddd48f011ce850f5"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/tests/test_operations.py",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/tests/test_operations.py",
+      "sha256": "f30dbb9c84c9bf93d213a23dddf93969fc075faebb59836e026c8b4514b72b0f"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/tests/test_optional_rpc.py",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/tests/test_optional_rpc.py",
+      "sha256": "e95a9032d8c9f6558ff9b10073d30efefc4224887fc8c518c86584451a5d4ba1"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/tests/test_pipeline_helpers.py",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/tests/test_pipeline_helpers.py",
+      "sha256": "ea6c465c61ac4b30da5812a66d41ddf29adc88ce1aac1f70f2873e7d54780025"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/tests/test_provider_context.py",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/tests/test_provider_context.py",
+      "sha256": "7601f338d30b9d2e820a19a1aaf1c668b06d0429a012c12f9f82933b476e77db"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/tests/test_report_replay.py",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/tests/test_report_replay.py",
+      "sha256": "a90f14cf70d91f0c0dc279d5a9b216e0f5d476d62854a52f01e4cfa69a382965"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/tests/test_reporting.py",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/tests/test_reporting.py",
+      "sha256": "98b935a62a10a0a9425e325b90004f07f9c1c05b308baf15ae01a716c28e7c52"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/tests/test_research_helpers.py",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/tests/test_research_helpers.py",
+      "sha256": "70f01219f41f59bd77e23dad22343ca49aad98b1c4dffcde5426df67025ade87"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/tests/test_review_regressions.py",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/tests/test_review_regressions.py",
+      "sha256": "a8759d8186bda3ef70d519623bb54d47dfdd0b1c853723c31ebd858f1642dfb4"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/tests/test_rpc_wire.py",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/tests/test_rpc_wire.py",
+      "sha256": "f41bedf921dabf261526c265548dcd1548aafe178f4172812ca69c9eef8f111d"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/tests/test_stopping_review.py",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/tests/test_stopping_review.py",
+      "sha256": "4239b628106084d0ab605f0502ce65567529177562f821208e8450ef85a958e7"
+    },
+    {
+      "source": ".claude/skills/crypto-evm-token-due-diligence/tests/test_strict_profile.py",
+      "destination": ".claude/skills/crypto-evm-token-due-diligence/tests/test_strict_profile.py",
+      "sha256": "62899035d2a721973e98ef6713b4acb349b6ec1fb58b8dab5fea8d5d8133895f"
+    },
+    {
+      "source": ".claude/agents/evm-liquidity-lane.md",
+      "destination": ".claude/agents/evm-liquidity-lane.md",
+      "sha256": "fa59a7c9dfe49c7f9b6a52aead6c92dbf652f6f51a9104439675296cf6173459"
+    },
+    {
+      "source": ".claude/agents/evm-project-lane.md",
+      "destination": ".claude/agents/evm-project-lane.md",
+      "sha256": "62beb8317b8c456efebcbb42fd88097c33da9bb54a778d632a3a4ffcab72b0a8"
+    },
+    {
+      "source": "sharing/README.public.md",
+      "destination": "README.md",
+      "sha256": "55d9487898905a61d313f677ffb4217a7ce3482ccfd97c5aca5b0046bd570860"
+    },
+    {
+      "source": "sharing/AGENTS.public.md",
+      "destination": "AGENTS.md",
+      "sha256": "d4d139a5f2a7087d285a8cbd58a6ac94177db56cac1a0a68e79e8b34bad37709"
+    },
+    {
+      "source": "sharing/HANDOFF.public.md",
+      "destination": "HANDOFF.md",
+      "sha256": "4ba07afced223e7cf93d4c553adc40b7e73f65dabe1cca17efe2c8158fd82db6"
+    },
+    {
+      "source": "sharing/gitignore.public",
+      "destination": ".gitignore",
+      "sha256": "4f053dfc90d10567fc67641db4d0c4c27a3cb5032a182ddfebc2e05e7024669d"
+    },
+    {
+      "source": "docs/diagrams/evm-diligence-architecture-dark.png",
+      "destination": "docs/diagrams/evm-diligence-architecture-dark.png",
+      "sha256": "4edeb246ec0c832e1261200882f9c26122de10ed1685fa92bbbbf599ad4da47e"
+    },
+    {
+      "source": "skills/crypto-token-due-diligence/SKILL.md",
+      "destination": "skills/crypto-token-due-diligence/SKILL.md",
+      "sha256": "17e668e40622e64e4d66a1e3d74862d3fb79181223beda62cbf4df6c3f8e4434"
+    },
+    {
+      "source": "skills/crypto-token-due-diligence/agents/openai.yaml",
+      "destination": "skills/crypto-token-due-diligence/agents/openai.yaml",
+      "sha256": "987faf2a17b3d0b8fd667eb019393dfb1f43398cc1b69faeb87528ca2a7f41bd"
+    },
+    {
+      "source": "skills/crypto-token-due-diligence/assets/release.json",
+      "destination": "skills/crypto-token-due-diligence/assets/release.json",
+      "sha256": "ad440fed575c94e7b5f10fbb47bef7ff595ddf7c211126918060f42b7247c0db"
+    },
+    {
+      "source": "skills/crypto-token-due-diligence/scripts/route.py",
+      "destination": "skills/crypto-token-due-diligence/scripts/route.py",
+      "sha256": "652d4e627953ca382728be26970f2f6c45ccd57e9dd2d51328f56525b430c49f"
+    },
+    {
+      "source": "skills/crypto-token-due-diligence/tests/test_route.py",
+      "destination": "skills/crypto-token-due-diligence/tests/test_route.py",
+      "sha256": "048340c94398ce4a55bcb98d3dcf42286f7e6f853bcb016121da043a9f1fd300"
+    }
+  ]
+}

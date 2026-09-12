@@ -1,0 +1,25 @@
+{
+  "request": {
+    "id": "block",
+    "jsonrpc": "2.0",
+    "method": "getBlock",
+    "params": [
+      100,
+      {
+        "commitment": "finalized",
+        "rewards": false,
+        "transactionDetails": "none"
+      }
+    ]
+  },
+  "response": {
+    "id": "block",
+    "jsonrpc": "2.0",
+    "result": {
+      "blockTime": 1789155718,
+      "blockhash": "GgBaCs3NCBuZN12kCJgAW63ydqohFkHEdfdEXBPzLHq",
+      "parentSlot": 99,
+      "previousBlockhash": "CktRuQ2mttgRGkXJtyksdKHjUdc2C4TgDzyB98oEzy8"
+    }
+  }
+}

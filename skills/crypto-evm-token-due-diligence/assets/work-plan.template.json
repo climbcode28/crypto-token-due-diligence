@@ -1,0 +1,73 @@
+{
+  "surfaces": [
+    {
+      "dimension": "token_controls",
+      "state": "pending",
+      "next_check": "Mint, seizure, transfer restrictions, proxy and upgrade authority",
+      "requests": null
+    },
+    {
+      "dimension": "canonical_lp_principal_custody",
+      "state": "pending",
+      "next_check": "Main-pool principal, position custody and withdrawal authority",
+      "requests": null
+    },
+    {
+      "dimension": "side_pool_removal_risk",
+      "state": "pending",
+      "next_check": "Side-pool principal and separately held positions",
+      "requests": null
+    },
+    {
+      "dimension": "sellability_exit_depth",
+      "state": "pending",
+      "next_check": "Current routes, sell restrictions and size-dependent exits",
+      "requests": null
+    },
+    {
+      "dimension": "current_concentration",
+      "state": "pending",
+      "next_check": "Holder balances, exclusions and circulating denominator",
+      "requests": null
+    },
+    {
+      "dimension": "historical_launch_integrity",
+      "state": "pending",
+      "next_check": "Launch allocation, creator sales and prior-launch attribution",
+      "requests": null
+    },
+    {
+      "dimension": "admin_treasury_reward_custody",
+      "state": "pending",
+      "next_check": "Treasury, fee recipients, reward custody and admin powers",
+      "requests": null
+    },
+    {
+      "dimension": "reward_accounting_liveness",
+      "state": "pending",
+      "next_check": "Reward entitlement, conservation, paid amounts and processing backlog",
+      "requests": null
+    },
+    {
+      "dimension": "utility_redemption_rights",
+      "state": "pending",
+      "next_check": "Enforceable holder rights, backing and redemption path",
+      "requests": null
+    },
+    {
+      "dimension": "external_dependencies",
+      "state": "pending",
+      "next_check": "Oracles, bridges, offchain operators and dependency failures",
+      "requests": null
+    },
+    {
+      "dimension": "development_disclosure",
+      "state": "pending",
+      "next_check": "Delivered work, repositories, claims and contrary project evidence",
+      "requests": null
+    }
+  ],
+  "overhead_requests": null,
+  "contingency_requests": null,
+  "seconds_required": null
+}

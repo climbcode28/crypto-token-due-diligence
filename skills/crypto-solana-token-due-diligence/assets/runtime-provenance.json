@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "origin_commit": "fc6020193f1471af0f6c49e0ca54b625e624eebf",
+  "source_sha256": {
+    "skills/crypto-evm-token-due-diligence/scripts/rpc_collect.py": "69634080eeb14c45dfc5c56add212ed6e11976c83a721ce4f88ac3693d16137a",
+    "skills/crypto-evm-token-due-diligence/scripts/investigation.py": "25cc74fd7ca6879c1638ff95ff42d2e89d9abd933d198684f1baf88c9346f9f3"
+  },
+  "adapted_transport_symbols": [
+    "HttpTransport",
+    "NoRedirect",
+    "configuration_settings",
+    "invocation_blockers",
+    "is_drpc_host",
+    "provider_availability",
+    "seconds",
+    "transport_settings"
+  ],
+  "session_origin": "transactional acquire-before-send and durable reservations; new Solana-local contract",
+  "differences": [
+    "No EVM imports/cache/pins/report validators",
+    "Plain research User-Agent",
+    "Strict endpoint/header/JSON validation",
+    "Conservative response cap includes no uncharged overflow probe",
+    "Counts late-read bytes before rejecting response",
+    "Durable per-attempt responses, per-family retries, original absolute timing, byte reservations and per-origin concurrency"
+  ],
+  "regression_vectors": [
+    "retry budgets and reserved rechecks",
+    "secret echoes and refused redirects",
+    "late body and exhausted grants",
+    "parallel-process acquisition",
+    "restart identity and finalized-directory refusal"
+  ],
+  "web_capture_port": {
+    "source": "skills/crypto-evm-token-due-diligence/scripts/web_capture.py",
+    "commit": "fc60201",
+    "sha256": "1e420c0dcb822a61a7748419e2831ff24b033ff35c49f4b3fdc467d74114c952",
+    "reviewed_primitives": [
+      "clean_url",
+      "public_url",
+      "capture_attempt",
+      "capture_one",
+      "capture"
+    ],
+    "adaptations": [
+      "Local HTTPS-only anonymous capture with actual public-peer check and proxies disabled",
+      "All redirects/retries acquire durable shared session grants",
+      "Body reads never exceed their byte reservation; late/error bodies remain accounted",
+      "Durable source ownership and sanitized refusal records",
+      "Raw evidence stored durably before file export; no EVM imports"
+    ]
+  }
+}

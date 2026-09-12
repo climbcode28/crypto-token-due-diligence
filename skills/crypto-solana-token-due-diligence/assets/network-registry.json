@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "checked_at": "2026-09-11",
+  "source": "https://solana.com/docs/references/clusters",
+  "scope": "Discovery context; every investigation must verify live genesis independently. No short CAIP-2 expansion or network guess.",
+  "clusters": [
+    {
+      "name": "mainnet",
+      "genesis_hash": "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d",
+      "public_rpc": "https://api.mainnet.solana.com",
+      "alternate_public_rpc": "https://solana-rpc.publicnode.com",
+      "market_slug": "solana",
+      "key_required": false,
+      "live_provider_tested": false,
+      "genesis_reference": {
+        "url": "https://github.com/ChainAgnostic/namespaces/blob/463bae5625aaa8c184ccc74f1db457da8a43e72b/solana/caip350.md",
+        "status": "draft namespace publication; full genesis example only",
+        "sha256": "c80ec6b0d920e4526ae7966cea4a0f7c3d8fe825403d5732c01c310c70b8f5e6"
+      }
+    },
+    {
+      "name": "devnet",
+      "genesis_hash": null,
+      "public_rpc": "https://api.devnet.solana.com",
+      "market_slug": null,
+      "identity_status": "requires independent exact genesis; resettable test cluster"
+    },
+    {
+      "name": "testnet",
+      "genesis_hash": null,
+      "public_rpc": "https://api.testnet.solana.com",
+      "market_slug": null,
+      "identity_status": "requires independent exact genesis; resettable test cluster"
+    }
+  ],
+  "limits": {
+    "advertised_total_per_10s": 100,
+    "advertised_method_per_10s": 40,
+    "advertised_new_connections_per_10s": 40,
+    "enforced_rpc_attempts_per_10s": 40,
+    "enforced_rpc_concurrency": 3,
+    "investigation_body_bytes": 67108864,
+    "advertised_limits_may_change": true
+  },
+  "custom_drpc": "deferred; no automatic paid fallback"
+}

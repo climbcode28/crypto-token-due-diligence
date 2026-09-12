@@ -1,0 +1,111 @@
+{
+  "schema_version": 1,
+  "synthetic": false,
+  "mode": "broad",
+  "question": null,
+  "materiality": null,
+  "limitations": [],
+  "target": {
+    "requested": {
+      "chain_id": null,
+      "address": null
+    },
+    "observed": {
+      "chain_id": null,
+      "address": null
+    },
+    "metadata": {
+      "name": {
+        "status": "unresolved",
+        "value": null,
+        "evidence_ids": [],
+        "reason": "Capture the exact target call or record the failed attempt before reporting."
+      },
+      "symbol": {
+        "status": "unresolved",
+        "value": null,
+        "evidence_ids": [],
+        "reason": "Capture the exact target call or record the failed attempt before reporting."
+      },
+      "decimals": {
+        "status": "unresolved",
+        "value": null,
+        "evidence_ids": [],
+        "reason": "Capture the exact target call or record the failed attempt before reporting."
+      },
+      "total_supply": {
+        "status": "unresolved",
+        "value": null,
+        "evidence_ids": [],
+        "reason": "Capture the exact target call or record the failed attempt before reporting."
+      }
+    }
+  },
+  "context": {
+    "requested_chain_name": null,
+    "exit_sizes": [],
+    "deployment": {
+      "status": "unresolved",
+      "reason": "Deployment has not been located."
+    },
+    "candidate_pools": [],
+    "architecture_artifact": null,
+    "asset_units_artifact": null,
+    "reconciliation_artifacts": []
+  },
+  "chains": [
+    {
+      "chain_id": null,
+      "label": null,
+      "chain_id_evidence": null,
+      "current_pin": "current",
+      "pins": [
+        {
+          "id": "current",
+          "number": null,
+          "hash": null,
+          "timestamp_utc": null,
+          "header_evidence": null,
+          "state_profile": "numbered_rechecked",
+          "recheck_evidence_ids": []
+        }
+      ]
+    }
+  ],
+  "scope": [
+    {
+      "id": "target",
+      "chain_id": null,
+      "address": null,
+      "roles": [
+        "target token"
+      ],
+      "material": true,
+      "pin_id": "current",
+      "provenance": [],
+      "runtime": {
+        "status": "unavailable",
+        "reason": "Runtime has not been captured.",
+        "evidence_ids": []
+      },
+      "proxy": {
+        "status": "unresolved",
+        "basis": "Proxy and authority inspection has not been completed.",
+        "evidence_ids": [],
+        "implementation_scope_ids": [],
+        "authority_scope_ids": []
+      }
+    }
+  ],
+  "evidence": [],
+  "discoveries": [],
+  "safety": {
+    "no_real_keys": true,
+    "no_real_signing": true,
+    "no_broadcast": true,
+    "simulation": {
+      "used": false
+    }
+  },
+  "validation_profile": "evm-evidence-v2"
+}

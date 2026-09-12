@@ -1,0 +1,315 @@
+{
+  "schema_version": 1,
+  "synthetic": false,
+  "manifest_sha256": null,
+  "target": {
+    "chain_id": null,
+    "address": null
+  },
+  "metadata": {
+    "name": {
+      "status": "unresolved",
+      "value": null,
+      "evidence_ids": [],
+      "reason": "Capture the exact target call or record the failed attempt before reporting."
+    },
+    "symbol": {
+      "status": "unresolved",
+      "value": null,
+      "evidence_ids": [],
+      "reason": "Capture the exact target call or record the failed attempt before reporting."
+    },
+    "decimals": {
+      "status": "unresolved",
+      "value": null,
+      "evidence_ids": [],
+      "reason": "Capture the exact target call or record the failed attempt before reporting."
+    },
+    "total_supply": {
+      "status": "unresolved",
+      "value": null,
+      "evidence_ids": [],
+      "reason": "Capture the exact target call or record the failed attempt before reporting."
+    }
+  },
+  "safety": {
+    "no_real_keys": true,
+    "no_real_signing": true,
+    "no_broadcast": true,
+    "simulation": {
+      "used": false
+    }
+  },
+  "verdict": null,
+  "conditions": null,
+  "main_reasons": null,
+  "strongest_contrary_evidence": null,
+  "unresolved_questions": null,
+  "change_evidence": null,
+  "summary": [],
+  "findings": [],
+  "ratings": [
+    {
+      "id": "token_controls",
+      "status": "unknown",
+      "severity": "unknown",
+      "likelihood": "unknown",
+      "confidence": "unknown",
+      "coverage": "unavailable",
+      "time_basis": null,
+      "finding_ids": [],
+      "rationale": "No check has been completed; this is not a pass."
+    },
+    {
+      "id": "canonical_lp_principal_custody",
+      "status": "unknown",
+      "severity": "unknown",
+      "likelihood": "unknown",
+      "confidence": "unknown",
+      "coverage": "unavailable",
+      "time_basis": null,
+      "finding_ids": [],
+      "rationale": "No check has been completed; this is not a pass."
+    },
+    {
+      "id": "side_pool_removal_risk",
+      "status": "unknown",
+      "severity": "unknown",
+      "likelihood": "unknown",
+      "confidence": "unknown",
+      "coverage": "unavailable",
+      "time_basis": null,
+      "finding_ids": [],
+      "rationale": "No check has been completed; this is not a pass."
+    },
+    {
+      "id": "sellability_exit_depth",
+      "status": "unknown",
+      "severity": "unknown",
+      "likelihood": "unknown",
+      "confidence": "unknown",
+      "coverage": "unavailable",
+      "time_basis": null,
+      "finding_ids": [],
+      "rationale": "No check has been completed; this is not a pass."
+    },
+    {
+      "id": "current_concentration",
+      "status": "unknown",
+      "severity": "unknown",
+      "likelihood": "unknown",
+      "confidence": "unknown",
+      "coverage": "unavailable",
+      "time_basis": null,
+      "finding_ids": [],
+      "rationale": "No check has been completed; this is not a pass."
+    },
+    {
+      "id": "historical_launch_integrity",
+      "status": "unknown",
+      "severity": "unknown",
+      "likelihood": "unknown",
+      "confidence": "unknown",
+      "coverage": "unavailable",
+      "time_basis": null,
+      "finding_ids": [],
+      "rationale": "No check has been completed; this is not a pass."
+    },
+    {
+      "id": "admin_treasury_reward_custody",
+      "status": "unknown",
+      "severity": "unknown",
+      "likelihood": "unknown",
+      "confidence": "unknown",
+      "coverage": "unavailable",
+      "time_basis": null,
+      "finding_ids": [],
+      "rationale": "No check has been completed; this is not a pass."
+    },
+    {
+      "id": "reward_accounting_liveness",
+      "status": "unknown",
+      "severity": "unknown",
+      "likelihood": "unknown",
+      "confidence": "unknown",
+      "coverage": "unavailable",
+      "time_basis": null,
+      "finding_ids": [],
+      "rationale": "No check has been completed; this is not a pass."
+    },
+    {
+      "id": "utility_redemption_rights",
+      "status": "unknown",
+      "severity": "unknown",
+      "likelihood": "unknown",
+      "confidence": "unknown",
+      "coverage": "unavailable",
+      "time_basis": null,
+      "finding_ids": [],
+      "rationale": "No check has been completed; this is not a pass."
+    },
+    {
+      "id": "external_dependencies",
+      "status": "unknown",
+      "severity": "unknown",
+      "likelihood": "unknown",
+      "confidence": "unknown",
+      "coverage": "unavailable",
+      "time_basis": null,
+      "finding_ids": [],
+      "rationale": "No check has been completed; this is not a pass."
+    },
+    {
+      "id": "development_disclosure",
+      "status": "unknown",
+      "severity": "unknown",
+      "likelihood": "unknown",
+      "confidence": "unknown",
+      "coverage": "unavailable",
+      "time_basis": null,
+      "finding_ids": [],
+      "rationale": "No check has been completed; this is not a pass."
+    }
+  ],
+  "validation_profile": "evm-evidence-v2",
+  "coverage_records": [
+    {
+      "dimension": "token_controls",
+      "status": "not_checked",
+      "surface": "token_controls",
+      "outcome": "No check attempted",
+      "gap": "Fresh evidence required",
+      "stop_reason": "Intake only",
+      "next_check": "Inspect the named surface",
+      "evidence_ids": [],
+      "discovery_ids": [],
+      "finding_ids": []
+    },
+    {
+      "dimension": "canonical_lp_principal_custody",
+      "status": "not_checked",
+      "surface": "canonical_lp_principal_custody",
+      "outcome": "No check attempted",
+      "gap": "Fresh evidence required",
+      "stop_reason": "Intake only",
+      "next_check": "Inspect the named surface",
+      "evidence_ids": [],
+      "discovery_ids": [],
+      "finding_ids": []
+    },
+    {
+      "dimension": "side_pool_removal_risk",
+      "status": "not_checked",
+      "surface": "side_pool_removal_risk",
+      "outcome": "No check attempted",
+      "gap": "Fresh evidence required",
+      "stop_reason": "Intake only",
+      "next_check": "Inspect the named surface",
+      "evidence_ids": [],
+      "discovery_ids": [],
+      "finding_ids": []
+    },
+    {
+      "dimension": "sellability_exit_depth",
+      "status": "not_checked",
+      "surface": "sellability_exit_depth",
+      "outcome": "No check attempted",
+      "gap": "Fresh evidence required",
+      "stop_reason": "Intake only",
+      "next_check": "Inspect the named surface",
+      "evidence_ids": [],
+      "discovery_ids": [],
+      "finding_ids": []
+    },
+    {
+      "dimension": "current_concentration",
+      "status": "not_checked",
+      "surface": "current_concentration",
+      "outcome": "No check attempted",
+      "gap": "Fresh evidence required",
+      "stop_reason": "Intake only",
+      "next_check": "Inspect the named surface",
+      "evidence_ids": [],
+      "discovery_ids": [],
+      "finding_ids": []
+    },
+    {
+      "dimension": "historical_launch_integrity",
+      "status": "not_checked",
+      "surface": "historical_launch_integrity",
+      "outcome": "No check attempted",
+      "gap": "Fresh evidence required",
+      "stop_reason": "Intake only",
+      "next_check": "Inspect the named surface",
+      "evidence_ids": [],
+      "discovery_ids": [],
+      "finding_ids": []
+    },
+    {
+      "dimension": "admin_treasury_reward_custody",
+      "status": "not_checked",
+      "surface": "admin_treasury_reward_custody",
+      "outcome": "No check attempted",
+      "gap": "Fresh evidence required",
+      "stop_reason": "Intake only",
+      "next_check": "Inspect the named surface",
+      "evidence_ids": [],
+      "discovery_ids": [],
+      "finding_ids": []
+    },
+    {
+      "dimension": "reward_accounting_liveness",
+      "status": "not_checked",
+      "surface": "reward_accounting_liveness",
+      "outcome": "No check attempted",
+      "gap": "Fresh evidence required",
+      "stop_reason": "Intake only",
+      "next_check": "Inspect the named surface",
+      "evidence_ids": [],
+      "discovery_ids": [],
+      "finding_ids": []
+    },
+    {
+      "dimension": "utility_redemption_rights",
+      "status": "not_checked",
+      "surface": "utility_redemption_rights",
+      "outcome": "No check attempted",
+      "gap": "Fresh evidence required",
+      "stop_reason": "Intake only",
+      "next_check": "Inspect the named surface",
+      "evidence_ids": [],
+      "discovery_ids": [],
+      "finding_ids": []
+    },
+    {
+      "dimension": "external_dependencies",
+      "status": "not_checked",
+      "surface": "external_dependencies",
+      "outcome": "No check attempted",
+      "gap": "Fresh evidence required",
+      "stop_reason": "Intake only",
+      "next_check": "Inspect the named surface",
+      "evidence_ids": [],
+      "discovery_ids": [],
+      "finding_ids": []
+    },
+    {
+      "dimension": "development_disclosure",
+      "status": "not_checked",
+      "surface": "development_disclosure",
+      "outcome": "No check attempted",
+      "gap": "Fresh evidence required",
+      "stop_reason": "Intake only",
+      "next_check": "Inspect the named surface",
+      "evidence_ids": [],
+      "discovery_ids": [],
+      "finding_ids": []
+    }
+  ],
+  "decision_review_version": 2,
+  "decision_review": null,
+  "closure_review_version": 1,
+  "completion_review_version": 2,
+  "completion_status": "complete",
+  "delivery_status": "final_report"
+}

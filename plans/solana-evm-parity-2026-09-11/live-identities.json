@@ -1,0 +1,37 @@
+{
+  "registered_at": "2026-09-12T00:35:17.177458+00:00",
+  "round": 1,
+  "maximum_round_attempts": 360,
+  "maximum_case_attempts": 120,
+  "maximum_case_response_bytes": 67108864,
+  "maximum_case_seconds": 600,
+  "delivery_reserve_seconds": 120,
+  "provider": "credential-free public Solana mainnet RPC",
+  "paid_access": false,
+  "cases": [
+    {
+      "id": "usdc",
+      "intended_case": "established SPL token",
+      "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "source": "https://help.circle.com/support/en/usdc-supported-blockchains-minting-redemption-faqs?id=kb_article_view&sysparm_article=KB0010590",
+      "basis": "Circle publishes this exact Solana USDC address."
+    },
+    {
+      "id": "pump",
+      "intended_case": "recent Pump launch/migration",
+      "mint": "2fRDA5f353VXLs2PeLJNqqHqTMhrjJunAXmWWpLkpump",
+      "source": "https://pump.fun/coin/2fRDA5f353VXLs2PeLJNqqHqTMhrjJunAXmWWpLkpump",
+      "basis": "Public Pump detail page titled Duplicate; Coin creation time showed 4h ago in a temporary hidden browser. Current on-chain stage remains to be verified."
+    },
+    {
+      "id": "pyusd",
+      "intended_case": "Token-2022 with material extensions",
+      "mint": "2b1kV6DkPAnxd5ixfnxCpjxmKwqjjaYmCZfHsFu24GXo",
+      "source": "https://www.paypal.com/us/cshelp/article/what-is-paypal-usd-pyusd-help1005",
+      "extension_source": "https://developer.paypal.com/community/blog/pyusd-quick-start-guide/",
+      "basis": "PayPal publishes the exact Solana mint and describes initialized transfer-hook/permanent-delegate extensions; current state remains to be verified."
+    }
+  ],
+  "genesis_hash": "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d",
+  "preselection_limit": "Primary identity publications and public browser listings only; no RPC, signing, wallet connection or trading. Browser introduction dismissed without accepting terms; cookies rejected; temporary tab closed."
+}

@@ -1,0 +1,132 @@
+from pathlib import Path
+import sys,tempfile,unittest,time,json,copy
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'scripts'))
+from broad_fixture import RichRpc,Web
+from solana_broad_collect import start,collect,status,STAGES
+from solana_profile import validate
+
+
+class BroadTests(unittest.TestCase):
+    def setup_run(self,scope='broad',urls=None):
+        tmp=tempfile.TemporaryDirectory();self.addCleanup(tmp.cleanup);root=Path(tmp.name)/'run';target=RichRpc.reset();Web.calls=[];Web.blocked=False
+        opts={'question':'Assess exact token, project claims and exit depth.','received_at':time.time()-10,'deadline_at':time.time()+590,'scope':scope,'focus':['exit depth'],
+          'urls':urls or [],'synthetic':True,'config':{'url':'https://synthetic.invalid','headers':{}},'factory':RichRpc,'opener_factory':Web}
+        return root,target,opts
+
+    def test_one_start_has_facts_two_briefs_and_valid_rich_partial_draft(self):
+        root,target,opts=self.setup_run();r=start(root,target,**opts);self.assertFalse(r['diagnostics'],r['diagnostics']);m,report=validate(root/'draft',True)
+        self.assertEqual(len(r['lane_pointers']),2);self.assertEqual(report['research_status'],'partial');self.assertIsNone(report['decision'])
+        f=json.loads((root/'draft/facts.json').read_text());p=next(x for x in f['facts'] if x['operation']=='pool');self.assertEqual(p['data']['reserves_atomic'],['9860','19740']);self.assertEqual(p['data']['lp_custody']['observed_atomic'],'450')
+        self.assertTrue(any(x['operation']=='holders' for x in f['facts']));self.assertTrue(any(x['operation']=='discovery_pools' for x in f['facts']));self.assertLessEqual(status(root)['started_attempts'],120)
+        graph=next(x['data'] for x in f['facts'] if x['operation']=='controllers')
+        self.assertTrue(graph['nodes']);self.assertTrue(graph['root_links']);self.assertIsNone(graph['safe_or_locked_conclusion'])
+        self.assertTrue(any(r['role']=='owning_token_program' for r in graph['root_links']))
+        self.assertTrue(all((root/'draft/notes'/(o+'.json')).exists() for o in ('coordinator','liquidity','project')))
+        marks=status(root)['phases'];self.assertTrue(set(STAGES)<={x['phase'] for x in marks})
+
+    def test_resume_preserves_attempts_absolute_timing_and_question_urls(self):
+        root,target,opts=self.setup_run(urls=['https://project.example/token']);first=start(root,target,**opts);before=status(root);calls=len(RichRpc.calls)
+        again=start(root,target,**opts);after=status(root);self.assertEqual(calls,len(RichRpc.calls));self.assertEqual(before['grants'],after['grants']);self.assertEqual(before['deadline_at'],after['deadline_at'])
+        self.assertEqual(again['investigation_id'],first['investigation_id']);self.assertEqual(after['question'],opts['question']);self.assertEqual(after['urls'],opts['urls'])
+        with self.assertRaisesRegex(ValueError,'Resume'):start(root,target,**{**opts,'received_at':time.time()})
+
+    def test_automatic_candidate_receipt_is_independently_verified(self):
+        from transaction_fixture import fixture
+        root,target,opts=self.setup_run();_,a,packet,_=fixture();tx=packet['response']['result']
+        tx['transaction']['message']['accountKeys']=[RichRpc.pool['pool'] if k==a['pool'] else k for k in tx['transaction']['message']['accountKeys']]
+        tx['blockTime']=RichRpc.stamp;RichRpc.receipt=tx
+        result=start(root,target,**opts);self.assertFalse(result['diagnostics'],result['diagnostics']);validate(root/'draft',True)
+        facts=json.loads((root/'draft/facts.json').read_text())
+        sales=next(f['data'] for f in facts['facts'] if f['operation']=='sales')
+        self.assertEqual(sales['verified_receipts'],1);sale=sales['receipts'][0]
+        self.assertEqual(sale['input_atomic'],'1000');self.assertEqual(sale['output_atomic'],'500');self.assertEqual(sale['seller'],a['owner'])
+        self.assertIsNone(sale['profit']);self.assertEqual(len([r for r in RichRpc.calls if r['method']=='getTransaction']),1)
+
+    def test_focused_scope_omits_lanes_markets_and_broad_dependencies(self):
+        root,target,opts=self.setup_run('focused');r=start(root,target,**opts);self.assertFalse(r['lane_pointers']);self.assertFalse(Web.calls);self.assertFalse((root/'lanes').exists())
+        m,report=validate(root/'draft',True);self.assertEqual(report['scope'],'focused');self.assertTrue(all(q['method']!='getTokenLargestAccounts' for q in RichRpc.calls))
+
+    def test_source_failure_keeps_control_facts_and_pending_work(self):
+        root,target,opts=self.setup_run();Web.blocked=True;r=start(root,target,**opts);m,report=validate(root/'draft',True)
+        self.assertTrue(any(f['id']=='pipeline-auto-controls' for f in report['findings']));self.assertEqual(report['research_status'],'partial');self.assertTrue(any(o['status']=='permission_denied' for o in m['observations']))
+        self.assertTrue(all(not c['closure']['standard_scope_complete'] for c in report['coverage']))
+
+    def test_two_followup_presets_share_grants_and_third_is_refused(self):
+        root,target,opts=self.setup_run('focused');start(root,target,**opts);before=status(root)
+        for ident in ('followup1','followup2'):
+            spec={'id':ident,'kind':'programs','parameters':{'addresses':[target['mint']]}}
+            result=collect(root,spec,opts['config'],factory=RichRpc);self.assertEqual(result['research_status'],'partial')
+        after=status(root);self.assertEqual(before['deadline_at'],after['deadline_at']);self.assertGreater(after['started_attempts'],before['started_attempts'])
+        with self.assertRaisesRegex(ValueError,'Two coordinator'):collect(root,{'id':'followup3','kind':'programs','parameters':{'addresses':[]}},opts['config'],factory=RichRpc)
+
+    def test_wrong_network_keeps_diagnostics_and_never_completes(self):
+        root,target,opts=self.setup_run();RichRpc.mode='wrong_network';r=start(root,target,**opts);self.assertEqual(r['research_status'],'partial');self.assertTrue(r['diagnostics'])
+        self.assertTrue((root/'session.sqlite').exists());self.assertTrue((root/'start-result.json').exists())
+
+    def test_indexed_pool_followup_captures_lead_before_dependencies(self):
+        from solana_broad_collect import capture
+        from solana_discovery import source_plan
+        root,target,opts=self.setup_run('focused');start(root,target,**opts)
+        capture(root,[source_plan(target)['primary']],'ordinary',opener_factory=Web)
+        result=collect(root,{'id':'custody','kind':'pool','parameters':{'adapter':'raydium_cpmm','pool':RichRpc.pool['pool']}},opts['config'],factory=RichRpc)
+        self.assertIsNone(result['preset_error']);facts=json.loads((root/'draft/facts.json').read_text())
+        self.assertTrue(any(f['operation']=='pool' and f['data']['reserves_atomic']==['9860','19740'] for f in facts['facts']))
+        self.assertTrue((root/'preset-requests/custody.json').exists())
+        from pool_fixture import key
+        before=status(root)['started_attempts']
+        with self.assertRaisesRegex(ValueError,'exact-mint discovery'):
+            collect(root,{'id':'foreign','kind':'pool','parameters':{'adapter':'raydium_cpmm','pool':key(99)}},opts['config'],factory=RichRpc)
+        self.assertEqual(before,status(root)['started_attempts']);self.assertFalse((root/'preset-requests/foreign.json').exists())
+
+    def test_repeated_start_preserves_edited_note_and_draft(self):
+        root,target,opts=self.setup_run();start(root,target,**opts)
+        path=root/'draft/notes/coordinator.json';n=json.loads(path.read_text());n['limitations']=['Analyst correction retained.'];path.write_text(json.dumps(n))
+        before={p:p.read_bytes() for p in (path,root/'draft/report.json',root/'work-plan.json')}
+        r=start(root,target,**opts);self.assertTrue(r['resumed']);self.assertEqual(before,{p:p.read_bytes() for p in before})
+
+    def test_later_unpinned_mint_does_not_erase_earlier_usable_controls(self):
+        from unittest.mock import patch
+        from pool_fixture import mint,key
+        import urllib.error,io
+        root,target,opts=self.setup_run('focused');start(root,target,**opts)
+        original=RichRpc.__call__;RichRpc.values[target['mint']]=mint(2000000,key(90))
+        def changed(rpc,request):
+            if request['method']=='getBlock' and request['params'][0]==101:
+                raise urllib.error.HTTPError('https://synthetic.invalid',429,'fixture',{},io.BytesIO(b''))
+            result=original(rpc,request)
+            if request['method'] in ('getAccountInfo','getMultipleAccounts'):result['result']['context']['slot']=101
+            return result
+        with patch.object(RichRpc,'__call__',changed):
+            collect(root,{'id':'changed','kind':'programs','parameters':{'addresses':[target['mint']]}},opts['config'],factory=RichRpc)
+        f=json.loads((root/'draft/facts.json').read_text())['facts'];latest=next(r for r in f if r['evidence_id']=='auto-controls');prior=next(r for r in f if r['evidence_id']=='prior-controls')
+        self.assertFalse(latest['usable']);self.assertEqual(latest['data']['mint']['mint_authority'],key(90))
+        self.assertTrue(prior['usable']);self.assertEqual(prior['data']['selection_scope'],'earlier_pinned_snapshot_newer_unpinned')
+        self.assertNotEqual(prior['data']['mint']['supply_atomic'],latest['data']['mint']['supply_atomic'])
+
+    def test_unpinned_optional_epoch_does_not_invalidate_mint_authority_snapshot(self):
+        from solana_import import Importer
+        from solana_profile import Evidence
+        root,target,opts=self.setup_run('focused');start(root,target,**opts)
+        importer=Importer(root)
+        try:
+            importer.rpc();importer.web()
+            for sample in importer.m['samples']:
+                if importer.objects[sample['observation_id']]['request']['method']=='getEpochInfo':sample['status']='partial'
+            importer.facts();e=Evidence(importer.root,importer.m,True)
+            self.assertIn('auto-controls',e.usable)
+            controls=next(d for d in importer.m['derivations'] if d['id']=='auto-controls')
+            self.assertNotIn('epoch',controls['parameters'])
+            self.assertTrue(any(o['id'].startswith('baseline_epoch') for o in importer.m['observations']))
+        finally:importer.session.close()
+
+    def test_concurrent_followups_are_serialized_and_invalid_invocation_does_not_use_slot(self):
+        root,target,opts=self.setup_run('focused');start(root,target,**opts)
+        with self.assertRaises(ValueError):collect(root,{'id':'invalid','kind':'write_transaction'},opts['config'],factory=RichRpc)
+        self.assertFalse((root/'preset-requests/invalid.json').exists())
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results=list(pool.map(lambda ident:collect(root,{'id':ident,'kind':'programs','parameters':{'addresses':[target['mint']]}},opts['config'],factory=RichRpc),('p1','p2')))
+        self.assertEqual(len(results),2);marks=[m for m in status(root)['phases'] if m['phase'] in ('preset_p1','preset_p2')]
+        self.assertEqual(marks[0]['phase'],marks[1]['phase']);self.assertNotEqual(marks[1]['phase'],marks[2]['phase'])
+
+if __name__=='__main__':unittest.main()

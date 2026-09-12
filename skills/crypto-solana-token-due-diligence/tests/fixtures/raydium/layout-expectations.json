@@ -1,0 +1,72 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "source_revisions": [
+    "3847088b66f96b70a888c20fbf01e46ec23ad632",
+    "59fb845a9e5bb569c8b2f3415f13b0c0ebcc6b92",
+    "c613c87c41edbe21112c9b8341774a70009c6d7b",
+    "c85e56deeaead43abbc33b7301058838b9c5136d",
+    "d26944bfb76fb5fa8f91e5d440c2050ed358ef81"
+  ],
+  "cpmm": {
+    "pool_length": 637,
+    "config_length": 236,
+    "gross": [
+      "10000",
+      "20000"
+    ],
+    "protocol": [
+      "100",
+      "200"
+    ],
+    "fund": [
+      "30",
+      "40"
+    ],
+    "creator": [
+      "10",
+      "20"
+    ],
+    "net": [
+      "9860",
+      "19740"
+    ]
+  },
+  "amm_v4": {
+    "pool_length": 752,
+    "open_orders_length": 3228,
+    "market_length": 388,
+    "event_length": 88,
+    "gross": [
+      "10000",
+      "20000"
+    ],
+    "pnl": [
+      "100",
+      "200"
+    ],
+    "orders": [
+      "300",
+      "600"
+    ],
+    "maker_bid_received_coin": "70",
+    "maker_bid_paid_quote": "100",
+    "legacy_net": [
+      "10270",
+      "20300"
+    ],
+    "vault_only_net": [
+      "9900",
+      "19800"
+    ],
+    "deployed_variant": "unresolved"
+  },
+  "lp": {
+    "accounting_supply": "1000",
+    "mint_supply": "900",
+    "sample_amount": "450",
+    "mint_supply_share": "1/2",
+    "accounting_share": "9/20",
+    "locked": null
+  }
+}

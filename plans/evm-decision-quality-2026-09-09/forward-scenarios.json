@@ -1,0 +1,51 @@
+{
+  "synthetic": true,
+  "instructions": "These are supplied synthetic observations for an offline reasoning exercise, not current chain facts. Do not fabricate live evidence or a validated live bundle.",
+  "cases": [
+    {
+      "id": "harbor",
+      "request": "Please assess HARBOR, 0x1234567890abcdef1234567890abcdef12345678 on chain 4663.",
+      "observations": [
+        "Supplied chain and source packet resolves exact identity and runtime; token source has fixed supply and no mint, seizure, freeze, fee or upgrade entry point. Launch restrictions expired under the chain's correct block-number semantics.",
+        "Public professional profiles and dated project pages independently link two named founders to this exact product; public disclosure alone does not map every admin key. Eight months of executed product use and releases are supplied, including one documented incident response and user reimbursement.",
+        "Canonical LP NFT is owned by a contract called Harbor Locker. Its runtime was captured, but source and approval/withdrawal permissions were not resolved before the collection deadline. There is no observation of principal removal.",
+        "Successful ordinary-holder sales at $100 and $1000 are supplied at historical pins. A $50000 quote chosen by the researcher as an illustrative test was not collected. The user did not state a position size.",
+        "Published economics explicitly say 80% of protocol fees are used for discretionary buybacks. No immutable payout or dividend was promised. The supplied prior 30-day ledger reconciles the stated purchases and burn transfers.",
+        "No creator-sale history or full holder unlock reconstruction was supplied. No material contrary mechanism was observed in the inspected token itself."
+      ]
+    },
+    {
+      "id": "meridian",
+      "request": "Please assess MERIDIAN, 0x2234567890abcdef1234567890abcdef12345678 on chain 4663.",
+      "observations": [
+        "Supplied chain/source/authority packet resolves exact target. A current admin can call forceTransfer to move any ordinary holder's balance to the admin without allowance, delay or opt-out. The path is source-matched and reachable. No exercise or loss is observed.",
+        "Public professional profiles independently establish a named team, five years of operating history, substantial measured product use and a previous completed public audit.",
+        "Matched locker and pinned approvals establish no withdrawal path for the sampled canonical principal; material side pools remain unexamined.",
+        "The project discloses the admin role and says its team can be trusted."
+      ]
+    },
+    {
+      "id": "cinder",
+      "request": "Please assess CINDER, 0x3234567890abcdef1234567890abcdef12345678. An aggregator calls it popular.",
+      "observations": [
+        "Exact-address discovery gives conflicting mainnet/testnet identities. Both authorized live RPC identity attempts failed. No verified chain/runtime/pin or readable project documentation was supplied.",
+        "All ownership, liquidity, creator and team checks are unperformed. The popularity assertion has no captured methodology or authenticated identity."
+      ]
+    },
+    {
+      "id": "harbor_requirement",
+      "request": "I require irreversibly locked canonical liquidity. Does HARBOR at 0x1234567890abcdef1234567890abcdef12345678 on chain 4663 meet that requirement?",
+      "observations": [
+        "Use the same supplied observations as harbor. The ownership read proves the NFT is at the named locker, but permission/removal paths remain unresolved."
+      ]
+    },
+    {
+      "id": "lantern",
+      "request": "Please assess LANTERN, 0x4234567890abcdef1234567890abcdef12345678 on chain 4663.",
+      "observations": [
+        "Supplied exact chain/runtime are resolved. Bounded runtime analysis found a reachable admin-controlled external-call branch. Partial decoding suggests principal withdrawal; target storage layout and called contract semantics remain unresolved. The supplied analyst classification is a low-confidence adverse inference with a fee-collection-only live alternative. No withdrawal or loss observed.",
+        "Public product use and named team affiliation are independently documented. No full custody analysis or sale-size quotes supplied."
+      ]
+    }
+  ]
+}

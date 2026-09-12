@@ -1,0 +1,4 @@
+interface:
+  display_name: "Crypto Solana Token Due Diligence"
+  short_description: "Evidence-bounded Solana controls, custody and exits"
+  default_prompt: "Use $crypto-solana-token-due-diligence for this exact Solana mint. Preserve my full question and deadline, use public RPC and the standard evidence workflow, and explain material findings and unresolved limits."
