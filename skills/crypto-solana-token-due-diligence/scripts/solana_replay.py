@@ -6,7 +6,7 @@ from solana_common import sha
 from solana_profile import PROFILE,regular,strict_json,check,validate,validate_report,Evidence
 from solana_compose import ComposeError, compose,draft_lock
 from solana_facts import encoded,atomic
-from solana_render import render,reading
+from solana_render import render,reading,reading_documents,FACTS_DOCUMENT
 
 VERSION='1.2.0'
 ENGINE_ROOT=Path(__file__).resolve().parents[1]
@@ -65,6 +65,8 @@ def verify(root,allow_synthetic=False):
     check(file_inventory(root)==expected,'delivery.inventory','Missing, changed or unlisted frozen file.')
     required={'manifest.json','report.json','report.md','reading.json','engine/scripts/solana_replay.py','engine/scripts/solana_profile.py','engine/scripts/solana_render.py','engine/assets/release.json'}
     check(required<=set(names),'delivery.inventory','Required frozen dependency missing.')
+    declared=strict_json(regular(root,'reading.json').read_bytes(),'reading.json').get('facts_document')
+    check(declared is None or (declared==FACTS_DOCUMENT and declared in names),'delivery.inventory','Declared facts document missing from the frozen inventory.')
     manifest=strict_json(regular(root,'manifest.json').read_bytes(),'manifest');report=strict_json(regular(root,'report.json').read_bytes(),'report')
     for name in ('manifest.json','report.json','report.md'):
         check(receipt['source_hashes'][name]==sha(regular(root,name).read_bytes()),name,'Source hash mismatch.')
@@ -94,7 +96,11 @@ def read(root,allow_synthetic=False):
         # Older frozen checklists carry every publication leaf; the presentation caps them the same way.
         if entry.get('kind')=='typed_fact' and entry.get('operation') in PUBLICATION_OPS and isinstance(entry.get('details'),list) and len(entry['details'])>PUBLICATION_DETAIL_LINES+1:
             rest=len(entry['details'])-PUBLICATION_DETAIL_LINES;entry['details']=entry['details'][:PUBLICATION_DETAIL_LINES]+['… '+str(rest)+' further publication detail lines retained in the frozen report and evidence.']
-    return {**content,'bundle':str(root),'report_path':str(root/'report.md'),
+    facts={}
+    if content.get('facts_document'):
+        # The sibling facts document is part of the verified inventory; the answer opens it only for a needed quantity.
+        facts={'facts_path':str(regular(root,content['facts_document']))}
+    return {**content,'bundle':str(root),'report_path':str(root/'report.md'),**facts,
         'verification':result['verification'],'deliverable':result['delivery_status']=='delivered'}
 
 
@@ -139,7 +145,8 @@ def finalize(root,out,*,note_name='notes/coordinator.json',allow_synthetic=False
         for p in list(stage.rglob('*')):
             if p.is_file() and p.relative_to(stage).as_posix() not in keep:p.unlink()
         release=snapshot_engine(stage/'engine',engine_root)
-        atomic(stage/'report.md',render(m,r).encode());atomic(stage/'reading.json',encoded(reading(m,r)))
+        payload,facts=reading_documents(m,r)
+        atomic(stage/'report.md',render(m,r).encode());atomic(stage/'reading.json',encoded(payload));atomic(stage/FACTS_DOCUMENT,encoded(facts))
         receipt={'schema_version':1,'profile':PROFILE,'target':m['target'],'investigation_id':m['investigation_id'],'synthetic':m['synthetic'],
             'delivery_status':r['delivery_status'],'reporting_version':VERSION,'engine_release':release,
             'source_hashes':{n:sha((stage/n).read_bytes()) for n in ('manifest.json','report.json','report.md')},'inventory':file_inventory(stage)}
@@ -155,7 +162,9 @@ def frozen_run(root,allow_synthetic=False):
     """Called by the explicitly trusted copied engine, never by verification."""
     root=Path(root);m,r=validate(root,allow_synthetic)
     check(render(m,r).encode()==regular(root,'report.md').read_bytes(),'report.md','Frozen rendering differs.')
-    check(encoded(reading(m,r))==regular(root,'reading.json').read_bytes(),'reading.json','Frozen reading checklist differs.')
+    payload,facts=reading_documents(m,r)
+    check(encoded(payload)==regular(root,'reading.json').read_bytes(),'reading.json','Frozen reading checklist differs.')
+    check(encoded(facts)==regular(root,FACTS_DOCUMENT).read_bytes(),FACTS_DOCUMENT,'Frozen facts document differs.')
     return {'reproduced':True,'report_sha256':sha(regular(root,'report.md').read_bytes()),'network_requests':0}
 
 

@@ -137,10 +137,14 @@ python3 "$S/scripts/solana_bundle.py" finalize "$RUN/draft" --out "$RUN/final"
 
 Finalize composes both lane notes and the coordinator note, preflights, freezes the
 engine and evidence, validates, renders and reproduces bytes, and returns `report_path`,
-the compact reading checklist (verdict and axes, every finding with its citation, the
-eleven coverage rows, typed-fact quantities and limits with `@aliases` for recurring
-addresses) and citations in one response. Answer from that checklist, expanding aliases
-from its `addresses` table; open `report_path` only for a disputed detail. It lists every error at once;
+`facts_path`, the compact reading checklist (verdict and axes, every finding with its
+citation, the eleven coverage rows, typed-fact summaries, limits and attention rows with
+`@aliases` for recurring addresses) and citations in one response. The typed-fact
+detail tables with every quantity are frozen in `facts-compact.json` (`facts_path`),
+keyed by evidence id as each entry's `details_ref` says. Answer from that checklist,
+expanding aliases from its `addresses` table; open `facts_path` in the same turn only
+for a quantity that no finding states, and `report_path` only for a disputed detail.
+It lists every error at once;
 repair the note and rerun. `compose --check` only validates a note without writing:
 
 ```sh

@@ -108,8 +108,9 @@ presets; raw evidence remains available for material disputes.
    text is the specification. `compose --check` is the repair tool for a rejected note,
    not a routine step. Unfinished standard work goes to `checkpoint`, never delivery.
 6. **Answer:** read the returned compact checklist and citations in that same response
-   and write the chat answer below from them; open `report_path` only for a disputed
-   detail. No new fetch or extra turn for formatting.
+   and write the chat answer below from them; open `facts_path` in the same turn only
+   for a quantity no finding states, and `report_path` only for a disputed detail. No
+   new fetch or extra turn for formatting.
 
 If a lane is absent/late, execute its feasible minimum checklist locally within the
 same cutoff or retain explicit incomplete work. Do not mark a lane completed just

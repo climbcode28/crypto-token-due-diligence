@@ -14,7 +14,8 @@ atomic new-directory publication. An existing output is never replaced. Failure
 removes the staging tree and leaves the previous draft/report intact.
 
 The frozen inventory includes manifest/report bytes, every registered evidence
-artifact and immutable lane-note snapshot, readable Markdown, `reading.json`, every
+artifact and immutable lane-note snapshot, readable Markdown, `reading.json`, its sibling
+`facts-compact.json` (the typed-fact detail tables), every
 Solana script/adapter, and all assets including registry/layout/source provenance and
 licenses. Python bytecode and mutable active notes are excluded. `delivery.json`
 records exact hashes and versions; its integrity inventory is not an authentication
@@ -29,20 +30,24 @@ returns absolute local `answer_link` values for the user-facing answer. The repo
 with a Summary: labeled findings (✅ Good / 🟡 Potential Risk / 🔴 Bad, ⚪ Unverified) with
 adjacent citations and exactly four Conclusions bullets, mirroring the chat contract.
 
-A successful finalize/read returns `report_path`, its compact reading checklist and
-citations in the same call; the full Markdown stays in the frozen report. Read all
-checklist entries before answering. Keep exact quantities and units, spending
+A successful finalize/read returns `report_path`, `facts_path`, its compact reading
+checklist and citations in the same call; the full Markdown stays in the frozen report.
+Read all checklist entries before answering. Keep exact quantities and units, spending
 owner versus beneficial owner, sample account/receipt counts, custody exclusions,
 LP principal versus fees, named controllers and bypass paths, quote versus execution,
 net proceeds versus gross/refunds/profit, economics/rights, assurance levels and the
 original focus. A short answer must not erase a material limitation or adverse fact.
-The checklist keeps every material quantity and limit in a compact shape: typed-fact
-details are nested, omit provenance (timestamps, digests, evidence ids, context slots)
-and null or empty fields, list same-shaped rows as column tables, and carry the fact's
-own pipeline finding; addresses that recur are `@aliases` resolved once in `addresses`
-(expand them when naming an account); only publication-derived details (indexer
-listings, repository metadata, quote routes) are capped with an explicit remainder note. Refer to the frozen report for supporting detail; do not assign standard
-unfinished research to the user as homework.
+The checklist keeps every judgment, limit and attention row and carries each typed
+fact's summary and its own pipeline finding; the typed-fact detail tables (every
+quantity, controller and status) are frozen beside it in `facts-compact.json`, keyed
+by evidence id as each entry's `details_ref` says, nested, without provenance
+(timestamps, digests, evidence ids, context slots) or null and empty fields, with
+same-shaped rows as column tables. Addresses that recur are `@aliases`; each document
+resolves the aliases it uses in its own `addresses` table (expand them when naming an
+account). Only publication-derived details (indexer listings, repository metadata,
+quote routes) are capped with an explicit remainder note. Open `facts_path` in the same
+turn only for a quantity that no finding states; refer to the frozen report for
+supporting detail; do not assign standard unfinished research to the user as homework.
 
 Use [replay guidance](report-replay.md) for verification and trust boundaries, and
 [reporting scenarios](reporting-scenarios.md) to calibrate conclusions.

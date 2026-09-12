@@ -508,3 +508,39 @@ opened with Read.
 
 Final state: Solana 381 passed, router 30, EVM 429; README suite count updated; `git diff
 --check` clean; nothing committed.
+
+### Payload split: facts document beside the reading checklist (2026-09-12, same evening)
+
+Approved follow-up to the compaction above, done as implement, review, improve. The finalize,
+checkpoint and read payload now carries every judgment, limit, attention row and citation, and
+each typed-fact entry keeps its summary, its own pipeline finding and a `details_ref`
+(`facts-compact.json#<evidence_id>`); the detail tables with every quantity, controller and
+status are frozen beside it in `facts-compact.json`, part of the verified inventory, reproduced
+by the frozen engine and returned by `read` as `facts_path`. Both documents are built in one
+pass (`reading_documents`) so an alias means the same address in both; each lists only the
+aliases it uses. Older bundles whose `reading.json` has no `facts_document` still read and
+verify. Docs (SKILL step 6, runbook, output reference) tell the coordinator to open
+`facts_path` in the same turn only for a quantity that no finding states.
+
+| Bundle | Before split (read payload) | After split (read payload) | Facts document |
+| --- | --- | --- | --- |
+| WIF `wif-e2e/checkpoint5` | 73.2 KB reading | 53.7 KB reading | 25.1 KB |
+| RAY run b delivered (`final` → `final3`) | 87.4 KB | 57.5 KB | 69.8 KB on disk |
+
+The independent review of the split found one real defect and it is fixed: the publication row
+cap recursed into table columns and into the contents of kept rows whenever a table carried
+hoisted constants, so on the live bundle the six kept indexer rows lost two column values each.
+`cap_rows` now caps only row collections. Also from the review: the no-loss test now runs a
+synthetic broad start (controls, holders, pools, discovery, transactions, sales, rebuys, sizes,
+local quote, launch, controllers) and checks every non-provenance leaf with digit boundaries and
+that the cap note never appears inside columns or a kept row; an old-bundle test rewrites a
+frozen bundle to the inline shape and asserts read and verify still pass; the facts document's
+note says where limits live; effect scopes stay on their effect, instruction accounts are kept
+(only the data blob is dropped), the lamport split and pre/post merge apply only when the rows
+have exactly the expected shape, and aliases are substituted only at word boundaries. A second
+review pass confirmed every fix against the code, the suite and the live bundle (1,688
+non-publication leaves, none missing; two cap notes, both whole row entries; every alias
+resolving in its own table) and raised one low-severity point, now closed: a table nested
+inside a kept publication row is no longer capped either.
+
+Suites after the split: Solana 384, router 30, EVM 429. Nothing committed.

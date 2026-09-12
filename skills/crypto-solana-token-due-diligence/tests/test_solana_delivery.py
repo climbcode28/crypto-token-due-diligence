@@ -48,7 +48,12 @@ class DeliveryTests(unittest.TestCase):
         from solana_render import PROVENANCE_KEYS,ADDRESS
         root,b,n=self.fixture(True);result=finalize(b.root,root/'final',allow_synthetic=True)
         manifest=json.loads((root/'final/manifest.json').read_text());typed={x['evidence_id']:x for x in result['reading_checklist'] if x['kind']=='typed_fact'}
-        table=result['addresses'];self.assertTrue(table)
+        # Every quantity lives in the sibling facts document, part of the verified inventory; the checklist keeps a reference.
+        self.assertEqual(result['facts_document'],'facts-compact.json');self.assertEqual(Path(result['facts_path']).resolve(),(root/'final/facts-compact.json').resolve())
+        facts=json.loads(Path(result['facts_path']).read_text());self.assertEqual(set(facts['facts']),set(typed));self.assertEqual(facts['investigation_id'],result['investigation_id'])
+        self.assertTrue(all('details' not in x and x['details_ref']=='facts-compact.json#'+x['evidence_id'] for x in typed.values()))
+        table={**facts['addresses'],**result['addresses']};self.assertTrue(table)
+        for entry in typed.values():entry['details']=facts['facts'][entry['evidence_id']]['details']
         def expand(text):return ADDRESS.sub(lambda m:m.group(0),text) if not table else __import__('re').sub(r'@[A-Za-z0-9_]+',lambda m:table.get(m.group(0),m.group(0)),text)
         def leaves(value,path=()):
             if isinstance(value,dict):
@@ -68,7 +73,85 @@ class DeliveryTests(unittest.TestCase):
         for alias in __import__('re').findall(r'@[A-Za-z0-9_]+',json.dumps(list(typed.values()),ensure_ascii=False)):
             if alias.startswith('@a') or alias in ('@target_mint','@wsol','@spl_token','@token_2022','@system','@genesis_hash'):self.assertIn(alias,table,alias)
         for alias,address in table.items():self.assertRegex(address,ADDRESS)
+        # Each document lists only the aliases it uses, and the two tables never disagree on an alias.
+        import re
+        for alias in result['addresses']:self.assertRegex(json.dumps(result['reading_checklist'],ensure_ascii=False),re.escape(alias)+r'(?![A-Za-z0-9_])')
+        for alias,address in facts['addresses'].items():self.assertEqual(result['addresses'].get(alias,address),address)
         self.assertLess(len(json.dumps(result,ensure_ascii=False).encode()),60_000)
+
+    def test_no_typed_leaf_is_lost_across_every_operation_of_a_synthetic_run(self):
+        """A synthetic start plus a swap receipt yields controls, holders, pools, discovery, transactions, sales,
+        rebuys, sizes, launch, programs, controllers and assurance facts; every non-provenance leaf of each must
+        survive in the checklist entry plus the facts document, and the publication cap must touch rows only."""
+        import re,time
+        from broad_fixture import RichRpc,Web
+        from transaction_fixture import fixture as receipt
+        from solana_broad_collect import start
+        from solana_render import reading_documents,PROVENANCE_KEYS,PUBLICATION_OPS,PUBLICATION_ROWS
+        t=tempfile.TemporaryDirectory();self.addCleanup(t.cleanup);root=Path(t.name)/'run';target=RichRpc.reset();Web.calls=[];Web.blocked=False
+        _,a,packet,_=receipt();tx=packet['response']['result'];tx['transaction']['message']['accountKeys']=[RichRpc.pool['pool'] if k==a['pool'] else k for k in tx['transaction']['message']['accountKeys']]
+        tx['blockTime']=RichRpc.stamp;RichRpc.receipt=tx
+        start(root,target,question='Assess exact token, project claims and exit depth.',received_at=time.time()-10,deadline_at=time.time()+590,scope='broad',focus=[],urls=[],
+              synthetic=True,config={'url':'https://synthetic.invalid','headers':{}},factory=RichRpc,opener_factory=Web)
+        m,r=validate(root/'draft',True);payload,facts=reading_documents(m,r)
+        ops={d['operation'] for d in m['derivations']};self.assertTrue({'controls','holders','pool','discovery_pools','transaction','sales','rebuys','quote_sizes','local_quote','launch','controllers'}<=ops,ops)
+        table={**facts['addresses'],**payload['addresses']};typed={x['evidence_id']:x for x in payload['reading_checklist'] if x['kind']=='typed_fact'}
+        def expand(text):return re.sub(r'@[A-Za-z0-9_]+',lambda mm:table.get(mm.group(0),mm.group(0)),text)
+        def leaves(value,publication,path=()):
+            if isinstance(value,dict):
+                for k,v in value.items():
+                    if k in PROVENANCE_KEYS or (path and path[-1]=='instructions' and k=='data'):continue
+                    yield from leaves(v,publication,path+(k,))
+            elif isinstance(value,list):
+                for v in (value[:PUBLICATION_ROWS] if publication else value):yield from leaves(v,publication,path)
+            elif value is not None and value not in ([],{},''):yield path,value
+        note='further publication rows retained'
+        def no_note_inside(value,inside_row=False):
+            if isinstance(value,dict):
+                if 'columns' in value and 'rows' in value:
+                    self.assertFalse(any(isinstance(c,str) and note in c for c in value['columns']))
+                    rows=value['rows'] if isinstance(value['rows'],list) else list(value['rows'].values())
+                    for row in rows:
+                        if isinstance(row,str):self.assertIn(note,row);continue
+                        no_note_inside(row,True)
+                    return
+                for v in value.values():no_note_inside(v,inside_row)
+            elif isinstance(value,list):
+                for v in value:
+                    if inside_row:self.assertFalse(isinstance(v,str) and note in v)
+                    no_note_inside(v,inside_row)
+        checked=0
+        for d in m['derivations']:
+            entry=typed[d['id']];doc=facts['facts'][d['id']];self.assertEqual(entry['details_ref'],'facts-compact.json#'+d['id'])
+            text=expand(json.dumps([doc['details'],entry['limits'],entry['attention'],entry['summary']],ensure_ascii=False));no_note_inside(doc['details'])
+            for path,value in leaves(d['output'],d['operation'] in PUBLICATION_OPS):
+                if path and path[-1] in ('places','rounding'):continue
+                s=json.dumps(value,ensure_ascii=False).strip('"');checked+=1
+                if re.fullmatch(r'-?\d+(\.\d+)?',s):self.assertRegex(text,r'(?<![0-9.\-])'+re.escape(s)+r'(?![0-9.])',(d['id'],path,value))
+                else:self.assertIn(s,text,(d['id'],path,value))
+        self.assertGreater(checked,300)
+
+    def test_old_bundle_without_facts_document_still_reads_and_verifies(self):
+        """A bundle frozen before the facts document (details inline, no facts_document key) keeps reading and verifying."""
+        from solana_replay import file_inventory
+        root,b,n=self.fixture(True);result=finalize(b.root,root/'final',allow_synthetic=True);out=root/'final'
+        content=json.loads((out/'reading.json').read_text());facts=json.loads((out/'facts-compact.json').read_text())
+        for entry in content['reading_checklist']:
+            if entry['kind']=='typed_fact':entry['details']=facts['facts'][entry['evidence_id']]['details'];entry.pop('details_ref')
+        content.pop('facts_document');(out/'reading.json').write_bytes(encoded(content));(out/'facts-compact.json').unlink()
+        receipt=json.loads((out/'delivery.json').read_text());receipt['inventory']=file_inventory(out);(out/'delivery.json').write_bytes(encoded(receipt))
+        self.assertTrue(verify(out,True)['valid']);old=read(out,True)
+        self.assertNotIn('facts_path',old);self.assertNotIn('facts_document',old);self.assertTrue(all('details' in x for x in old['reading_checklist'] if x['kind']=='typed_fact'))
+
+    def test_facts_document_is_frozen_and_verified(self):
+        root,b,n=self.fixture(True);result=finalize(b.root,root/'final',allow_synthetic=True);path=Path(result['facts_path'])
+        inventory={r['path']:r for r in json.loads((root/'final/delivery.json').read_text())['inventory']};self.assertIn('facts-compact.json',inventory)
+        self.assertEqual(verify(root/'final',True)['valid'],True)
+        raw=path.read_bytes();path.write_bytes(raw.replace(b'"facts"',b'"facts "',1))
+        with self.assertRaises(ValueError):verify(root/'final',True)
+        path.write_bytes(raw);self.assertEqual(read(root/'final',True),result)
+        path.unlink()
+        with self.assertRaises(ValueError):verify(root/'final',True)
 
     def test_checkpoint_records_unjudged_work_but_cannot_deliver(self):
         t=tempfile.TemporaryDirectory();self.addCleanup(t.cleanup);root=Path(t.name);b=Bundle(root/'draft');save(b,note(b))

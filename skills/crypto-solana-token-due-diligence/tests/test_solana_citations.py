@@ -30,8 +30,10 @@ class CitationTests(unittest.TestCase):
         t=tempfile.TemporaryDirectory();self.addCleanup(t.cleanup);b=rich(t.name,'raydium_cpmm')
         m,r=validate(b.root,True);content=reading(m,r)
         pool=next(x for x in content['reading_checklist'] if x['kind']=='typed_fact' and x['operation']=='pool')
-        import json;joined=json.dumps(pool['details']);self.assertIn('9860',joined);self.assertIn('19740',joined);self.assertIn('450',joined)
-        self.assertNotIn('completed_at',joined);self.assertNotIn('data_sha256',joined);self.assertIn('@target_mint',json.dumps(content['addresses']) and joined+json.dumps(pool['summary']))
+        import json;from solana_render import facts_compact
+        facts=facts_compact(m,r);joined=json.dumps(facts['facts'][pool['evidence_id']]['details']);self.assertIn('9860',joined);self.assertIn('19740',joined);self.assertIn('450',joined)
+        self.assertNotIn('details',pool);self.assertNotIn('completed_at',joined);self.assertNotIn('data_sha256',joined)
+        self.assertIn('@target_mint',facts['addresses']);self.assertEqual(facts['investigation_id'],content['investigation_id']);self.assertEqual(content['facts_document'],'facts-compact.json')
         self.assertTrue(pool['limits']);self.assertIn('quote versus execution',content['answer_rule'])
 
 if __name__=='__main__':unittest.main()

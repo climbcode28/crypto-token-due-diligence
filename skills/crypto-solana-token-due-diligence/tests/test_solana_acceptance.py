@@ -45,7 +45,9 @@ class AcceptanceTests(unittest.TestCase):
                 self.assertTrue(fact['usable']);m,r=validate(b.root,True);packet=reading(m,r)
                 retained=next(f for f in packet['reading_checklist'] if f['kind']=='typed_fact' and f['operation']=='pool')
                 for path,wanted in expected.items():self.assertEqual(lookup(fact['data'],path),wanted,path)
-                self.assertTrue(retained['limits']);self.assertTrue(retained['details']);self.assertIn(kind,render(m,r))
+                from solana_render import facts_compact
+                self.assertTrue(retained['limits']);self.assertNotIn('details',retained);self.assertEqual(retained['details_ref'],'facts-compact.json#'+retained['evidence_id'])
+                self.assertTrue(facts_compact(m,r)['facts'][retained['evidence_id']]['details']);self.assertIn(kind,render(m,r))
 
     def test_revocation_does_not_hide_permanent_delegate_hook_and_pause(self):
         from test_solana_accounts import mint,tlv
