@@ -3,8 +3,7 @@
 The standard v2 workflow is standalone Python standard library. No EVM sibling import,
 package installation, new credential or persistent RPC connection is required. Use
 [the runbook](runbook.md) for commands and [the skill](../SKILL.md) for scope/timing.
-V2 is the default after functional acceptance; live rich-case parity remains unmet.
-Existing schema-1 collection
+V2 is the default; live evidence is recorded in the plans. Existing schema-1 collection
 and reading use [the explicit legacy contract](legacy-v1.md), with unchanged evidence.
 
 ## Public collection and evidence
@@ -12,10 +11,11 @@ and reading use [the explicit legacy contract](legacy-v1.md), with unchanged evi
 `solana_broad_collect.py start` performs local zero-request public provider preflight,
 creates one durable session and executes the bounded dependency stages. Default RPC
 is `https://api.mainnet-beta.solana.com`, optionally a credential-free public root in
-`SOLANA_RPC_URL`. Custom Solana dRPC is deferred. Do not reuse EVM endpoint variables.
-Read applicable project provider policy and source any documented private env with
-tracing disabled in the same invocation. Configuration is not paid-use permission.
-No key or payment is required to continue available public-source research.
+`SOLANA_RPC_URL`. Custom Solana dRPC is deferred. Do not reuse EVM endpoint variables;
+no policy file read, private env or provider check is involved. The public free tier
+refuses `getTokenLargestAccounts` and windows other methods per ten seconds; the session
+waits out windows, marks refused methods and substitutes a bounded SPL account scan for
+holder discovery. No key or payment is required to continue public-source research.
 
 The shared session binds the original question, focus, URLs, investigation ID,
 expected genesis/mint and absolute receipt/target/deadline. Actual sends, redirects,

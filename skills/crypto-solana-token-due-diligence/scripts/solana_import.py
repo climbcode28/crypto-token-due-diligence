@@ -41,6 +41,10 @@ class Importer:
             plan=json.loads(path.read_text());sample=plan['sample_id']
             for r in plan['reads']:
                 if r['critical']:self.critical[sample+'_'+r['name']]=True
+        kinds={}
+        for path in sorted((self.session.root/'preset-requests').glob('*.json')):
+            try:request=json.loads(path.read_text());kinds[path.stem]=request.get('kind')
+            except ValueError:continue
         for a in ledger:
             if a['transport_kind']!='rpc' or a['response'] is None:continue
             p=json.loads(a['response']);eid=p['request']['id']
@@ -48,7 +52,9 @@ class Importer:
             p.update(started_at=a['started_at'],completed_at=a['completed_at']);req=p['request'];method=req['method']
             path=self.artifact(eid+'.json',encoded(p));sub=self.subject()
             if method in ('getAccountInfo','getTokenSupply','getTokenLargestAccounts','getSignaturesForAddress','getTokenAccountsByOwner','getProgramAccounts'):
-                sub=self.subject('wallet' if method in ('getSignaturesForAddress','getTokenAccountsByOwner') else 'program' if method=='getProgramAccounts' else 'mint',req['params'][0])
+                filters=req['params'][1].get('filters') if method=='getProgramAccounts' and isinstance(req['params'][1],dict) else None
+                scan=filters[1]['memcmp']['bytes'] if isinstance(filters,list) and len(filters)==2 and filters[1].get('memcmp',{}).get('offset')==0 else None
+                sub=self.subject('mint',scan) if scan else self.subject('wallet' if method in ('getSignaturesForAddress','getTokenAccountsByOwner') else 'program' if method=='getProgramAccounts' else 'mint',req['params'][0])
             elif method=='getMultipleAccounts':sub=self.subject('mint',req['params'][0][0])
             status=normalized_status(p)
             if p['status']=='ok':
@@ -57,32 +63,58 @@ class Importer:
             o={'id':eid,'kind':'rpc','subject':sub,'status':status,'artifact':path,'sha256':sha(encoded(p)),
                'captured_at':utc(a['completed_at']),'synthetic':self.m['synthetic'],'source':{'namespace':a['source'],'owner':'pipeline'},'request_id':eid,'sample_id':None}
             self.obs[eid]=o;self.objects[eid]=p;self.m['observations'].append(o)
-            dimension='current_concentration' if method=='getTokenLargestAccounts' else 'historical_launch_integrity' if method=='getSignaturesForAddress' else 'sellability_exit_depth' if method=='getTransaction' else 'token_controls'
-            self.m['attempts'].append({'id':'a-'+str(a['id']),'evidence_id':eid,'dimension':dimension,'owner':'pipeline','status':status,'route':'primary','source':a['source']})
+            self.m['attempts'].append({'id':'a-'+str(a['id']),'evidence_id':eid,'dimension':self.rpc_dimension(eid,method,kinds),'owner':'pipeline','status':status,'route':'primary','source':a['source']})
         self.pin()
+
+    def rpc_dimension(self,eid,method,kinds):
+        """The coverage surface an RPC attempt evidences: by method, else by the sample that planned it."""
+        if method in ('getTokenLargestAccounts','getProgramAccounts'):return 'current_concentration'
+        if method=='getSignaturesForAddress':return 'historical_launch_integrity'
+        if method=='getTransaction':return 'sellability_exit_depth'
+        intent=self.session.root/'read-intents'/(eid+'.json');sample=''
+        if intent.exists():
+            try:sample=json.loads(intent.read_text()).get('sample_id','') or ''
+            except ValueError:sample=''
+        kind=kinds.get(sample[:-4] if sample.endswith('lead') else sample)
+        by_kind={'pool':'canonical_lp_principal_custody','positions':'canonical_lp_principal_custody','programs':'admin_treasury_reward_custody',
+            'transactions':'sellability_exit_depth','pool_activity':'sellability_exit_depth','quote':'sellability_exit_depth','holders':'current_concentration','creator_history':'historical_launch_integrity'}
+        if kind in by_kind:return by_kind[kind]
+        if sample.startswith('pool') or sample.startswith('lpleads'):return 'canonical_lp_principal_custody'
+        if sample=='programs':return 'admin_treasury_reward_custody'
+        if sample=='receipts':return 'sellability_exit_depth'
+        return 'token_controls'
 
     def pin(self):
         successful=[eid for eid,c in self.checked.items() if c['status']=='ok']
         genesis=[eid for eid in successful if self.objects[eid]['request']['method']=='getGenesisHash']
         genesis.sort(key=lambda eid:self.objects[eid]['started_at'])
+        bracket=None
         if len(genesis)>=2 and self.objects[genesis[0]]['completed_at']<self.objects[genesis[-1]]['started_at']:
             self.m['network_checks']={'initial_evidence_id':genesis[0],'recheck_evidence_id':genesis[-1]}
+            # The verified interval and provider that the strict profile requires for a pinned sample.
+            bracket=(self.objects[genesis[0]]['completed_at'],self.objects[genesis[-1]]['started_at'],self.obs[genesis[0]]['source']['namespace'])
         headers={}
         for eid in successful:
             p=self.objects[eid]
-            if p['request']['method']=='getBlock':headers.setdefault(p['request']['params'][0],[]).append(eid)
+            if p['request']['method'] in ('getBlock','getBlockTime'):headers.setdefault(p['request']['params'][0],[]).append(eid)
         pairs={}
         for slot,ids in headers.items():
             ids.sort(key=lambda eid:self.objects[eid]['started_at'])
-            if len(ids)>=2 and self.objects[ids[0]]['completed_at']<self.objects[ids[-1]]['started_at']:
-                pairs[slot]=(ids[0],ids[-1]);self.m['header_checks'].append({'initial_evidence_id':ids[0],'recheck_evidence_id':ids[-1]})
+            # The initial header is a full getBlock; the later recheck may be a full header or its block time.
+            initial=next((i for i in ids if self.objects[i]['request']['method']=='getBlock'),None)
+            later=[i for i in ids if initial and self.objects[i]['started_at']>self.objects[initial]['completed_at']]
+            if initial and later:
+                pairs[slot]=(initial,later[-1]);self.m['header_checks'].append({'initial_evidence_id':initial,'recheck_evidence_id':later[-1]})
         for eid in successful:
             c=self.checked[eid]
             if 'context_slot' not in c:continue
             p=self.objects[eid];slot=c['context_slot'];h,r=pairs.get(slot,(None,None));critical=self.critical.get(eid.rsplit('_',1)[0],False)
             sid='s-'+eid;self.obs[eid]['sample_id']=sid
             stamp=self.objects[h]['response']['result'].get('blockTime') if h else None
-            pinned=bool(h and self.m['network_checks'] and stamp is not None and -60<=p['completed_at']-stamp<=300)
+            namespace=self.obs[eid]['source']['namespace']
+            inside=bool(bracket and bracket[0]<=p['started_at'] and p['completed_at']<=bracket[1] and namespace==bracket[2])
+            header_ok=bool(h and stamp is not None and -60<=p['completed_at']-stamp<=300 and self.obs[h]['source']['namespace']==namespace)
+            pinned=inside and header_ok  # Outside the verified interval a sample stays partial; the run still imports.
             self.m['samples'].append({'id':sid,'observation_id':eid,'context_slot':slot,'addresses':c.get('addresses',[]),'address_indices':c.get('address_indices',{}),
                 'encoding':'base64' if p['request']['method'] in ('getAccountInfo','getMultipleAccounts','getTokenAccountsByOwner','getProgramAccounts') else 'json',
                 'commitment':'finalized','captured_at':self.obs[eid]['captured_at'],'block_evidence_id':h,'block_recheck_evidence_id':r,'critical':critical,
@@ -108,7 +140,8 @@ class Importer:
                 'status':normalized_status(record),'artifact':artifact,'sha256':sha(raw),'captured_at':utc(record['captured_at']),'synthetic':self.m['synthetic'],
                 'source':{'capture':record,'owner':'shared' if record['owner']=='ordinary' else record['owner']},'sample_id':None}
             self.obs[eid]=o;self.objects[eid]={'record':record,'raw':raw};self.m['observations'].append(o)
-            dim='canonical_lp_principal_custody' if urlsplit(record['url']).hostname in ('api.dexscreener.com','api.geckoterminal.com') else 'development_disclosure'
+            host=urlsplit(record['url']).hostname
+            dim=record.get('dimension') or ('canonical_lp_principal_custody' if host in ('api.dexscreener.com','api.geckoterminal.com') else 'sellability_exit_depth' if host in ('lite-api.jup.ag','api.jup.ag') else 'development_disclosure')
             route='alternate' if 'geckoterminal.com' in record['url'] else 'primary'
             self.m['attempts'].append({'id':'capture-'+sha(eid.encode())[:24],'evidence_id':eid,'dimension':dim,'owner':'pipeline' if record['owner']=='ordinary' else record['owner'],
                 'status':o['status'],'route':route,'source':urlsplit(record['url']).hostname})
@@ -143,7 +176,7 @@ class Importer:
         for eid,o in list(self.obs.items()):
             if o['kind']!='document' or o['status']!='ok':continue
             host=urlsplit(o['source']['capture']['url']).hostname
-            if host in ('api.dexscreener.com','api.geckoterminal.com'):
+            if host in ('api.dexscreener.com','api.geckoterminal.com') and not (host=='api.geckoterminal.com' and '/pools' not in urlsplit(o['source']['capture']['url']).path):
                 did='market-'+sha(eid.encode())[:16]
                 result=self.derive(did,'discovery_pools',{'capture':eid,'source':'geckoterminal' if host=='api.geckoterminal.com' else 'dexscreener'})
                 if result:
@@ -153,23 +186,32 @@ class Importer:
         if auto.exists():leads+=json.loads(auto.read_text())
         for path in sorted((self.session.root/'preset-requests').glob('*.json')):
             request=json.loads(path.read_text())
-            if request['kind'] in ('pool','positions'):leads.append(request.get('parameters',{}))
+            if request['kind'] in ('pool','positions','pool_activity'):leads.append(request.get('parameters',{}))
         epochs=[i for i,c in self.checked.items() if i in raw_evidence.usable and c['status']=='ok' and self.objects[i]['request']['method']=='getEpochInfo']
+        usable_mint=mint
         if mint:
             optional_epoch={'epoch':epochs[-1]} if epochs else {}
             self.derive('auto-controls','controls',{'mint':mint,**optional_epoch,'selection_scope':'latest_retained_account_snapshot'})
             if mint not in raw_evidence.usable:
                 prior=[eid for eid,c in self.checked.items() if eid in raw_evidence.usable and target['mint'] in c.get('addresses',[]) and self.objects[eid]['request']['method'] in ('getAccountInfo','getMultipleAccounts')]
-                if prior:
-                    prior_mint=max(prior,key=lambda eid:self.objects[eid]['completed_at'])
-                    self.derive('prior-controls','controls',{'mint':prior_mint,**optional_epoch,'selection_scope':'earlier_pinned_snapshot_newer_unpinned'})
-            params={'mint':mint}
+                usable_mint=max(prior,key=lambda eid:self.objects[eid]['completed_at']) if prior else None
+                if usable_mint:self.derive('prior-controls','controls',{'mint':usable_mint,**optional_epoch,'selection_scope':'earlier_pinned_snapshot_newer_unpinned'})
+        if usable_mint:
+            # Aggregates take the latest usable snapshot, never a newer unusable one.
+            params={'mint':usable_mint}
             if prices:
                 from solana_session import epoch
-                did,price=prices[0];params.update(price_discovery=did,price_pool=price['pool'],now=max(epoch(self.obs[mint]['captured_at']),price['captured_at']))
+                did,price=prices[0];params.update(price_discovery=did,price_pool=price['pool'],now=max(epoch(self.obs[usable_mint]['captured_at']),price['captured_at']))
             self.derive('auto-sizes','quote_sizes',params)
-        largest=[i for i,c in self.checked.items() if c['status']=='ok' and self.objects[i]['request']['method']=='getTokenLargestAccounts' and self.objects[i]['request']['params'][0]==target['mint']]
-        samples=[i for i,c in self.checked.items() if c['status']=='ok' and self.objects[i]['request']['method']=='getMultipleAccounts' and target['mint'] in c.get('addresses',[]) and len(c['addresses'])>1 and '_holdings_' in i]
+        def discovers(i):
+            req=self.objects[i]['request']
+            if req['method']=='getTokenLargestAccounts':return req['params'][0]==target['mint']
+            if req['method']=='getProgramAccounts':
+                filters=req['params'][1].get('filters') or []
+                return len(filters)==2 and filters[1].get('memcmp')=={'offset':0,'bytes':target['mint']}
+            return False
+        largest=[i for i,c in self.checked.items() if c['status']=='ok' and i in raw_evidence.usable and discovers(i)]
+        samples=[i for i,c in self.checked.items() if c['status']=='ok' and i in raw_evidence.usable and self.objects[i]['request']['method']=='getMultipleAccounts' and target['mint'] in c.get('addresses',[]) and len(c['addresses'])>1 and '_holdings_' in i]
         if largest and samples:self.derive('auto-holders','holders',{'discovery':largest[-1],'sample':samples[-1]})
         from adapters import pool_adapter
         by_program={pool_adapter(k).PROGRAM:k for k in ADAPTERS}
@@ -210,6 +252,14 @@ class Importer:
                 if len(pieces)>=3 and pieces[0]=='repos':
                     repo='/'.join(pieces[1:3]);op='repository_metadata' if len(pieces)==3 else 'repository_revision' if len(pieces)==5 and pieces[3:]==['commits','HEAD'] else None
                     if op:self.derive('repo-'+sha(eid.encode())[:16],op,{'capture':eid,'repository':repo})
+        # Captured public quotes (a lane's Jupiter lite/keyed capture) become typed quote facts for the exact mint.
+        from solana_quotes import quote_request
+        for eid,o in list(self.obs.items()):
+            if o['kind']!='document' or o['status']!='ok':continue
+            try:source,request=quote_request(o['source']['capture']['url'])
+            except (ValueError,KeyError,TypeError):continue
+            if request['input_mint']!=target['mint']:continue
+            self.derive('quote-'+sha(eid.encode())[:16],'public_quote',{'capture':eid,'source':source,'output_mint':request['output_mint'],'input_atomic':request['input_atomic'],'slippage_bps':request['slippage_bps']})
         txs=[]
         for eid,c in list(self.checked.items()):
             if c['status']=='ok' and self.objects[eid]['request']['method']=='getTransaction':
@@ -217,16 +267,52 @@ class Importer:
                 if headers:
                     name='tx-'+sha(eid.encode())[:16]
                     if self.derive(name,'transaction',{'transaction':eid,'block':headers[0]}):txs.append(name)
+        # Attributed-key history pages (coordinator creator_history presets) are typed per address; the
+        # window ends at the latest current context and starts at genesis, so coverage stays an explicit gap.
+        histories={};latest_slot=max([c.get('context_slot',0) for c in self.checked.values() if c.get('context_slot')] or [0])
+        pages={}
+        for eid,c in sorted(self.checked.items(),key=lambda item:self.objects[item[0]]['started_at']):
+            req=self.objects[eid]['request']
+            if c['status']=='ok' and req['method']=='getSignaturesForAddress' and 'creator_history' in eid:pages.setdefault(req['params'][0],[]).append(eid)
+        for address,ids in pages.items():
+            if latest_slot>0 and self.derive('history-'+sha(address.encode())[:12],'history',{'address':address,'pages':ids[:2],'start_slot':0,'end_slot':latest_slot}):histories[address]='history-'+sha(address.encode())[:12]
         if txs:
-            self.derive('auto-launch','launch',{'executions':txs[:4]})
+            launch=self.derive('auto-launch','launch',{'executions':txs[:4]})
             known_pools={lead['pool'] for lead in leads if lead.get('pool')}
-            candidates=[]
+            candidates=[];seen_signatures=set()
             for name in txs:
+                sig=self.objects[name].get('signature')
+                if sig in seen_signatures:continue  # The same receipt read twice is one execution.
+                seen_signatures.add(sig)
                 swaps=[e for e in self.objects[name].get('effects',[]) if e['kind']=='swap_instruction' and e['pool'] in known_pools]
                 if len(swaps)==1:candidates.append({'pool':swaps[0]['pool'],'execution':name})
-            if candidates:self.derive('auto-sales','sales',{'candidates':candidates[:2]})
+            sales=rebuys=None
+            if candidates:
+                # Both directions are derived from the same receipts; a buy is never a failed sale.
+                sales=self.derive('auto-sales','sales',{'candidates':candidates[:2]});rebuys=self.derive('auto-rebuys','rebuys',{'candidates':candidates[:2]})
+            attributed=[]
+            for init in (launch or {}).get('initializations',[]):
+                for address in (init['creator_argument'],):
+                    if address not in {a['address'] for a in attributed} and len(attributed)<2:attributed.append({'mint':target['mint'],'address':address,'role':'creator','evidence':init['evidence']})
+            signers={s for name in txs for s in self.objects[name].get('signers',[]) if any(e['kind']=='launch_initialize' for e in self.objects[name].get('effects',[]))}
+            for address in sorted({a['address'] for a in attributed}|signers)[:2]:
+                self.derive('prior-'+sha(address.encode())[:12],'prior_launches',{'address':address,'executions':txs[:8]})
+            if attributed:
+                params={'attributions':attributed,'executions':txs[:8],'histories':[histories[a['address']] for a in attributed if a['address'] in histories]}
+                if sales:params['sales']='auto-sales'
+                if rebuys:params['rebuys']='auto-rebuys'
+                self.derive('auto-creator','creator_activity',params)
         roots=[d['id'] for d in self.m['derivations'] if d['operation'] in ('controls','pool','program')]
-        if roots:self.derive('auto-controllers','controllers',{'root_derivations':roots,'observations':accounts})
+        if roots:
+            # One unusable root or a newer unusable packet must not taint the whole authority graph:
+            # build it from usable roots and the latest usable packet per address.
+            usable=Evidence(self.root,self.m,self.m['synthetic']).usable
+            chosen=[r for r in roots if r in usable] or roots
+            usable_accounts={}
+            for eid,c in sorted(self.checked.items(),key=lambda item:self.objects[item[0]]['completed_at']):
+                if c['status']=='ok' and eid in usable and self.objects[eid]['request']['method'] in ('getAccountInfo','getMultipleAccounts'):
+                    for a in c.get('addresses',[]):usable_accounts[a]=eid
+            self.derive('auto-controllers','controllers',{'root_derivations':chosen,'observations':usable_accounts or accounts})
         for d in list(self.m['derivations']):
             if d['operation']=='program':self.derive('assurance-'+sha(d['id'].encode())[:16],'source_assurance',{'address':d['subject']['address'],'program':d['id']},d['subject'])
 

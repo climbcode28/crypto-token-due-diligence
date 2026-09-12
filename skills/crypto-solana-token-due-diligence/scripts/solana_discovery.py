@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 import re
 
+from urllib.parse import urlsplit
+
 from solana_common import need, pubkey, target_identity, sha
 from solana_transport import unique_object, invalid_constant
 from solana_web_capture import clean_url
@@ -24,6 +26,9 @@ def source_plan(target, *, surface="pools", program=None):
         mint = target["mint"]
         return {"primary": "https://api.dexscreener.com/token-pairs/v1/solana/"+mint,
                 "alternate": "https://api.geckoterminal.com/api/v2/networks/solana/tokens/"+mint+"/pools?page=1"}
+    if surface == "token_info":
+        need(target["genesis_hash"] == MAINNET, "public token index supports mainnet only")
+        return {"primary": "https://api.geckoterminal.com/api/v2/networks/solana/tokens/"+target["mint"]+"/info"}
     need(surface in ("program_metadata", "source_verification"), "unsupported discovery surface")
     pubkey(program)
     need(target["genesis_hash"] == MAINNET, "program metadata route requires explicit mainnet target")
@@ -140,6 +145,68 @@ def pools(record, raw, target, *, source="dexscreener"):
             "candidates": candidates, "rejected": rejected, "duplicates": duplicates,
             "project_links": list({r["url"]: r for r in links}.values()), "evidence": [record["id"]],
             "scope": "one bounded indexer response; not exhaustive pool or custody verification"}
+
+
+def link_identity(url):
+    """Comparable identity of a project link: a social handle or a registered host, lowercased."""
+    parts = urlsplit(clean_url(url))
+    host = (parts.hostname or "").lower().removeprefix("www.")
+    segments = [s for s in parts.path.split("/") if s]
+    if host in ("x.com", "twitter.com", "mobile.twitter.com") and segments:
+        return ("twitter", segments[0].lower().lstrip("@"))
+    if host in ("t.me", "telegram.me") and segments:
+        return ("telegram", segments[0].lower().lstrip("@"))
+    if host in ("discord.gg", "discord.com") and segments:
+        return ("discord", segments[-1].lower())
+    return ("host", host)
+
+
+def token_info(record, raw, target):
+    """GeckoTerminal token-info publication for the exact mint: a second indexer's project links."""
+    target = target_identity(target)
+    value = captured_json(record, raw, expected_url=source_plan(target, surface="token_info")["primary"])
+    need(isinstance(value, dict) and isinstance(value.get("data"), dict), "token info object required")
+    data = value["data"]
+    attributes = data.get("attributes") or {}
+    need(data.get("id") == "solana_"+target["mint"] and data.get("type") == "token" and attributes.get("address") == target["mint"], "token info identity mismatch")
+    identities, links = [], []
+    for url in attributes.get("websites") or []:
+        try:
+            cleaned = clean_url(url)
+        except (ValueError, TypeError):
+            continue
+        links.append(cleaned)
+        identities.append(link_identity(cleaned))
+    for key, kind in (("twitter_handle", "twitter"), ("telegram_handle", "telegram")):
+        handle = attributes.get(key)
+        if isinstance(handle, str) and handle.strip():
+            identities.append((kind, handle.strip().lower().lstrip("@")))
+    discord = attributes.get("discord_url")
+    if isinstance(discord, str) and discord.strip():
+        try:
+            identities.append(link_identity(clean_url(discord)))
+        except (ValueError, TypeError):
+            pass
+    return {"target": target, "source": "geckoterminal", "evidence": [record["id"]], "captured_at": record["captured_at"],
+            "name": attributes.get("name"), "symbol": attributes.get("symbol"), "websites": links,
+            "identities": sorted(set(identities)), "scope": "indexer publication; not project verification"}
+
+
+def corroborate_links(links, infos):
+    """Indexer project links are auto-captured only when a second indexer names the same identity."""
+    known = {identity for info in infos for identity in info["identities"]}
+    decided, seen = [], set()
+    for link in links:
+        url = link["url"]
+        if url in seen:
+            continue
+        seen.add(url)
+        identity = link_identity(url)
+        corroborated = identity in known
+        decided.append({"url": url, "source": link.get("source"), "evidence": link.get("evidence", []), "identity": list(identity),
+                        "status": "corroborated" if corroborated else "unverified_indexer_profile",
+                        "basis": "second indexer names the same identity" if corroborated else "single indexer claim; not fetched automatically"})
+    return decided
 
 
 def repository_urls(repo, revision=None):

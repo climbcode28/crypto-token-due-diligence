@@ -77,6 +77,23 @@ class QuoteTests(unittest.TestCase):
             if source=='jupiter_v2':self.assertEqual(q['price_impact_fraction'],{'numerator':'-1','denominator':'1000'})
             else:self.assertIsNone(q['price_impact_fraction'])
 
+    def test_jupiter_lite_quote_accepts_reordered_benign_parameters_and_refuses_wallets(self):
+        from solana_quotes import quote_request
+        target,a,_=fixture();out=a['mints'][1]
+        body={'inputMint':target['mint'],'outputMint':out,'inAmount':'1000','outAmount':'500','otherAmountThreshold':'497','slippageBps':50,'swapMode':'ExactIn',
+              'priceImpactPct':'0.0012','contextSlot':446296732,'swapUsdValue':'999.94','timeTaken':0.01,
+              'routePlan':[{'swapInfo':{'ammKey':a['pool'],'label':'Raydium','inputMint':target['mint'],'outputMint':out,'inAmount':'1000','outAmount':'500','feeAmount':'3','feeMint':target['mint']},'percent':100}]}
+        url='https://lite-api.jup.ag/swap/v1/quote?outputMint='+out+'&amount=1000&inputMint='+target['mint']+'&slippageBps=50&onlyDirectRoutes=false'
+        rec,raw=capture(body,url);q=public_quote('jupiter_v1_lite',target,rec,raw,out,'1000')
+        self.assertEqual((q['output_atomic'],q['minimum_output_atomic'],q['context_slot'],q['provider_usd_value'],q['provider_price_impact_raw']),('500','497',446296732,'999.94','0.0012'))
+        self.assertIsNone(q['price_impact_fraction']);self.assertEqual(q['route'][0]['pool'],a['pool']);self.assertEqual(q['fees'][0]['amount_atomic'],'3')
+        self.assertEqual(quote_request(url)[0],'jupiter_v1_lite');self.assertEqual(quote_request(quote_url('jupiter_v2',target,out,'1000'))[0],'jupiter_v2')
+        for bad in (url+'&taker='+key(9),url.replace('amount=1000','amount=1001'),url.replace('lite-api.jup.ag','api.jup.ag'),url+'&unknown=1'):
+            rec,raw=capture(body,bad)
+            with self.assertRaises(ValueError):public_quote('jupiter_v1_lite',target,rec,raw,out,'1000')
+        rec,raw=capture({**body,'swapTransaction':'AQID'},url)
+        with self.assertRaises(ValueError):public_quote('jupiter_v1_lite',target,rec,raw,out,'1000')
+
     def test_captured_quote_bytes_input_route_and_transaction_assembly_attacks(self):
         for kind in ('transaction','input','mint','route','threshold','hash','url','leg'):
             target,a,url,body=self.quote('jupiter_v2')

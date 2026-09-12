@@ -9,6 +9,7 @@ METHODS = {"getGenesisHash", "getAccountInfo", "getMultipleAccounts", "getBlock"
     "getEpochInfo", "getTokenLargestAccounts", "getTokenSupply", "getSignaturesForAddress",
     "getTransaction", "getTokenAccountsByOwner", "getProgramAccounts"}
 STATE = {"getAccountInfo", "getMultipleAccounts", "getTokenLargestAccounts", "getTokenSupply", "getTokenAccountsByOwner", "getProgramAccounts"}
+SCAN_ROWS = 5000  # A sliced program scan is a bounded census; the byte allowance still caps it.
 
 
 def amount(value):
@@ -85,7 +86,7 @@ def validate_request(request):
         need(len(params) == 2, "program lookup needs configuration")
         pubkey(params[0])
         account_config(params[1], ("filters", "withContext"))
-        need(params[1].get("withContext") is True and "dataSlice" not in params[1], "program lookup requires context and full account bytes")
+        need(params[1].get("withContext") is True, "program lookup requires context")
         filters = params[1].get("filters")
         need(isinstance(filters, list) and len(filters) == 2, "unbounded program scans prohibited")
         size, match = filters
@@ -95,6 +96,9 @@ def validate_request(request):
         need(isinstance(match, dict) and set(match) == {"offset", "bytes"}, "invalid relationship filter")
         need(natural(match["offset"]) + 32 <= size["dataSize"], "relationship filter outside account")
         pubkey(match["bytes"])
+        part = params[1].get("dataSlice")
+        if part is not None:
+            need(part["offset"] == 0 and match["offset"] + 32 <= part["length"] <= size["dataSize"], "program scan slice must retain the relationship prefix")
     return request
 
 
@@ -161,17 +165,19 @@ def validate_response(request, response):
                 account(item, "dataSlice" in settings)
             output.update(addresses=addresses, address_indices={a: i for i, a in enumerate(addresses)}, missing_indices=[i for i, a in enumerate(values) if a is None])
         elif method in {"getTokenAccountsByOwner", "getProgramAccounts"}:
-            need(isinstance(data, list) and len(data) <= 100, "owner/program result exceeds bounded sample")
+            sliced = method == "getProgramAccounts" and "dataSlice" in settings
+            need(isinstance(data, list) and len(data) <= (SCAN_ROWS if sliced else 100), "owner/program result exceeds bounded sample")
             addresses = []
             for row in data:
                 addresses.append(pubkey(row["pubkey"]))
                 need(row["account"] is not None, "lookup account missing")
-                account(row["account"])
+                account(row["account"], sliced)
                 raw = base64.b64decode(row["account"]["data"][0], validate=True)
                 if method == "getProgramAccounts":
                     size, match = settings["filters"]
                     match = match["memcmp"]
-                    need(row["account"]["owner"] == params[0] and len(raw) == size["dataSize"] and raw[match["offset"]:match["offset"]+32] == base58_bytes(match["bytes"], 32), "unrequested program account relationship")
+                    expected = settings["dataSlice"]["length"] if sliced else size["dataSize"]
+                    need(row["account"]["owner"] == params[0] and len(raw) == expected and raw[match["offset"]:match["offset"]+32] == base58_bytes(match["bytes"], 32), "unrequested program account relationship")
                 else:
                     need(row["account"]["owner"] in (TOKEN_PROGRAM, TOKEN_2022) and len(raw) >= 165,
                          "owner lookup did not return a base token account")
@@ -230,7 +236,7 @@ def validate_response(request, response):
 
 def consistency(observations, target):
     """Scan all successful genesis/headers, including observations unused by findings."""
-    headers, networks, accounts = {}, [], {}
+    headers, networks, accounts, times = {}, [], {}, {}
     for row in observations:
         if row.get("status") != "ok":
             continue
@@ -246,11 +252,21 @@ def consistency(observations, target):
             slot = request["params"][0]
             normalized = header(value, slot)
             need(slot not in headers or normalized == headers[slot], "contradictory block observation")
+            need(slot not in times or times[slot] == normalized["blockTime"], "contradictory block time observation")
             headers[slot] = normalized
+        elif request["method"] == "getBlockTime":
+            slot = request["params"][0]
+            need(slot not in times or times[slot] == value, "contradictory block time observation")
+            need(slot not in headers or headers[slot]["blockTime"] == value, "contradictory block time observation")
+            times[slot] = value
         elif request["method"] in ("getAccountInfo", "getMultipleAccounts"):
             values = value["value"] if request["method"] == "getMultipleAccounts" else [value["value"]]
+            options = request["params"][1] if len(request["params"]) > 1 and isinstance(request["params"][1], dict) else {}
+            data_slice = options.get("dataSlice")
+            data_slice = (data_slice.get("offset"), data_slice.get("length")) if isinstance(data_slice, dict) else None
             for address, account_value in zip(validated["addresses"], values):
-                key = (validated["context_slot"], address)
+                # A sliced read and a full read of one account are different observations, not a contradiction.
+                key = (validated["context_slot"], address, data_slice)
                 need(key not in accounts or accounts[key] == account_value, "contradictory account observation at same context")
                 accounts[key] = account_value
     return {"network_observations": len(networks), "header_slots": sorted(headers)}

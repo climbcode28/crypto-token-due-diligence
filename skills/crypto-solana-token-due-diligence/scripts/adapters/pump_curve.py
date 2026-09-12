@@ -9,12 +9,12 @@ PROGRAM=CURVE_PROGRAM
 GLOBAL=pda(PROGRAM,b'global')
 CAPABILITY=capability('pump_curve',PROGRAM,REVISION,model='bonding_curve_real_and_virtual_separate',
     dependencies=['curve','global','base_mint','base_holding','quote_holding_if_non_native','fee_config','program_control'])
-CAPABILITY.update(version='1.1.0',allocation_bytes=[115,124,150],migration='successful exact migration instruction plus current destination pool required',
+CAPABILITY.update(version='1.2.0',allocation_bytes=[115,124],reserved_tail_policy='evidenced allocation lengths only; an all-zero trailing allocation is accepted, any nonzero tail is refused',migration='successful exact migration instruction plus current destination pool required',
     quote=False,historical_execution='typed create/migrate/trade-intent/fee roles; native direct lamport effects may remain unresolved')
 
 
 def decode_pool(account):
-    v=fixed(account,PROGRAM,'BondingCurve',sizes=(115,124,150))
+    v=fixed(account,PROGRAM,'BondingCurve',sizes=(115,124))
     v.update(quote_mint_stored=v['quote_mint'],quote_mint=WSOL if v['quote_mint']==ZERO else v['quote_mint'])
     zero_completed=v['complete'] and all(v[k]==0 for k in ('virtual_token_reserves','virtual_quote_reserves','real_token_reserves','real_quote_reserves'))
     need((v['virtual_token_reserves']>0 or zero_completed) and v['real_token_reserves']<=v['virtual_token_reserves'],'invalid Pump curve token reserves')

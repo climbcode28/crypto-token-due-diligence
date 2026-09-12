@@ -52,9 +52,8 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s skills/crypto-solana-t
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s skills/crypto-evm-token-due-diligence/tests -q
 ```
 
-New operational/guidance tests are included by discovery. The v2 workflow remains
-opt-in until the compatibility, evidence, adapter, research-quality and offline
-integration gates in the parity plan pass. Live timing is a separate measured gate;
-synthetic tests are not a live research-speed claim. Keep old bundles readable through
+New operational/guidance tests are included by discovery. The v2 workflow is the
+default; live timing is a separate measured gate recorded in the plans, and synthetic
+tests are not a live research-speed claim. Keep old bundles readable through
 explicit `legacy-v1`; roll back a defective default without rewriting evidence.
 No installs, commits, pushes or registration changes are required by this workflow.

@@ -15,8 +15,8 @@ DIMENSIONS=('token_controls','canonical_lp_principal_custody','side_pool_removal
     'admin_treasury_reward_custody','reward_accounting_liveness','utility_redemption_rights','external_dependencies','development_disclosure')
 AXES=('technical_exposure','credibility_maturity','token_economics','research_confidence')
 SUBJECTS={'mint','holding','program','controller','pool','position','wallet','document'}
-STATUSES={'ok','null','rpc_error','transport_failure','invalid','redacted','unsupported','stale','timeout','permission_denied','budget_denied'}
-EXTERNAL_FAILURES={'null','rpc_error','transport_failure','stale','timeout','permission_denied'}
+STATUSES={'ok','null','rpc_error','transport_failure','invalid','redacted','unsupported','stale','timeout','permission_denied','budget_denied','method_unavailable','node_lag'}
+EXTERNAL_FAILURES={'null','rpc_error','transport_failure','stale','timeout','permission_denied','method_unavailable','node_lag'}
 
 
 class ProfileError(ValueError):
@@ -87,6 +87,11 @@ def refs(values,known,path,*,nonempty=False):
     return values
 
 
+def block_time(packet):
+    """Comparable header value: a full header's blockTime or a block-time read."""
+    result=packet['response']['result'];return result['blockTime'] if packet['request']['method']=='getBlock' else result
+
+
 def normalized_status(value):
     status=value.get('status')
     if status in STATUSES:return status
@@ -100,6 +105,8 @@ def normalized_status(value):
 class Evidence:
     def __init__(self,root,manifest,allow_synthetic):
         self.root=root;self.m=manifest;self.target=target_identity(manifest['target']);self.objects={};self.raw={};self.checked={};self.pinned=set();self.usable=set();self.categories={};self.closure={};self.effects={};self.stable=set()
+        # Retained evidence that cannot support resolved facts, with the reason; never a hard failure.
+        self.degraded={};self.unpinned=set();self.stability_changes={}
         check(manifest['schema_version']==2 and type(manifest['schema_version']) is int and manifest['profile']==PROFILE,'manifest.profile','explicit v2 schema/profile required')
         label(manifest['investigation_id']);check(type(manifest['synthetic']) is bool,'manifest.synthetic','boolean required')
         check(not manifest['synthetic'] or allow_synthetic,'manifest.synthetic','synthetic bundle requires explicit opt-in')
@@ -157,7 +164,12 @@ class Evidence:
                 requested=req['params'][0] if method=='getMultipleAccounts' else [req['params'][0]]
                 check(e['subject']['address'] in requested,p+'.subject','RPC subject not requested')
             elif method in ('getTokenSupply','getTokenLargestAccounts','getSignaturesForAddress','getTokenAccountsByOwner','getProgramAccounts'):
-                check(e['subject']['address']==req['params'][0],p+'.subject','RPC subject differs from requested address')
+                expected=[req['params'][0]]
+                if method=='getProgramAccounts':
+                    # A holder scan filters one program by mint prefix; its subject is that mint.
+                    filters=req['params'][1].get('filters') if isinstance(req['params'][1],dict) else None
+                    if isinstance(filters,list) and len(filters)==2 and isinstance(filters[1].get('memcmp'),dict) and filters[1]['memcmp'].get('offset')==0:expected.append(filters[1]['memcmp'].get('bytes'))
+                check(e['subject']['address'] in expected,p+'.subject','RPC subject differs from requested address')
             check(type(value.get('started_at')) in (int,float) and type(value.get('completed_at')) in (int,float),p,'actual request timing required')
             check(math.isfinite(value['started_at']) and math.isfinite(value['completed_at']) and value['started_at']<=value['completed_at'],p,'invalid request timing')
             check(abs(value['completed_at']-utc(e['captured_at'],p))<0.001,p,'RPC capture time differs')
@@ -193,12 +205,12 @@ class Evidence:
             for eid,c in self.checked.items():
                 packet=self.objects[eid]
                 if c['status']=='ok' and self.rows[eid]['status']=='ok' and packet['request']['method']=='getSignaturesForAddress':
-                    check(self.rows[eid]['source']['namespace']==self.rows[a]['source']['namespace'] and first['completed_at']<=packet['started_at'] and last['started_at']>=packet['completed_at'],'manifest.observations.'+eid,'history outside verified network interval')
-                    self.usable.add(eid)
+                    if self.rows[eid]['source']['namespace']==self.rows[a]['source']['namespace'] and first['completed_at']<=packet['started_at'] and last['started_at']>=packet['completed_at']:self.usable.add(eid)
+                    else:self.degraded[eid]='history outside verified network interval'  # retained, never usable
         for pair in sequence(self.m.get('header_checks',[]),'manifest.header_checks'):
             x,y=pair['initial_evidence_id'],pair['recheck_evidence_id'];v,w=self.independent(x,y,'manifest.header_checks')
-            check(v['request']['method']==w['request']['method']=='getBlock' and v['request']['params']==w['request']['params'],'manifest.header_checks','same-slot header pair required')
-            check(v['response']['result']==w['response']['result'],'manifest.header_checks','historical header changed')
+            check(v['request']['method']=='getBlock' and w['request']['method'] in ('getBlock','getBlockTime') and v['request']['params'][0]==w['request']['params'][0],'manifest.header_checks','same-slot header pair required')
+            if block_time(v)!=block_time(w):self.degraded[y]='historical header changed';continue
             if network_ok and self.rows[x]['source']['namespace']==self.rows[a]['source']['namespace']:self.usable.update((x,y))
         by_observation={}
         for sid,s in self.samples.items():
@@ -213,12 +225,15 @@ class Evidence:
             if s['status']=='partial':continue
             check(e['status']=='ok',p,'unusable observation cannot be pinned')
             check(network_ok,p,'verified network recheck pair required')
-            check(e['source']['namespace']==self.rows[a]['source']['namespace'] and first['completed_at']<=packet['started_at'] and last['started_at']>=packet['completed_at'],p,'state outside verified provider/network interval')
             h,r=s['block_evidence_id'],s['block_recheck_evidence_id'];hv,rv=self.independent(h,r,p+'.block_recheck')
-            check(hv['request']['method']==rv['request']['method']=='getBlock' and hv['request']['params'][0]==rv['request']['params'][0]==s['context_slot'],p,'header slot mismatch')
-            check(hv['response']['result']==rv['response']['result'],p,'header changed')
-            stamp=hv['response']['result']['blockTime'];check(stamp is not None and -60<=packet['completed_at']-stamp<=300,p,'current sample stale or undated')
-            check(self.rows[h]['source']['namespace']==e['source']['namespace'],p,'header provider mismatch')
+            check(hv['request']['method']=='getBlock' and rv['request']['method'] in ('getBlock','getBlockTime') and hv['request']['params'][0]==rv['request']['params'][0]==s['context_slot'],p,'header slot mismatch')
+            stamp=hv['response']['result']['blockTime']
+            # These are boundary conditions, not identity contradictions: the sample stays retained
+            # but unpinned, so a later failed network recheck cannot make the whole import raise.
+            reason=('state outside verified provider/network interval' if not (e['source']['namespace']==self.rows[a]['source']['namespace'] and first['completed_at']<=packet['started_at'] and last['started_at']>=packet['completed_at'])
+                else 'header changed' if block_time(hv)!=block_time(rv) else 'current sample stale or undated' if not (stamp is not None and -60<=packet['completed_at']-stamp<=300)
+                else 'header provider mismatch' if self.rows[h]['source']['namespace']!=e['source']['namespace'] else None)
+            if reason:self.unpinned.add(sid);self.degraded[eid]=reason;continue
             self.pinned.add(eid);self.usable.update((eid,h,r))
         for eid,c in self.checked.items():
             if c['status']=='ok' and 'context_slot' in c:check(eid in by_observation,'manifest.samples','contextual observation missing sample')
@@ -228,11 +243,33 @@ class Evidence:
                 other=self.samples.get(s['recheck_of']);check(other is not None and other['id']!=sid,p+'.recheck_of','unknown/self recheck')
                 v,w=self.independent(other['observation_id'],s['observation_id'],p+'.recheck_of')
                 check(s['context_slot']>=other['context_slot'] and set(other['addresses'])<=set(s['addresses']),p,'critical recheck address/context mismatch')
-                from solana_programs import observed_account
-                if all(observed_account(address,v)[0]==observed_account(address,w)[0] for address in other['addresses']):self.stable.add(other['observation_id'])
-            if s['critical'] and s['status']=='pinned' and not s.get('recheck_of'):
-                fresh=[r for r in self.samples.values() if r.get('recheck_of')==sid and r['status']=='pinned']
-                check(len(fresh)==1,p,'one later critical account recheck required')
+                stable,changes=self.stability(other['addresses'],v,w)
+                if stable and sid not in self.unpinned:self.stable.add(other['observation_id'])
+                if changes:self.stability_changes[other['observation_id']]=changes
+        for sid,s in self.samples.items():
+            p='manifest.samples.'+sid
+            if s['critical'] and s['status']=='pinned' and sid not in self.unpinned and not s.get('recheck_of'):
+                fresh=[r for r in self.samples.values() if r.get('recheck_of')==sid and r['status']=='pinned' and r['id'] not in self.unpinned]
+                check(len(fresh)<=1,p,'one later critical account recheck required')
+                if not fresh:
+                    # The recheck was retained but degraded: the initial critical state is unpinned too.
+                    eid=s['observation_id'];self.unpinned.add(sid);self.degraded[eid]='critical recheck unavailable';self.pinned.discard(eid);self.usable.discard(eid);self.stable.discard(eid)
+
+    def stability(self,addresses,v,w):
+        """Byte-stable accounts are stable; a mint whose only change is its supply is stable with changed_fields."""
+        from solana_programs import observed_account
+        from solana_accounts import decode_mint
+        changes={}
+        for address in addresses:
+            a=observed_account(address,v)[0];b=observed_account(address,w)[0]
+            if a==b:continue
+            if a is None or b is None or {k:x for k,x in a.items() if k!='data'}!={k:x for k,x in b.items() if k!='data'}:return False,changes
+            try:da,db=decode_mint(a),decode_mint(b)
+            except (ValueError,KeyError,TypeError):return False,changes
+            ignored={'supply_atomic','data_sha256'}
+            if {k:x for k,x in da.items() if k not in ignored}!={k:x for k,x in db.items() if k not in ignored}:return False,changes
+            changes[address]=['supply_atomic']
+        return True,changes
 
     def _derive(self):
         check(set(self.derivations)=={eid for eid,e in self.rows.items() if e['kind']=='derived'},'manifest.derivations','derived observation/operation inventory differs')
@@ -242,8 +279,10 @@ class Evidence:
             check(eid not in active,'manifest.derivations.'+eid,'cyclic derived inputs');active.add(eid)
             if eid not in self.derivations:self.closure[eid]=set();done.add(eid);active.remove(eid);return
             d=self.derivations[eid];p='manifest.derivations.'+eid;e=self.rows[eid]
-            check(d['version']==derivations.VERSION,p+'.version','unsupported operation version');check(d['subject']==e['subject'],p+'.subject','derivation subject changed')
             params=d['parameters'];operation=d['operation']
+            try:compatible=derivations.recomputable(operation,d['version'])
+            except ValueError:compatible='unsupported operation version'
+            check(compatible=='ok',p+'.version',compatible);check(d['subject']==e['subject'],p+'.subject','derivation subject changed')
             expected_address=params.get('address',self.target['mint']) if operation in ('mint','program','source_assurance','history','prior_launches') else params['pool'] if operation=='pool' else params['owner'] if operation=='inventory' else self.target['mint']
             expected_kind='program' if operation in ('program','source_assurance') else 'pool' if operation=='pool' else 'wallet' if operation in ('inventory','prior_launches') else None if operation=='history' else 'mint'
             check(e['subject']['address']==expected_address and (expected_kind is None or e['subject']['kind']==expected_kind),p+'.subject','operation subject differs from bound parameters')
@@ -271,8 +310,8 @@ class Evidence:
                     network=self.m.get('network_checks')
                     if network and bid in self.usable and self.rows[tid]['status']==e['status']=='ok':
                         initial,final=network['initial_evidence_id'],network['recheck_evidence_id']
-                        check(self.rows[tid]['source']['namespace']==self.rows[initial]['source']['namespace'] and self.objects[initial]['completed_at']<=tx['started_at'] and self.objects[final]['started_at']>=tx['completed_at'],p,'execution outside verified provider/network interval')
-                        self.usable.add(tid);self.usable.add(eid)
+                        if self.rows[tid]['source']['namespace']==self.rows[initial]['source']['namespace'] and self.objects[initial]['completed_at']<=tx['started_at'] and self.objects[final]['started_at']>=tx['completed_at']:self.usable.add(tid);self.usable.add(eid)
+                        else:self.degraded[tid]='execution outside verified provider/network interval';self.usable.discard(eid)
                 for effect in output['effects']:
                     check(effect['id'] not in self.effects,p,'duplicate execution effect identifier');self.effects[effect['id']]=(eid,effect)
             active.remove(eid);done.add(eid)
@@ -352,9 +391,12 @@ def findings(evidence,report,judged):
             if f['claim']=='state_observation':check(bool(roles & {'state','derivation'}) and all(evidence.categories[r['evidence_id']]=='state' for r in f['support'] if r['role'] in ('state','derivation')),p,'document-as-runtime/state promotion forbidden')
             if f['claim']=='historical_execution':check('execution' in roles,p,'historical claim needs exact supported execution effect')
             if f['claim']=='source_analysis':check(bool(roles & {'publication','derivation'}),p,'source analysis needs captured publication/assurance')
-        if f['signal'] in ('bad','potential_risk'):
-            c=f.get('concern');check(isinstance(c,dict) and primary and f['claim']!='coverage_gap',p+'.concern','adverse concern needs observed evidence')
+        c=f.get('concern')
+        if c is not None:
+            check(isinstance(c,dict) and set(c)=={'basis','mechanism','consequence'},p+'.concern','concern must be an object with basis, mechanism and consequence text')
             for k in ('basis','mechanism','consequence'):text(c.get(k),p+'.concern.'+k,judged=judged)
+        if f['signal'] in ('bad','potential_risk'):
+            check(isinstance(c,dict) and primary and f['claim']!='coverage_gap',p+'.concern','adverse concern needs observed evidence')
         time=f['time_basis'];check(isinstance(time,dict) and time['kind'] in ('sampled_state','historical_execution','publication','mixed','attempt'),p+'.time_basis','explicit time basis required')
         samples=refs(time.get('sample_ids',[]),evidence.samples,p+'.time_basis.sample_ids')
         required_samples=set()

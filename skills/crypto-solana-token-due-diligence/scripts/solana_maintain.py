@@ -41,7 +41,7 @@ def promote(root,record_id,review,*,now=None):
         packets.append(value)
     check(packets[0]['completed_at']<packets[1]['started_at'],'promotion','Recovery must follow the failure.')
     if row['recovery']=='bounded_retry':
-        check(packets[0]['source']==packets[1]['source'] and proof[0]['status'] in ('timeout','transport_failure','rpc_error'),'promotion','Retry needs the same source and transient failure.')
+        check(packets[0]['source']==packets[1]['source'] and proof[0]['status'] in ('timeout','transport_failure','rpc_error','node_lag'),'promotion','Retry needs the same source and transient failure.')
         if row['source_class']=='public_rpc':check(packets[0]['request']['params']==packets[1]['request']['params'],'promotion','Retry request scope differs.')
     else:check(packets[0]['source']!=packets[1]['source'],'promotion','Alternate must be a distinct source.')
     if row['source_class']=='public_rpc':check(packets[0]['request']['params']==packets[1]['request']['params'],'promotion','Recovery request scope differs.')

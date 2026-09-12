@@ -35,15 +35,25 @@ class GuidanceTests(unittest.TestCase):
         self.assertEqual(active(S/'assets/operational-lessons.json'),[])
 
     def test_provider_policy_and_registrations_unchanged(self):
-        # Pinned 2026-09-11 to the generic, credential-free policy section; personal standing
-        # authorizations moved to the untracked HANDOFF.local.md, which provider_context prefers.
-        policy=(REPO/'HANDOFF.md').read_bytes().split(b'## Project and research operation')[0]
-        self.assertEqual(hashlib.sha256(policy).hexdigest(),'f278e8c8a594abb129a1fc340ea0b09a1fd8622146b87c46c35c40a00e4ce346')
-        link=REPO/'.agents/skills/crypto-evm-token-due-diligence';self.assertTrue(link.is_symlink());self.assertEqual(link.resolve(),REPO/'skills/crypto-evm-token-due-diligence')
-        self.assertNotIn('four folders under', (REPO/'HANDOFF.md').read_text())
-        for name in ('crypto-token-due-diligence','crypto-solana-token-due-diligence'):
-            personal=Path.home()/'.codex/skills'/name
-            if personal.exists():self.assertTrue(personal.is_symlink());self.assertEqual(personal.resolve(),REPO/'skills'/name)
+        # The Solana path is public-only: it reads no policy file, so only the repository's
+        # Solana statements are checked, and an installed copy without the repo skips them.
+        handoff=REPO/'HANDOFF.md'
+        if not handoff.exists():self.skipTest('installed copy without repository handoff')
+        text=handoff.read_text()
+        for sentence in ('The standalone Solana transport reads `SOLANA_RPC_URL`, not the EVM endpoint.','reads no\n  provider policy file'):
+            self.assertIn(sentence,text)
+        self.assertNotIn('four folders under',text)
+        link=REPO/'.agents/skills/crypto-evm-token-due-diligence'
+        if link.is_symlink():self.assertEqual(link.resolve(),REPO/'skills/crypto-evm-token-due-diligence')
+        skill=(S/'SKILL.md').read_text()
+        for phrase in ('✅ Good','🟡 Potential Risk','🔴 Bad','⚪ Unverified','**Conclusions**','300–600 words','`SOLANA_RPC_URL`'):
+            self.assertIn(phrase,skill)
+        for stale in ('HANDOFF.md','source its documented private env','README provider setup'):
+            self.assertNotIn(stale,skill)
+        runbook=(S/'references/runbook.md').read_text()
+        for phrase in ('pool_activity','`holders`','"$S/scripts/','"$RUN/draft"','--received-at','diagnostics'):
+            self.assertIn(phrase,runbook)
+        self.assertNotIn('skills/crypto-solana-token-due-diligence/scripts',runbook)
 
     def test_lane_briefs_preserve_owned_commands_and_absolute_cutoff(self):
         for owner in ('liquidity','project'):

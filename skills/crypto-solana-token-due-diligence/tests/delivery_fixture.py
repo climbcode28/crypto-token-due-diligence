@@ -1,8 +1,7 @@
 """Maintained compact notes for an independently specified bounded complete case."""
 import copy
 from profile_fixture import Bundle
-from compose_fixture import note,save,lane
-from solana_pipeline_note import generate
+from compose_fixture import note,save,lane,assign
 
 
 def complete(root,adverse=False):
@@ -15,5 +14,5 @@ def complete(root,adverse=False):
         if isinstance(v,dict):return {k:rename(x) for k,x in v.items()}
         return v
     for field in ('findings','coverage','decision','summary_ids','limitations'):n[field]=rename(original[field])
-    n['signal_assignments']={f['id']:'unverified' for f in generate(b.root,True)['findings']}
+    n['signal_assignments']=assign(b,'unverified')
     n['research_status']='completed';save(b,n);lane(b,'liquidity');lane(b,'project');return b,n

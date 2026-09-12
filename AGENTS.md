@@ -19,8 +19,9 @@
   maintainer's local `archive/pre-publish` branch and is ignored here. When present on disk, do not
   rerun its historical installers as an installation or upgrade procedure; preserve evidence bytes.
 - Keep credentials outside the project. A configured dRPC key is not permission for paid
-  usage. Before the first provider check or RPC attempt, read the current policy that
-  `provider_context.py --policy` prints: the untracked personal `HANDOFF.local.md` when it
+  usage. Before the first EVM provider check or RPC attempt, read the current policy that
+  the EVM skill's `provider_context.py --policy` prints (the Solana skill uses credential-free
+  public RPC and reads no policy file): the untracked personal `HANDOFF.local.md` when it
   exists on this machine, otherwise the generic section at the top of `HANDOFF.md`. Honor a
   standing bounded paid read-only authorization recorded in the personal file unless the
   current user restricts it; it does not authorize purchases, top-ups, plan changes or

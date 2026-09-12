@@ -4,13 +4,16 @@ import json
 import threading
 import time
 
-from solana_common import b58encode, TOKEN_PROGRAM
+from solana_common import b58encode, base58_bytes, TOKEN_PROGRAM
 
 KEY = b58encode(bytes([2])*32)
 OTHER = b58encode(bytes([3])*32)
 GENESIS = b58encode(bytes([4])*32)
 SIG = b58encode(bytes([5])*64)
 TARGET = {"family": "solana", "mint": KEY, "genesis_hash": GENESIS}
+OWNER = b58encode(bytes([7])*32)
+# One initialized 165-byte SPL holding of the fixture mint: mint, owner, amount 17, state 1.
+HOLDING_RAW = base58_bytes(KEY, 32)+base58_bytes(OWNER, 32)+(17).to_bytes(8, "little")+bytes(36)+b"\1"+bytes(56)
 
 
 def account(raw=None):
@@ -65,12 +68,26 @@ class Rpc:
                 slot = 103 if "critical" in req["id"] else 102 if "holdings" in req["id"] else 100
                 result = {"context": {"slot": slot}, "value": values}
             elif method == "getTokenLargestAccounts":
+                if cls.mode == "largest_refused":
+                    import io
+                    import urllib.error
+                    raise urllib.error.HTTPError("https://synthetic.invalid", 429, "limited", {"Retry-After": "10", "x-ratelimit-method-limit": "0"}, io.BytesIO(b""))
                 result = {"context": {"slot": 101}, "value": [{"address": OTHER, "amount": "17", "decimals": 9}]}
+            elif method == "getProgramAccounts":
+                part = params[1].get("dataSlice")
+                data = HOLDING_RAW[part["offset"]:part["offset"]+part["length"]] if part else HOLDING_RAW
+                row = {"owner": TOKEN_PROGRAM, "executable": False, "lamports": 100, "space": 165,
+                       "data": [base64.b64encode(data).decode(), "base64"]}
+                result = {"context": {"slot": 101}, "value": [{"pubkey": OTHER, "account": row}]}
             elif method == "getEpochInfo":
                 result = {"absoluteSlot": 100, "blockHeight": 80, "epoch": 1, "slotIndex": 10, "slotsInEpoch": 90}
             elif method == "getBlock":
                 result = {"blockhash": OTHER if cls.mode == "changed_header" and repeats > 1 else KEY,
                           "previousBlockhash": OTHER, "parentSlot": params[0]-1, "blockTime": cls.stamp}
+            elif method == "getBlockTime":
+                # A changed header shows as a changed block time on the recheck.
+                repeats = sum(c["method"] in ("getBlock", "getBlockTime") and c["params"][0] == params[0] for c in cls.calls)
+                result = cls.stamp+1 if cls.mode == "changed_header" and repeats > 1 else cls.stamp
             elif method == "getTransaction":
                 result = {"slot": 25, "blockTime": 123456, "version": 0, "meta": None,
                           "transaction": {"signatures": [params[0]], "message": {"accountKeys": [KEY]}}}

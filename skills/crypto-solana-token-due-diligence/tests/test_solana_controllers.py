@@ -6,12 +6,23 @@ import unittest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]/"scripts"))
 from adapters import spl_multisig, squads_v4
 from solana_programs import authority_graph
-from solana_common import TOKEN_PROGRAM, b58encode
+from solana_common import TOKEN_PROGRAM, TOKEN_2022, b58encode, base58_bytes
 from solana_fixture import KEY, OTHER, account
 from program_fixture import squads, spending, packet
+from test_solana_accounts import mint, tlv
 
 
 class ControllerTests(unittest.TestCase):
+    def test_token_metadata_update_authority_is_a_controller_edge_not_an_unknown_gap(self):
+        payload = base58_bytes(OTHER, 32)+base58_bytes(KEY, 32)+b"".join(len(t).to_bytes(4, "little")+t for t in (b"n", b"s", b"u"))+(0).to_bytes(4, "little")
+        value = mint(extensions=tlv(19, payload), program=TOKEN_2022)
+        result = authority_graph([KEY], {KEY: packet(KEY, value, "m")})
+        self.assertFalse([g for g in result["gaps"] if g.get("reason") == "unknown_extension"])
+        self.assertTrue(any(e["role"] == "token_metadata_authority" and e["to"] == OTHER and e["from"] == KEY for e in result["edges"]))
+        wrong = mint(extensions=tlv(19, base58_bytes(OTHER, 32)+base58_bytes(OTHER, 32)+payload[64:]), program=TOKEN_2022)
+        result = authority_graph([KEY], {KEY: packet(KEY, wrong, "m")})
+        self.assertTrue(any(g.get("reason") == "invalid_extensions" for g in result["gaps"]))
+
     def test_full_spl_signers_and_invalid_threshold_display(self):
         raw = bytes([2, 3, 1])+b"".join(bytes([i])*32 for i in range(1, 12))
         result = spl_multisig.decode(KEY, account(raw))

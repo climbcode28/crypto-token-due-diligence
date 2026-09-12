@@ -54,6 +54,18 @@ class WebTests(unittest.TestCase):
     def source(self, url="https://example.org/start", owner="ordinary"):
         return register_urls(self.session, [url], owners={url: owner})[0]["source_id"]
 
+    def test_declared_dimension_travels_with_the_source_into_the_capture_record(self):
+        url = "https://example.org/terms"
+        entry = register_urls(self.session, [url], owners={url: "project"}, dimensions={url: "utility_redemption_rights"})[0]
+        self.assertEqual(entry["dimension"], "utility_redemption_rights")
+        again = register_urls(self.session, [url], owners={url: "project"})[0]
+        self.assertEqual(again["dimension"], "utility_redemption_rights")  # Ownership and dimension never change on re-registration.
+        with self.assertRaisesRegex(ValueError, "unknown capture dimension"):
+            register_urls(self.session, ["https://example.org/other"], dimensions={"https://example.org/other": "adoption"})
+        record = capture_one(self.session.root, entry["source_id"], owner="project", opener=Opener([(200, b'{"terms":true}', {})]))
+        self.assertEqual((record["status"], record["dimension"]), ("ok", "utility_redemption_rights"))
+        self.assertIsNone(capture_one(self.session.root, self.source(), opener=Opener([(200, b"{}", {})]))["dimension"])
+
     def test_redirect_retry_and_repeated_batch_share_one_finite_ledger(self):
         source = self.source(owner="liquidity")
         opener = Opener([(302, b"", {"Location": "/end"}), (429, b"slow", {}), (200, b'{"ok":true}', {})])

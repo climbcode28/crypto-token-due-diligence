@@ -76,15 +76,23 @@ class PublicHTTPSHandler(urllib.request.HTTPSHandler):
         return self.do_open(PublicHTTPSConnection, req, context=self._context)
 
 
-def register_urls(session, urls, *, owners=None, cap=12):
-    """Preserve every intake position, dedupe normalized URLs and assign one owner."""
+DIMENSIONS = ("token_controls", "canonical_lp_principal_custody", "side_pool_removal_risk", "sellability_exit_depth",
+              "current_concentration", "historical_launch_integrity", "admin_treasury_reward_custody",
+              "reward_accounting_liveness", "utility_redemption_rights", "external_dependencies", "development_disclosure")
+
+
+def register_urls(session, urls, *, owners=None, dimensions=None, cap=12):
+    """Preserve every intake position, dedupe normalized URLs and assign one owner and, optionally, one coverage dimension."""
     need(isinstance(urls, list) and all(isinstance(u, str) for u in urls), "URL list required")
     need(type(cap) is int and 0 <= cap <= 40, "invalid capture-source cap")
     owners = owners or {}
+    dimensions = dimensions or {}
+    need(all(d in DIMENSIONS for d in dimensions.values()), "unknown capture dimension")
     entries = []
     with session.transaction():
         session.db.execute("CREATE TABLE IF NOT EXISTS web_sources(id TEXT PRIMARY KEY,url TEXT NOT NULL,owner TEXT NOT NULL,status TEXT NOT NULL,original_sha256 TEXT NOT NULL)")
         session.db.execute("CREATE TABLE IF NOT EXISTS web_intake(id INTEGER PRIMARY KEY,source_id TEXT NOT NULL,original_sha256 TEXT NOT NULL)")
+        session.db.execute("CREATE TABLE IF NOT EXISTS web_dimensions(source_id TEXT PRIMARY KEY,dimension TEXT NOT NULL)")
         for url in urls:
             digest = sha(url.encode())
             try:
@@ -103,8 +111,12 @@ def register_urls(session, urls, *, owners=None, cap=12):
                 if status == "pending" and selected >= cap:
                     status = "unattempted_cap"
                 session.db.execute("INSERT INTO web_sources VALUES(?,?,?,?,?)", (source_id, safe, owner, status, digest))
+                if url in dimensions:
+                    # The declared coverage surface travels with the source so every dimension can evidence an attempt.
+                    session.db.execute("INSERT OR IGNORE INTO web_dimensions VALUES(?,?)", (source_id, dimensions[url]))
             session.db.execute("INSERT INTO web_intake(source_id,original_sha256) VALUES(?,?)", (source_id, digest))
-            entries.append({"source_id": source_id, "url": safe, "owner": owner, "status": status, "original_sha256": digest})
+            entries.append({"source_id": source_id, "url": safe, "owner": owner, "status": status, "original_sha256": digest,
+                            "dimension": source_dimension(session, source_id)})
     return entries
 
 
@@ -130,6 +142,13 @@ def _body(response, limit, deadline):
     if size == limit and status == "ok":
         status = "response_limit"
     return b"".join(chunks), status
+
+
+def source_dimension(session, source_id):
+    if not session.db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='web_dimensions'").fetchone():
+        return None
+    row = session.db.execute("SELECT dimension FROM web_dimensions WHERE source_id=?", (source_id,)).fetchone()
+    return row[0] if row else None
 
 
 def capture_one(session_root, source_id, *, owner="ordinary", opener=None, max_bytes=1_000_000):
@@ -224,6 +243,7 @@ def capture_one(session_root, source_id, *, owner="ordinary", opener=None, max_b
             packet = {**packet, "status": "redirect_limit"}
         capture_id = packet["request_id"]
         result = {"id": capture_id, "source_id": source_id, "url": source["url"], "final_url": packet["url"], "owner": owner,
+                  "dimension": source_dimension(session, source_id),
                   "status": packet["status"], "attempts": [p["request_id"] for p in history],
                   "http_status": packet.get("http_status"), "content_type": packet.get("content_type"),
                   "captured_at": packet.get("captured_at"), "sha256": packet.get("sha256"),

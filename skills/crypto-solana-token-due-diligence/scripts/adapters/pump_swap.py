@@ -10,11 +10,11 @@ PROGRAM=SWAP_PROGRAM
 GLOBAL=pda(PROGRAM,b'global_config')
 CAPABILITY=capability('pumpswap',PROGRAM,REVISION,model='fungible_token2022_lp_actual_vaults_with_separate_virtual_quote',
     dependencies=['pool','global_config','mints','vaults','lp_mint','fee_config','program_control'])
-CAPABILITY.update(version='1.1.0',allocation_bytes=[261,300,301],quote=False,historical_execution='pinned create/swap/withdraw/fee roles; exact transfer reconciliation separate')
+CAPABILITY.update(version='1.2.0',allocation_bytes=[261,301],reserved_tail_policy='evidenced allocation lengths only; an all-zero trailing allocation is accepted, any nonzero tail is refused',quote=False,historical_execution='pinned create/swap/withdraw/fee roles; exact transfer reconciliation separate')
 
 
 def decode_pool(account):
-    v=fixed(account,PROGRAM,'Pool',sizes=(261,300,301))
+    v=fixed(account,PROGRAM,'Pool',sizes=(261,301))
     need(v['base_mint']!=v['quote_mint'] and v['pool_base_token_account']!=v['pool_quote_token_account'],'PumpSwap asset/vault overlap')
     v.update(mints=[v['base_mint'],v['quote_mint']],vaults=[v['pool_base_token_account'],v['pool_quote_token_account']],config=GLOBAL,
         canonical_creator=v['creator']==pool_authority(v['base_mint']))

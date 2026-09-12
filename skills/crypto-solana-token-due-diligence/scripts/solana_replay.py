@@ -4,11 +4,11 @@ from pathlib import Path
 from urllib.parse import quote,unquote
 from solana_common import sha
 from solana_profile import PROFILE,regular,strict_json,check,validate,validate_report,Evidence
-from solana_compose import compose,draft_lock
+from solana_compose import ComposeError, compose,draft_lock
 from solana_facts import encoded,atomic
 from solana_render import render,reading
 
-VERSION='1.0.0'
+VERSION='1.1.0'
 ENGINE_ROOT=Path(__file__).resolve().parents[1]
 MAX_FILES=2000
 MAX_BYTES=192*1024*1024
@@ -79,16 +79,21 @@ def verify(root,allow_synthetic=False):
 
 
 def read(root,allow_synthetic=False):
+    """The frozen reading checklist and citations; the full report stays in report_path, never in the payload."""
     root=Path(root).resolve();result=verify(root,allow_synthetic)
     content=strict_json(regular(root,'reading.json').read_bytes(),'reading.json')
     check(content['target']==result['receipt']['target'] and content['delivery_status']==result['delivery_status'],'reading','Reading identity/status differs.')
-    from solana_render import safe_text
+    from solana_render import safe_text,PUBLICATION_OPS,PUBLICATION_DETAIL_LINES
     for row in content['citations']:
         if row['kind']=='frozen_evidence':
             name=unquote(row['url']);row['path']=str(regular(root,name));target='<'+quote(row['path'],safe='/._- ')+'>'
         else:target=row['url']
         row['answer_link']='['+safe_text(row['label'])+']('+target+')'
-    return {**content,'bundle':str(root),'report_path':str(root/'report.md'),'markdown':regular(root,'report.md').read_text(),
+    for entry in content['reading_checklist']:
+        # Older frozen checklists carry every publication leaf; the presentation caps them the same way.
+        if entry.get('kind')=='typed_fact' and entry.get('operation') in PUBLICATION_OPS and isinstance(entry.get('details'),list) and len(entry['details'])>PUBLICATION_DETAIL_LINES+1:
+            rest=len(entry['details'])-PUBLICATION_DETAIL_LINES;entry['details']=entry['details'][:PUBLICATION_DETAIL_LINES]+['… '+str(rest)+' further publication detail lines retained in the frozen report and evidence.']
+    return {**content,'bundle':str(root),'report_path':str(root/'report.md'),
         'verification':result['verification'],'deliverable':result['delivery_status']=='delivered'}
 
 
@@ -114,8 +119,13 @@ def finalize(root,out,*,note_name='notes/coordinator.json',allow_synthetic=False
         stage=Path(directory)/'bundle';stage.mkdir()
         with draft_lock(root):
             check(not (root/'.draft-transaction.json').exists(),'draft','Recover interrupted composition first.')
-            copy_draft(root,stage,None if checkpoint else note_name)
+            copy_draft(root,stage,note_name)
+        note_status='composed'
         if checkpoint:
+            # A checkpoint carries the analyst's current judgments when the note composes; an
+            # invalid note never blocks preserving the last valid draft.
+            try:compose(stage,note_name,allow_synthetic=allow_synthetic)
+            except ComposeError as exc:note_status='not_composed: '+'; '.join(e['path']+': '+e['message'] for e in exc.errors[:3])
             m,r=validate(stage,allow_synthetic);check(r['research_status']!='completed','checkpoint','Use finalize for completed broad reports.')
         else:
             compose(stage,note_name,allow_synthetic=allow_synthetic)
@@ -137,7 +147,7 @@ def finalize(root,out,*,note_name='notes/coordinator.json',allow_synthetic=False
         # Atomic same-filesystem directory rename; refuse concurrent destination reuse.
         check(not out.exists() and not out.is_symlink(),'output','Output appeared during finalization.')
         os.rename(stage,out)
-    return read(out,allow_synthetic)
+    return {**read(out,allow_synthetic),**({'note_status':note_status} if checkpoint else {})}
 
 
 def frozen_run(root,allow_synthetic=False):

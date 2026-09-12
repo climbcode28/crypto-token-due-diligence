@@ -9,6 +9,7 @@ from pool_fixture import mint,key
 from solana_fixture import request,response
 from solana_presets import settings
 from solana_discovery import MAINNET
+import solana_derivations as derivations
 
 BASE=datetime(2026,9,11,12,tzinfo=timezone.utc).timestamp()
 def utc(t):return datetime.fromtimestamp(t,timezone.utc).isoformat()
@@ -96,7 +97,7 @@ class Bundle:
         for x in inputs:
             for d in self.m['derivations']:
                 if d['id']==x:closure.update(d['transitive_inputs'])
-        self.m['derivations'].append({'id':eid,'operation':operation,'version':'1.0.0','parameters':parameters,'subject':copy.deepcopy(sub),
+        self.m['derivations'].append({'id':eid,'operation':operation,'version':derivations.VERSION,'parameters':parameters,'subject':copy.deepcopy(sub),
             'inputs':[{'id':x,'sha256':self.obs(x)['sha256']} for x in inputs],'transitive_inputs':sorted(closure),'units':'exact atomic units and typed configuration','output':result})
 
     def finding(self,fid,dim,claim):

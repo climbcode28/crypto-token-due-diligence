@@ -1,13 +1,12 @@
 # Compact notes and composition
 
-Use the installed `scripts/solana_bundle.py`; `solana-evidence-v2` is the default.
-Explicit profile flags remain valid. All paths below are within one run.
+Use the installed `$S/scripts/solana_bundle.py`; `solana-evidence-v2` is the default
+profile. The bundle root is `$RUN/draft` (it holds `manifest.json`). `finalize` composes;
+these are the standalone tools for an omitted detail or a rejected note:
 
 ```sh
-python3 skills/crypto-solana-token-due-diligence/scripts/solana_bundle.py facts RUN --profile solana-evidence-v2
-python3 skills/crypto-solana-token-due-diligence/scripts/solana_bundle.py scaffold RUN --profile solana-evidence-v2
-python3 skills/crypto-solana-token-due-diligence/scripts/solana_bundle.py compose RUN --profile solana-evidence-v2 --check
-python3 skills/crypto-solana-token-due-diligence/scripts/solana_bundle.py compose RUN --profile solana-evidence-v2
+python3 "$S/scripts/solana_facts.py" "$RUN/draft" --check --category holders
+python3 "$S/scripts/solana_bundle.py" compose "$RUN/draft" --check
 ```
 
 `facts` checks raw input closure once and writes full `facts.json` plus
@@ -19,9 +18,11 @@ Facts contain no assessment signal. Unsupported input invalidates its dependent
 conclusion; it does not erase independent facts. Integrity failures must be repaired
 from retained original evidence, never bypassed by changing a hash.
 
-`scaffold` creates `notes/coordinator.json` only if absent. It preserves original
-question, focus and URLs, supplies aliases and pending coverage, and leaves decisions
-as TODO. Edit this JSON directly. No per-run script or helper-source read is needed.
+`start` already scaffolds `notes/coordinator.json`, `notes/liquidity.json` and
+`notes/project.json`; `solana_bundle.py scaffold` recreates one only when it is missing.
+The scaffold preserves original question, focus and URLs, lists the citeable aliases
+under `alias_hints` and pending coverage, and leaves decisions as TODO. Edit this JSON
+directly. No per-run script or helper-source read is needed.
 The `decision_template` and `judgment_todo` must be replaced or removed before marking
 research completed. Missing knowledge may remain precisely unverified; unfinished
 standard work keeps the run partial.
@@ -40,7 +41,10 @@ A compact coordinator finding can be:
 }
 ```
 
-Use a current exact evidence ID whenever an operation/category alias is ambiguous.
+Support cites alias keys: an evidence ID (`baseline_mint_0`), a derivation ID
+(`auto-controls`), an operation name or `category:address`; the `fact-` prefix shown in
+compact facts is display text, not an ID. Use a current exact evidence ID whenever an
+operation/category alias is ambiguous.
 Support may instead be `{ "alias": "ID", "role": "execution", "effect_id": "ID",
 "subject": { "genesis_hash": "...", "kind": "mint", "address": "..." } }`.
 The actual role, subject and effect must pass the strict profile. A missing support
@@ -49,13 +53,17 @@ human. Current sample IDs are expanded from dependency closure. Counterevidence
 uses the same aliases. Explicit stability assertions still require unchanged fresh
 critical rechecks.
 
-Assign a pipeline finding without rewriting its text:
+Assign a pipeline finding without rewriting its text. The scaffold pre-fills each
+assignment with `"signal": null` and the current `input_digests` of the facts the
+finding cites; set the signal (and impact/concern for adverse signals). A stale digest
+after a refresh is a field-specific compose error, never a silent carry-over:
 
 ```json
 "signal_assignments": {
   "pipeline-controls": {
     "signal": "potential_risk",
     "impact": "high",
+    "input_digests": {"auto-controls": "<current sha256 from facts>"},
     "concern": {
       "basis": "The captured mint records a retained mint authority.",
       "mechanism": "That authority can issue additional units under the observed program rules.",

@@ -34,7 +34,7 @@ def fixture(*,complete=False,non_native=False,virtual=0):
     raw=bytearray(1045);raw[:8]=discriminator('Global');raw[8]=1
     for off in (9,41,113,386,418):put(raw,off,key(60))
     struct.pack_into('<Q',raw,105,10);struct.pack_into('<Q',raw,154,20);values[curve.GLOBAL]=owned(bytes(raw),CURVE_PROGRAM)
-    raw=bytearray(300);raw[:8]=discriminator('Pool');raw[8]=bump
+    raw=bytearray(301);raw[:8]=discriminator('Pool');raw[8]=bump
     for off,k in zip((11,43,75,107,139,171,211),(authority,m,q,lp,*vaults,key(51))):put(raw,off,k)
     struct.pack_into('<Q',raw,203,1000);raw[245:261]=virtual.to_bytes(16,'little',signed=True);values[pool]=owned(bytes(raw),SWAP_PROGRAM)
     raw=bytearray(940);raw[:8]=discriminator('GlobalConfig')

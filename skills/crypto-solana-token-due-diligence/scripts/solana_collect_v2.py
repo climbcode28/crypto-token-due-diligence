@@ -5,12 +5,15 @@ import multiprocessing
 from pathlib import Path
 import time
 
-from solana_common import need, sha, target_identity, write_new
+from solana_common import need, sha, target_identity, write_new, TOKEN_PROGRAM
 from solana_session import Session, TRANSIENT, encoded, label
 from solana_transport import HttpTransport, session_request
 from solana_wire import validate_response, consistency, STATE
-from solana_presets import read, validate_plan, account_batches, mint_baseline, holding_sample
+from solana_presets import read, validate_plan, account_batches, mint_baseline, holding_sample, holder_scan
 from solana_cache import ObservationCache
+
+MAX_WAIT_SECONDS = 30  # Longest wait for one read's provider window/backoff; remaining time bounds it too.
+SLEEP = time.sleep
 
 
 def block_params(slot):
@@ -56,13 +59,30 @@ def execute(session_root, config, sample, row, owner="ordinary", factory=HttpTra
                     need(json.loads(path.read_text()) == intent, "read intent changed")
                 else:
                     write_new(path, intent)
-                packet = session_request(session, transport, request, family=family, owner=owner,
-                                         retry=index == 1, strict=True)
+                if index == 1:
+                    SLEEP(min(1, session.remaining_seconds(owner)))  # The single transient retry is never immediate.
+                packet = _send(session, transport, request, family=family, owner=owner, retry=index == 1)
             if packet["status"] not in TRANSIENT:
                 return packet
         return packet
     finally:
         session.close()
+
+
+def _send(session, transport, request, *, family, owner, retry):
+    """Wait out a provider backoff or rate window within the remaining time; waiting is never an attempt."""
+    waited = 0.0
+    while True:
+        packet = session_request(session, transport, request, family=family, owner=owner, retry=retry, strict=True)
+        until = packet.get("wait_until") if packet.get("status") == "budget_denied" else None
+        if until is None:
+            return packet
+        delay = max(0.05, until - time.time())
+        if waited + delay > min(MAX_WAIT_SECONDS, session.remaining_seconds(owner)):
+            packet["waited"] = waited
+            return packet
+        SLEEP(delay)
+        waited += delay
 
 
 def queue(session_root, config, sample, rows, *, owner="ordinary", factory=HttpTransport):
@@ -98,22 +118,33 @@ def _checked(packet):
     return validate_response(packet["request"], packet["response"]) if packet.get("status") == "ok" else {}
 
 
+def _block_time(packet):
+    """The comparable value of a header check: a full header's blockTime, or the block-time read itself."""
+    result = packet["response"]["result"]
+    return result["blockTime"] if packet["request"]["method"] == "getBlock" else result
+
+
 def collect(session_root, out, config, sample, rows, *, factory=HttpTransport, expand_largest=False):
     """All outputs are observations; collection success never implies research completion."""
     label(sample)
     need(len(sample) <= 16, "sample ID too long")
     validate_plan(rows)
     need(all(len(r["name"]) <= 45 for r in rows), "read name too long")
-    need(all(r["name"] not in ("network", "renetwork") and not r["name"].startswith(("critical_", "header_", "reheader_", "holdings_")) for r in rows), "reserved collector read name")
+    need(all(r["name"] not in ("network", "renetwork", "holderscan") and not r["name"].startswith(("critical_", "header_", "reheader_", "holdings_")) for r in rows), "reserved collector read name")
     session = Session(session_root)
     try:
+        session.recover_expired()  # A lost worker from an earlier process must not hold a concurrency slot.
         # Reserve worst-case distinct state/header contexts before discretionary sends.
         critical = list(dict.fromkeys(a for r in rows if r["critical"] for a in
             (r["params"][0] if r["method"] == "getMultipleAccounts" else [r["params"][0]])))
         need(all(r["method"] in ("getAccountInfo", "getMultipleAccounts") and "dataSlice" not in r["params"][1]
                  for r in rows if r["critical"]), "critical checks require full accounts")
         need(session.meta["target"]["mint"] in critical, "critical target mint read required")
-        critical_reads = account_batches(critical, prefix="critical")
+        # One recheck batch per initial critical read, so several leads in one sample each keep
+        # their own fresh recheck instead of sharing a single deduplicated batch.
+        critical_rows = [r for r in rows if r["critical"]]
+        critical_reads = [b for i, r in enumerate(critical_rows) for b in account_batches(
+            r["params"][0] if r["method"] == "getMultipleAccounts" else [r["params"][0]], prefix="critical_"+str(i))]
         states = sum(r["method"] in STATE or r["method"] in ("getTransaction", "getEpochInfo") for r in rows)
         # Fresh critical batches, their headers, initial context headers and genesis.
         identity = {"sample_id": sample, "reads": rows, "expand_largest": expand_largest,
@@ -123,7 +154,7 @@ def collect(session_root, out, config, sample, rows, *, factory=HttpTransport, e
         if manifest.exists():
             need(json.loads(manifest.read_text()) == identity, "named sample plan changed")
         else:
-            session.ensure_final_reserve(states+2*len(critical_reads)+1+int(expand_largest), "sample "+sample+" planned state/header rechecks")
+            session.ensure_final_reserve(states+2*len(critical_reads)+1+2*int(expand_largest), "sample "+sample+" planned state/header rechecks")
             write_new(manifest, identity)
         genesis = execute(session_root, config, sample, read("network", "getGenesisHash", []), factory=factory)
         if _checked(genesis).get("result") != session.meta["target"]["genesis_hash"]:
@@ -131,18 +162,31 @@ def collect(session_root, out, config, sample, rows, *, factory=HttpTransport, e
             return
         result = queue(session_root, config, sample, rows, factory=factory)
         if expand_largest:
-            largest = _checked(result.get("largest", {}))
-            if largest.get("status") == "ok":
-                derived = holding_sample(session.meta["target"]["mint"], result["largest"])
+            mint = session.meta["target"]["mint"]
+            largest = result.get("largest", {})
+            discovery = largest if _checked(largest).get("status") == "ok" else None
+            refused = largest.get("status") == "method_unavailable" or largest.get("reason") == "method_unavailable"
+            mint_value = (_checked(result.get("mint", {})).get("result") or {}).get("value") or {}
+            if discovery is None and refused and mint_value.get("owner") == TOKEN_PROGRAM:
+                # The public tier refuses largest accounts: a bounded census of fixed-size SPL
+                # holdings is the discovery lead instead. Token-2022 keeps an explicit gap.
+                scan = queue(session_root, config, sample, [holder_scan(mint)], factory=factory)
+                result.update(scan)
+                if _checked(scan.get("holderscan", {})).get("status") == "ok":
+                    discovery = scan["holderscan"]
+            if discovery is not None:
+                derived = holding_sample(mint, discovery)
                 result.update(queue(session_root, config, sample, derived, factory=factory))
         floor = max((_checked(p).get("context_slot", 0) for p in result.values()), default=0)
-        rechecks = account_batches(critical, prefix="critical", floor=floor)
+        rechecks = [b for i, r in enumerate(critical_rows) for b in account_batches(
+            r["params"][0] if r["method"] == "getMultipleAccounts" else [r["params"][0]], prefix="critical_"+str(i), floor=floor)]
         result.update(queue(session_root, config, sample, rechecks, owner="final", factory=factory))
         slots = sorted({v for p in result.values() for c in [_checked(p)]
                         for v in [c.get("context_slot", c.get("historical_slot"))] if v is not None})
         headers = [read("header_"+str(slot), "getBlock", block_params(slot)) for slot in slots]
         queue(session_root, config, sample, headers, factory=factory)
-        fresh = [read("reheader_"+str(slot), "getBlock", block_params(slot)) for slot in slots]
+        # The recheck of a finalized header only needs its time; getBlockTime has twice the public window.
+        fresh = [read("reheader_"+str(slot), "getBlockTime", [slot]) for slot in slots]
         fresh.append(read("renetwork", "getGenesisHash", []))
         queue(session_root, config, sample, fresh, owner="final", factory=factory)
         session.mark("collection", {"sample": sample, "status": "schedule_finished"})
@@ -187,7 +231,7 @@ def summarize(session_root, sample):
                 a, b = by_name.get(first, {}), by_name.get(last, {})
                 need(a.get("status") == b.get("status") == "ok", "fresh network/header check missing")
                 need(b["started_at"] > a["completed_at"] and a["attempt_id"] != b["attempt_id"], "recheck is not later independent request")
-                need(a["response"]["result"] == b["response"]["result"], "recheck changed")
+                need(_block_time(a) == _block_time(b), "recheck changed")
             current_slots = {_checked(p)["context_slot"] for p in packets if p["status"] == "ok" and "context_slot" in _checked(p)}
             for slot in current_slots:
                 block_time = by_name["header_"+str(slot)]["response"]["result"]["blockTime"]
@@ -230,7 +274,7 @@ def summarize(session_root, sample):
         pending = [a["request_id"] for a in session.observations() if a["request_id"].startswith(sample+"_") and a["status"] == "started"]
         if pending:
             gaps.append({"reason": "unfinished_attempts", "requests": pending})
-        return {"schema_version": 2, "profile": "solana-evidence-v2", "collector_version": "2.0.0-dev.3",
+        return {"schema_version": 2, "profile": "solana-evidence-v2", "collector_version": "2.1.0",
                 "target": session.meta["target"], "investigation_id": session.meta["investigation_id"],
                 "synthetic": session.meta["synthetic"], "sample_id": sample, "observations": packets,
                 "samples": samples, "collection_status": "partial" if gaps else "captured",

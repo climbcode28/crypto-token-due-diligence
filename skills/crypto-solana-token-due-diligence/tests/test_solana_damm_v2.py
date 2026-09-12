@@ -38,6 +38,11 @@ class DammTests(unittest.TestCase):
         self.assertTrue(c['protocol_delegate_eligible']);self.assertFalse(c['delegate_has_nft_transfer_allowance'])
         self.assertEqual(c['delegate_protocol_permissions']['remove_liquidity'],'owner_ATA_only')
         self.assertEqual(c['delegate_protocol_permissions']['claim_fees'],'unrestricted')
+        self.assertEqual((c['delegate_protocol_permissions']['add_liquidity'],c['delegate_protocol_permissions']['lock_position']),('absent','absent'))
+        locked=dict(v);locked[a['lead']['position']]=mutate(v[a['lead']['position']],392,((1<<2)|(1<<3)|1|(1<<7)).to_bytes(4,'little'))
+        c2=self.analyze(locked)[0]['positions'][0]['custody']
+        self.assertEqual((c2['delegate_protocol_permissions']['add_liquidity'],c2['delegate_protocol_permissions']['lock_position']),('allowed','allowed'))
+        self.assertEqual(c2['delegate_protocol_permissions']['remove_liquidity'],'owner_ATA_only')
         v[a['holding']]=mutate(v[a['holding']],121,(1).to_bytes(8,'little'))
         c=self.analyze(v)[0]['positions'][0]['custody']
         self.assertFalse(c['protocol_delegate_eligible']);self.assertTrue(c['delegate_has_nft_transfer_allowance'])

@@ -439,17 +439,19 @@ Address shape, ticker or a brokerage listing alone does not verify the chain.
 
 Solana reads use `SOLANA_RPC_URL`, not the configured EVM endpoint. Solana defaults to available public RPC/explorer/API sources;
 no dRPC connection, key or persistent configuration is required. A public endpoint can
-be supplied temporarily to the collector. Both paths preserve network/paid-use authorization
-and fallback without setup prompts. Native SOL research is distinct from WSOL/LST tokens.
+be supplied temporarily to the collector. The EVM path honors a configured, authorized
+provider; the Solana path is public-only, reads no policy file and needs no setup prompts. Native SOL research is distinct from WSOL/LST tokens.
 
 Solana v2 workflow/reporting **2.0.0** is the default after functional acceptance.
 The [runbook](skills/crypto-solana-token-due-diligence/references/runbook.md) integrates
 one original session, two bounded research lanes, typed facts, at most two follow-up
 presets, note composition and immutable readable delivery/replay. Public RPC uses a
 standalone standard-library transport; custom Solana dRPC is deferred. Use explicit `--profile legacy-v1` for old bundles; their evidence and rendering
-remain unchanged. Live rich-case parity remains **unmet**: all three public cases
-were substantive partial checkpoints. See [acceptance](plans/solana-evm-parity-2026-09-11/acceptance.md)
-and [live measurements](plans/solana-evm-parity-2026-09-11/live-results.md).
+remain unchanged. The three original public live cases were partial checkpoints; the
+2026-09-11 review traced that to a public-endpoint transport defect and fixed it. See
+[review fixes](plans/solana-review-fixes-2026-09-11.md) for the live evidence, alongside the
+original [acceptance](plans/solana-evm-parity-2026-09-11/acceptance.md) and
+[live measurements](plans/solana-evm-parity-2026-09-11/live-results.md).
 
 Supported typed product families are Raydium CPMM, AMM v4, CLMM; Orca Whirlpool;
 Meteora DLMM, DAMM v2; and Pump curve/PumpSwap. Capability limits are product-specific:
@@ -466,7 +468,7 @@ bundled code, while isolated replay requires explicit trust. Operational feedbac
 bounded, nonblocking and separately reviewed; no active lessons are installed.
 
 All three unittest suites above remain mandatory. Current implementation checks:
-Solana **323**, router **30**, EVM **428** are the final acceptance suite counts,
+Solana **379**, router **30**, EVM **429** are the current suite counts (Solana grew with the 2026-09-11 review fixes),
 including independent outcome, live-regression, legacy and default-dispatch tests. See [implementation](plans/solana-evm-parity-2026-09-11/implementation.md)
 and [evidence tools](skills/crypto-solana-token-due-diligence/references/evidence-and-tools.md).
 Targets are seven-minute ordinary research and ten-minute handling, with two minutes

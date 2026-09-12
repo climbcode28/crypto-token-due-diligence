@@ -1,7 +1,8 @@
 """Exact size policies, scoped offline CPMM estimates and captured public quotes."""
 from decimal import Decimal, InvalidOperation
 from fractions import Fraction
-from urllib.parse import urlencode
+from urllib.parse import urlencode,urlsplit,parse_qsl
+import re
 from solana_common import need,pubkey,target_identity,natural,TOKEN_PROGRAM
 from solana_wire import amount
 from solana_accounts import decode_mint
@@ -12,7 +13,12 @@ from adapters import raydium_cpmm as cp
 from adapters.base import Sample
 from adapters.meteora_common import point,CLOCK
 
-VERSION='1.0.0'
+VERSION='1.1.0'
+SOURCES=('jupiter_v1_lite','jupiter_v2','raydium_quote')
+QUOTE_PARAMS={'jupiter_v1_lite':('inputMint','outputMint','amount','slippageBps'),'jupiter_v2':('inputMint','outputMint','amount','slippageBps'),'raydium_quote':('inputMint','outputMint','amount','slippageBps','txVersion')}
+# Route-shaping parameters a quote may carry; the capture layer still refuses credential-like names (e.g. anything containing 'token').
+BENIGN_PARAMS={'onlyDirectRoutes','asLegacyTransaction','maxAccounts','dynamicSlippage','platformFeeBps','excludeDexes','dexes'}
+WALLET_PARAMS={'taker','wallet','userPublicKey','payer','owner'}
 
 
 def decimal(value):
@@ -126,21 +132,53 @@ def quote_url(source,target,output_mint,input_atomic,*,slippage_bps=50):
     need(target['genesis_hash']==MAINNET and output_mint!=target['mint'],'exact mainnet quote pair required')
     need(0<amount(input_atomic)<2**64 and 0<=natural(slippage_bps)<=10000,'invalid quote inputs')
     params={'inputMint':target['mint'],'outputMint':output_mint,'amount':input_atomic,'slippageBps':str(slippage_bps)}
-    if source=='jupiter_v2':return 'https://api.jup.ag/swap/v2/order?'+urlencode(params)
+    if source=='jupiter_v1_lite':return 'https://lite-api.jup.ag/swap/v1/quote?'+urlencode(params)  # credential-free public route
+    if source=='jupiter_v2':return 'https://api.jup.ag/swap/v2/order?'+urlencode(params)  # keyed alternate
     need(source=='raydium_quote','unsupported quote source')
     params['txVersion']='V0'
     return 'https://transaction-v1.raydium.io/compute/swap-base-in?'+urlencode(params)
 
 
+def quote_request(url):
+    """Parse a captured quote URL into (source, request parameters); refuse wallet-bound or unknown shapes."""
+    parts=urlsplit(url);host,path=parts.hostname,parts.path.rstrip('/')
+    source={('lite-api.jup.ag','/swap/v1/quote'):'jupiter_v1_lite',('api.jup.ag','/swap/v2/order'):'jupiter_v2',('transaction-v1.raydium.io','/compute/swap-base-in'):'raydium_quote'}.get((host,path))
+    need(source is not None and parts.scheme=='https' and not parts.username and not parts.fragment,'unsupported quote route')
+    params={}
+    for k,v in parse_qsl(parts.query,keep_blank_values=True):
+        need(k not in params,'duplicate quote parameter');params[k]=v
+    need(not set(params)&WALLET_PARAMS,'wallet-bound quote request is not a read-only quote')
+    need(set(QUOTE_PARAMS[source])<=set(params) and set(params)<=set(QUOTE_PARAMS[source])|BENIGN_PARAMS,'unexpected quote parameters')
+    need(source!='raydium_quote' or params['txVersion']=='V0','unsupported Raydium quote version')
+    need(re.fullmatch(r'0|[1-9][0-9]{0,38}',params['amount']) and re.fullmatch(r'[0-9]{1,5}',params['slippageBps']),'invalid quote amount/slippage')
+    return source,{'input_mint':pubkey(params['inputMint']),'output_mint':pubkey(params['outputMint']),'input_atomic':params['amount'],'slippage_bps':int(params['slippageBps'])}
+
+
 def public_quote(source,target,record,raw,output_mint,input_atomic,*,slippage_bps=50):
     target=target_identity(target)
-    url=quote_url(source,target,output_mint,input_atomic,slippage_bps=slippage_bps)
-    body=captured_json(record,raw,expected_url=url);need(isinstance(body,dict),'quote object required')
+    quote_url(source,target,output_mint,input_atomic,slippage_bps=slippage_bps)
+    # The captured URL may order or add benign parameters differently; compare the parsed request.
+    parsed_source,request=quote_request(record['url'])
+    need(parsed_source==source and request=={'input_mint':target['mint'],'output_mint':pubkey(output_mint),'input_atomic':input_atomic,'slippage_bps':natural(slippage_bps)},'captured quote request differs from the requested pair/size')
+    body=captured_json(record,raw,expected_url=record['url']);need(isinstance(body,dict),'quote object required')
     result={'schema_version':1,'kind':'api_quote','source':source,'target':target,'input_mint':target['mint'],
         'output_mint':output_mint,'input_atomic':input_atomic,'status':'quoted','route':[],'fees':[],
         'captured_at':record['captured_at'],'evidence':[record['id']],'context_slot':None,'gaps':[],
         'execution_observed':False,'scope':'read-only provider quote; route/depth/price remain provider claims, not on-chain execution'}
-    if source=='jupiter_v2':
+    if source=='jupiter_v1_lite':
+        need('swapTransaction' not in body and 'transaction' not in body,'quote-only response unexpectedly contains transaction bytes')
+        need(body.get('swapMode')=='ExactIn','unsupported Jupiter swap mode')
+        quoted=body;in_key,out_key='inAmount','outAmount';plan=body.get('routePlan')
+        impact=body.get('priceImpactPct')
+        result['provider_price_impact_raw']=str(impact) if impact is not None else None
+        if impact is not None:decimal(impact)
+        result['price_impact_fraction']=None
+        result['price_impact_definition']='provider priceImpactPct retained verbatim; ratio/percentage convention not assumed across API versions'
+        if body.get('swapUsdValue') is not None:decimal(body['swapUsdValue']);result['provider_usd_value']=str(body['swapUsdValue'])
+        if body.get('platformFee') is not None:
+            fee=body['platformFee'];need(isinstance(fee,dict) and 0<=natural(fee.get('feeBps',0))<=10000,'invalid platform fee')
+            result['fees'].append({'basis_points':fee.get('feeBps'),'amount_atomic':fee.get('amount'),'scope':'provider platform fee; do not add again to quoted output'})
+    elif source=='jupiter_v2':
         need(body.get('transaction') in (None,''),'quote-only response unexpectedly contains transaction bytes')
         need(body.get('swapMode')=='ExactIn','unsupported Jupiter swap mode')
         quoted=body;in_key,out_key='inAmount','outAmount';plan=body.get('routePlan')
@@ -168,9 +206,9 @@ def public_quote(source,target,record,raw,output_mint,input_atomic,*,slippage_bp
     need(isinstance(plan,list) and len(plan)<=12,'bounded route plan required')
     for leg in plan:
         need(isinstance(leg,dict),'invalid route leg')
-        info=leg.get('swapInfo') if source=='jupiter_v2' else leg
+        info=leg.get('swapInfo') if source in ('jupiter_v2','jupiter_v1_lite') else leg
         need(isinstance(info,dict),'invalid route leg')
-        pool=pubkey(info['ammKey' if source=='jupiter_v2' else 'poolId'])
+        pool=pubkey(info['ammKey' if source in ('jupiter_v2','jupiter_v1_lite') else 'poolId'])
         leg_in,leg_out=pubkey(info['inputMint']),pubkey(info['outputMint']);need(leg_in!=leg_out,'route leg mints overlap')
         r={'pool':pool,'input_mint':leg_in,'output_mint':leg_out,'provider_label':info.get('label')}
         for name in ('inAmount','outAmount'):
@@ -178,7 +216,7 @@ def public_quote(source,target,record,raw,output_mint,input_atomic,*,slippage_bp
         if 'feeAmount' in info:
             fee=amount(info['feeAmount']);need(fee<2**64,'invalid route fee amount')
             result['fees'].append({'pool':pool,'amount_atomic':str(fee),'mint':pubkey(info['feeMint']),'scope':'included provider route fee; not an extra deduction'})
-        if source=='jupiter_v2':r.update(percent=leg.get('percent'),bps=leg.get('bps'))
+        if source in ('jupiter_v2','jupiter_v1_lite'):r.update(percent=leg.get('percent'),bps=leg.get('bps'))
         result['route'].append(r)
     # Every leg must lie on some directed path from the requested input to output.
     reachable={target['mint']};can_finish={output_mint}

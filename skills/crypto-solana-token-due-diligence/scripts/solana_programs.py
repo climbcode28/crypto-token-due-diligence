@@ -150,7 +150,7 @@ def authority_graph(roots, observations, *, vault_links=None, spending_limits=No
                         node.update(decoded, status="observed")
                         related.extend(("multisig_signer", k, "current_signer") for k in decoded["signers"])
                     elif len(raw) == 82 or len(raw) >= 166 and raw[165] == 1:
-                        decoded = decode_mint(account)
+                        decoded = decode_mint(account, address=address)
                         node.update(kind="mint", facts=decoded, status="observed")
                         related.extend((role, decoded[role], "current_controller") for role in ("mint_authority", "freeze_authority") if decoded[role] is not None)
                         for ext in decoded["extensions"]:

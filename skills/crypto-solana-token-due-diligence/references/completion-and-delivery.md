@@ -23,8 +23,7 @@ is ineligible for final broad delivery. Frozen/delivered broad status requires b
 scope and completed research, judgments, requirement review and severe-finding
 visibility. Focused work cannot pass that broad-delivery gate.
 
-Validation is read-only. It does not create, freeze or deliver a report. Authoring,
-multi-error preflight and frozen rendering/replay have their own workflow stages;
-default activation waits for final acceptance. The eventual finalizer must validate
-the concrete artifact and rendered bytes before marking delivery. Failures preserve
-the prior draft and any already delivered report.
+Validation is read-only. It does not create, freeze or deliver a report. `finalize`
+composes, runs the multi-error preflight, freezes, validates the concrete artifact and
+rendered bytes, and reproduces them before marking delivery. Failures preserve the
+prior draft and any already delivered report.

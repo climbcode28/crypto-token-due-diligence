@@ -137,8 +137,11 @@ def custody(sample,position,address,lead,state,core):
     sample.same_bank([*core,address,nft,holding_address])
     eligible=h['delegate'] is not None and h['delegated_amount_atomic'] == '0'
     mask=position['delegate_permission']
+    # Upstream PositionDelegatePermission bits: AddLiquidity 0, RemoveLiquidity 1, RemoveLiquidityToOwner 2,
+    # ClaimPositionFee 3, ClaimPositionFeeToOwner 4, ClaimReward 5, ClaimRewardToOwner 6, LockPosition 7.
     permissions={name:('unrestricted' if mask&(1<<bit) else 'owner_ATA_only' if mask&(1<<(bit+1)) else 'absent')
                  for name,bit in [('remove_liquidity',1),('claim_fees',3),('claim_rewards',5)]}
+    permissions.update(add_liquidity='allowed' if mask&1 else 'absent',lock_position='allowed' if mask&(1<<7) else 'absent')
     return {'holding':holding_address,**h,'mint_controls':m,'representation':'token2022_position_nft',
         'protocol_delegate_eligible':eligible,'delegate_protocol_permissions':permissions,
         'delegate_has_nft_transfer_allowance':h['delegate'] is not None and int(h['delegated_amount_atomic']) >= 1,
@@ -211,5 +214,6 @@ def analyze(target,pool,observations,*,positions=None):
     for key in ('liquidity','sqrt_min_price','sqrt_max_price','sqrt_price','permanent_lock_liquidity'):
         state[key]=str(state[key])
     for key in ('fee_growth','token_amounts'):state[key]=list(map(str,state[key]))
-    sample.result['gaps'].append('executable_withdrawal_and_dynamic_swap_fees_not_established')
+    # A resolved sample is observed; execution limits are scope, not a missing dependency.
+    sample.result.setdefault('limitations',[]).append('executable_withdrawal_and_dynamic_swap_fees_not_established')
     return common.finish(sample)

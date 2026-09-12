@@ -13,7 +13,7 @@ def decode(program,raw,a):
     e={'mint':None,'amount_atomic':None,'participants':{},'quantity_scope':'protocol instruction roles; actual movements and beneficiaries need effect reconciliation'}
     if program==CURVE_PROGRAM and raw[:8] in (tag('create'),tag('create_v2')):
         v2=raw[:8]==tag('create_v2')
-        need(len(a) in ((16,17,19) if v2 else (14,)),'unsupported Pump create accounts')
+        need(len(a)==(16 if v2 else 14),'unsupported Pump create accounts')  # pinned IDL: create_v2 has exactly 16 accounts
         r=Reader(raw);r.take(8)
         texts=[]
         for cap in (256,64,2048):
@@ -28,7 +28,7 @@ def decode(program,raw,a):
         e.update(kind='launch_initialize',mint=mint,curve=curve,base_holding=a[3],token_program=token_program,
             participants={'mint':mint,'curve':curve,'creator_argument':creator,'payer':a[5] if v2 else a[7]},
             metadata_claim={'name':texts[0],'symbol':texts[1],'uri':texts[2]},is_mayhem_mode=mayhem,is_cashback_coin=cashback,
-            quote_mint=a[16] if v2 and len(a)>16 else WSOL)
+            quote_mint=None if v2 else WSOL,quote_mint_scope='v2 quote mint is BondingCurve state, not a create argument' if v2 else 'legacy curve quotes in WSOL')
     elif program==CURVE_PROGRAM and raw[:8] in (tag('migrate'),tag('migrate_v2')):
         v2=raw[:8]==tag('migrate_v2');need(len(raw)==8 and len(a)==(27 if v2 else 25),'unsupported Pump migration layout')
         mint=a[2];quote=a[3] if v2 else a[14];curve=a[4] if v2 else a[3];pool=a[10] if v2 else a[9];authority=a[11] if v2 else a[10]
@@ -55,9 +55,12 @@ def decode(program,raw,a):
     elif program==SWAP_PROGRAM and raw[:8]==tag('collect_coin_creator_fee'):
         need(len(raw)==8 and len(a)==8,'unsupported PumpSwap fee claim')
         e.update(kind='creator_fee_claim',mint=a[0],participants={'creator':a[2],'vault':a[4],'destination':a[5]})
-    elif program==CURVE_PROGRAM and raw[:8] in (tag('sell'),tag('sell_v2'),tag('buy_v2'),tag('buy_exact_quote_in_v2')):
-        legacy=raw[:8]==tag('sell');sell=raw[:8] in (tag('sell'),tag('sell_v2'))
-        need(len(raw)==24 and len(a)==(14 if legacy else 26 if sell else 27),'unsupported Pump trade layout')
+    elif program==CURVE_PROGRAM and raw[:8] in (tag('sell'),tag('buy'),tag('sell_v2'),tag('buy_v2'),tag('buy_exact_quote_in_v2')):
+        legacy=raw[:8] in (tag('sell'),tag('buy'));sell=raw[:8] in (tag('sell'),tag('sell_v2'))
+        if raw[:8]==tag('buy'):
+            # Legacy curve buy: amount, max_sol_cost and a one-byte OptionBool track_volume flag.
+            need(len(raw)==25 and raw[24] in (0,1) and len(a)==16,'unsupported Pump trade layout')
+        else:need(len(raw)==24 and len(a)==(14 if legacy else 26 if sell else 27),'unsupported Pump trade layout')
         mint=a[2] if legacy else a[1];curve=a[3] if legacy else a[10];need(curve==curve_address(mint),'Pump trade curve mismatch')
         e.update(kind='protocol_trade_instruction',mint=mint,curve=curve,quote_mint=WSOL if legacy else a[2],
             direction='sell_base' if sell else 'buy_base',participants={'user':a[6] if legacy else a[13],

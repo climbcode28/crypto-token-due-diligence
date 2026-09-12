@@ -6,7 +6,7 @@ from solana_programs import observed_account
 from solana_accounts import decode_holding
 from adapters.pump_common import CURVE_PROGRAM,SWAP_PROGRAM,curve_address,pool_address
 
-VERSION='1.0.0'
+VERSION='1.1.0'
 
 
 def history_pages(address,packets,*,start_slot,end_slot):
@@ -14,7 +14,8 @@ def history_pages(address,packets,*,start_slot,end_slot):
     address=pubkey(address);need(natural(start_slot)<natural(end_slot),'invalid history window')
     need(isinstance(packets,list) and len(packets)<=2,'history cap is two pages')
     result={'address':address,'start_slot':start_slot,'end_slot':end_slot,'window':'(start_slot,end_slot]',
-        'pages_attempted':len(packets),'page_limit':25,'signatures':[],'evidence':[],'window_covered':False,'gaps':[]}
+        'pages_attempted':len(packets),'page_limit':packets[0]['request']['params'][1].get('limit') if packets else None,
+        'signatures':[],'evidence':[],'window_covered':False,'gaps':[]}
     seen=set();before=None;previous_slot=2**64
     for packet in packets:
         req=packet['request'];need(req['method']=='getSignaturesForAddress' and req['params'][0]==address,'history address mismatch')

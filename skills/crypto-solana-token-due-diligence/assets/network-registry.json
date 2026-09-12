@@ -7,7 +7,7 @@
     {
       "name": "mainnet",
       "genesis_hash": "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d",
-      "public_rpc": "https://api.mainnet.solana.com",
+      "public_rpc": "https://api.mainnet-beta.solana.com",
       "alternate_public_rpc": "https://solana-rpc.publicnode.com",
       "market_slug": "solana",
       "key_required": false,
@@ -40,7 +40,23 @@
     "enforced_rpc_attempts_per_10s": 40,
     "enforced_rpc_concurrency": 3,
     "investigation_body_bytes": 67108864,
-    "advertised_limits_may_change": true
+    "advertised_limits_may_change": true,
+    "method_limits_per_10s": {
+      "getBlock": 6,
+      "getBlockTime": 10,
+      "getSignaturesForAddress": 10,
+      "getTransaction": 10,
+      "getProgramAccounts": 10,
+      "getTokenAccountsByOwner": 10,
+      "getAccountInfo": 50,
+      "getMultipleAccounts": 50,
+      "getBlockHeight": 50,
+      "getGenesisHash": 150,
+      "getEpochInfo": 150,
+      "getTokenSupply": 150,
+      "getTokenLargestAccounts": 0
+    },
+    "method_limits_note": "x-ratelimit-method-limit headers observed on api.mainnet-beta.solana.com free tier, 2026-09-11 (record only). The pacing table the session enforces is solana_session.METHOD_LIMITS: getBlock is paced at 5 because the provider still refused sends at 6, and getTokenLargestAccounts (refused, limit 0) is discovered live and marked unavailable rather than pre-blocked, so a provider that allows it still works."
   },
   "custom_drpc": "deferred; no automatic paid fallback"
 }

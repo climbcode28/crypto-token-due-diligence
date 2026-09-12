@@ -1,9 +1,30 @@
 """Explicit installed offline fact operations; no arbitrary expression/plugin execution."""
+import re
 from solana_common import need,target_identity,pubkey
 from solana_programs import observed_account
 
-VERSION='1.0.0'
-RUNTIME_VERSION='1.3.0'  # VERSION is the persisted derivation schema contract.
+VERSION='1.1.0'  # Persisted derivation contract; bumped whenever any operation's output shape changes.
+RUNTIME_VERSION='1.4.0'
+# The contract version in which each operation's output last changed. A derivation recorded
+# before its operation last changed cannot be recomputed by this engine: read or replay it
+# with its frozen engine instead. Operations absent here have not changed since 1.0.0.
+# 1.1.0 (2026-09-11 review): controllers root_links; discovery project-link corroboration; holders discovery
+# record and rounding; mint/controls Token-2022 metadata fields and authority; pool limitation scope;
+# transaction/sales/rebuys route and fee-sink fields; launch history page limits; public quote sources.
+CHANGED_IN={op:'1.1.0' for op in ('controllers','discovery_pools','holders','mint','controls','pool','transaction','sales','rebuys','history')}
+
+
+def version_tuple(value):
+    need(isinstance(value,str) and re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+',value) is not None,'invalid operation version')
+    return tuple(int(x) for x in value.split('.'))
+
+
+def recomputable(operation,recorded):
+    """'ok' when this engine reproduces the recorded shape; otherwise the reason it cannot."""
+    recorded=version_tuple(recorded)
+    if recorded>version_tuple(VERSION):return 'derivation recorded by a newer engine; use read/replay'
+    if recorded<version_tuple(CHANGED_IN.get(operation,'1.0.0')):return 'operation version differs from installed engine; use read/replay'
+    return 'ok'
 PUBLICATION_OPS={'public_quote','discovery_pools','repository_metadata','repository_revision','repository_tree'}
 EXECUTION_OPS={'transaction','sales','rebuys','launch','creator_activity','inventory','prior_launches'}
 

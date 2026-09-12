@@ -14,6 +14,7 @@ class ScaffoldTests(unittest.TestCase):
     def test_scope_aliases_focus_and_todo_without_optimistic_judgment(self):
         b=self.fixture();n=write(b.root,allow_synthetic=True);self.assertEqual(n['question'],b.r['question']);self.assertEqual(n['urls'],b.m['intake']['urls']);self.assertIn('controls',n['alias_hints']);self.assertIsNone(n['decision'])
         self.assertTrue(all(v['signal'] is None for v in n['signal_assignments'].values()));self.assertTrue(all(not r['closure']['standard_scope_complete'] for r in n['coverage']))
+        self.assertTrue(all(v['input_digests']=={'controls':b.obs('controls')['sha256']} for v in n['signal_assignments'].values()))
         compose(b.root,allow_synthetic=True)
         with self.assertRaisesRegex(ValueError,'Existing analyst'):write(b.root,allow_synthetic=True)
 

@@ -89,7 +89,8 @@ def main():
             from solana_facts import build, compact
             facts = build(args.root, args.allow_synthetic)
             display = compact(facts, args.category)
-            generate(args.root, args.allow_synthetic, facts=facts)
+            if not args.check:  # --check is a read-only view; nothing is written.
+                generate(args.root, args.allow_synthetic, facts=facts)
             print(display, end="")
             return 0
         if args.action == "init":

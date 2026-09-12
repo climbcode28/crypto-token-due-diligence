@@ -23,6 +23,18 @@ class HolderTests(unittest.TestCase):
         s = {"request": req, "status": "ok", "response": response(req, {"context": {"slot": 105}, "value": [m]+values})}
         return d, s
 
+    def test_unknown_mint_extension_keeps_sample_status_but_holding_unknowns_demote(self):
+        values = [holding(2**59, program=TOKEN_2022), holding(101, program=TOKEN_2022), holding(7, owner=KEY, program=TOKEN_2022)]
+        d, s = self.packets(values=values, program=TOKEN_2022)
+        s["response"]["result"]["value"][0] = mint(extensions=tlv(60000, b"opaque"), program=TOKEN_2022)
+        result = aggregate_holders(d, s, TARGET)
+        self.assertEqual(result["status"], "sampled")
+        self.assertEqual(result["mint"]["unknown_extensions"], [60000])
+        self.assertEqual((result["coverage_share"]["rounding"], result["coverage_share"]["places"]), ("half_up", 4))
+        values = [holding(2**59, program=TOKEN_2022, extensions=tlv(60001, b"?")), holding(101, program=TOKEN_2022), holding(7, owner=KEY, program=TOKEN_2022)]
+        d, s = self.packets(values=values, program=TOKEN_2022)
+        self.assertEqual(aggregate_holders(d, s, TARGET)["status"], "partial")
+
     def test_large_integer_owner_aggregate_rank_and_denominator(self):
         d, s = self.packets()
         result = aggregate_holders(d, s, TARGET)

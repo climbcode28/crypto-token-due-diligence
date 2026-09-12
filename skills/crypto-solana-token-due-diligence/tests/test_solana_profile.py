@@ -80,5 +80,46 @@ class ProfileTests(unittest.TestCase):
         with self.assertRaisesRegex(ProfileError,'stability'):validate(b.root,True)
         b.r['findings'][0]['time_basis']['stability']='not_asserted';b.save();validate(b.root,True)
 
+    def test_history_outside_verified_bracket_is_retained_but_unusable(self):
+        b=self.fixture();b.rpc('history','getSignaturesForAddress',[key(2),{'commitment':'finalized','limit':5}],[],45);b.save()
+        m,r=validate(b.root,True);e=Evidence(b.root,m,True)
+        self.assertEqual(e.degraded.get('history'),'history outside verified network interval');self.assertNotIn('history',e.usable);self.assertIn('controls',e.usable)
+        b.rpc('inside','getSignaturesForAddress',[key(2),{'commitment':'finalized','limit':5}],[],25);b.save();e=Evidence(b.root,validate(b.root,True)[0],True)
+        self.assertIn('inside',e.usable);self.assertNotIn('inside',e.degraded)
+
+    def test_sample_outside_bracket_is_unpinned_not_a_crash(self):
+        b=self.fixture();packet=b.obj('regenesis');packet['started_at']=BASE+15;packet['completed_at']=BASE+15.5;b.replace('regenesis',packet);b.obs('regenesis')['captured_at']=utc(BASE+15.5);b.save()
+        e=Evidence(b.root,json.loads((b.root/'manifest.json').read_bytes()),True)
+        self.assertEqual(e.degraded.get('mint-fresh'),'state outside verified provider/network interval');self.assertIn('sample-mint-fresh',e.unpinned)
+        self.assertEqual(e.degraded.get('mint'),'critical recheck unavailable');self.assertNotIn('mint',e.pinned);self.assertNotIn('controls',e.usable)
+        with self.assertRaisesRegex(ProfileError,'unusable evidence cannot support'):validate(b.root,True)  # a finding-level rule, not an import crash
+
+    def test_operation_versions_report_engine_differences_not_tampering(self):
+        import solana_derivations as derivations
+        b=self.fixture();b.derived('graph','controllers',{'root_derivations':['controls'],'observations':{}},['controls'],{'nodes':[],'roots':[]});b.m['derivations'][-1]['version']='1.0.0';b.save()
+        with self.assertRaisesRegex(ProfileError,'operation version differs from installed engine; use read/replay'):validate(b.root,True)
+        b.m['derivations'][-1]['version']='9.9.9';b.save()
+        with self.assertRaisesRegex(ProfileError,'newer engine'):validate(b.root,True)
+        b.m['derivations'][-1]['version']='x';b.save()
+        with self.assertRaisesRegex(ProfileError,'unsupported operation version'):validate(b.root,True)
+        b=self.fixture();b.m['derivations'][0]['version']='1.0.0';b.save()
+        with self.assertRaisesRegex(ProfileError,'operation version differs'):validate(b.root,True)  # controls output changed in 1.1.0
+        self.assertEqual(derivations.recomputable('quote_sizes','1.0.0'),'ok');self.assertEqual(derivations.recomputable('controls',derivations.VERSION),'ok')
+        self.assertIn('differs',derivations.recomputable('controllers','1.0.0'))
+
+    def test_supply_tick_between_rechecks_keeps_stability_with_changed_fields(self):
+        import base64
+        b=self.fixture();packet=b.obj('mint-fresh');raw=bytearray(base64.b64decode(packet['response']['result']['value']['data'][0]))
+        raw[36:44]=(1000001).to_bytes(8,'little');packet['response']['result']['value']['data'][0]=base64.b64encode(bytes(raw)).decode();b.replace('mint-fresh',packet);b.save()
+        m,r=validate(b.root,True);e=Evidence(b.root,m,True);self.assertIn('mint',e.stable);self.assertEqual(e.stability_changes,{'mint':{key(2):['supply_atomic']}})
+        raw[0:4]=(1).to_bytes(4,'little');raw[4:36]=bytes([9])*32;packet['response']['result']['value']['data'][0]=base64.b64encode(bytes(raw)).decode();b.replace('mint-fresh',packet);b.save()
+        with self.assertRaisesRegex(ProfileError,'stability'):validate(b.root,True)
+
+    def test_concern_shape_is_validated_for_every_finding(self):
+        b=self.fixture();b.r['findings'][0]['concern']='not an object';b.save()
+        with self.assertRaisesRegex(ProfileError,'concern must be an object'):validate(b.root,True)
+        b.r['findings'][0]['concern']={'basis':'x','mechanism':'y'};b.save()
+        with self.assertRaisesRegex(ProfileError,'concern must be an object'):validate(b.root,True)
+
 
 if __name__=='__main__':unittest.main()

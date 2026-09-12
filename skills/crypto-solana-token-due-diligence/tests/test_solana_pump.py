@@ -21,6 +21,16 @@ class PumpTests(unittest.TestCase):
         value=copy.deepcopy(curve_row['account']);raw=bytearray(base64.b64decode(value['data'][0]));raw[48]=0;value['data'][0]=base64.b64encode(raw).decode()
         with self.assertRaisesRegex(ValueError,'token reserves'):curve.decode_pool(value)
 
+    def test_unevidenced_allocation_lengths_are_refused_and_tail_policy_is_declared(self):
+        import base64
+        target,a,v=fixture()
+        for address,decoder,size in ((a['curve'],curve.decode_pool,150),(a['pool'],swap.decode_pool,300)):
+            value=copy.deepcopy(v[address]);raw=base64.b64decode(value['data'][0]);raw=raw+bytes(size-len(raw)) if size>len(raw) else raw[:size]
+            value['data'][0]=base64.b64encode(raw).decode();value['space']=len(raw)
+            with self.assertRaisesRegex(ValueError,'unsupported Pump account layout length'):decoder(value)
+        self.assertEqual(curve.CAPABILITY['allocation_bytes'],[115,124]);self.assertEqual(swap.CAPABILITY['allocation_bytes'],[261,301])
+        for cap in (curve.CAPABILITY,swap.CAPABILITY):self.assertIn('nonzero tail is refused',cap['reserved_tail_policy'])
+
     def test_pre_and_completed_curve_are_not_migrated(self):
         for complete in (False,True):
             target,a,v=fixture(complete=complete);r=curve.analyze(target,a['curve'],batch(v))

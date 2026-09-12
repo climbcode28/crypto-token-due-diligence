@@ -36,9 +36,10 @@ attempt; it applies to whoever is running the skill from this checkout.
   alone do not verify a deployment. Never substitute testnet for mainnet.
 - Solana currently uses public RPC/explorer/API sources; custom Solana dRPC is deferred.
   The standalone Solana transport reads `SOLANA_RPC_URL`, not the EVM endpoint.
-- Solana v2 workflow 2.0.0 is the default after functional acceptance. Live rich-case
-  parity remains unmet; see `plans/solana-evm-parity-2026-09-11/live-results.md`.
-  One broad start shares
+- Solana v2 workflow 2.0.0 is the default after functional acceptance. The 2026-09-11 review
+  found and fixed the public-endpoint failure that had kept every live run partial; see
+  `plans/solana-review-fixes-2026-09-11.md` for the live evidence. The Solana skill reads no
+  provider policy file and needs no private env. One broad start shares
   original receipt/deadline and 120-attempt/64-MiB grants across typed controls,
   supported pools/positions, two bounded lanes and at most two coordinator presets.
   Compose/finalize returns a frozen readable report/checklist/citations; partial work

@@ -93,6 +93,24 @@ class DiscoveryTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             repository_tree(record, raw, bound)
 
+    def test_token_info_corroborates_indexer_links_by_identity_not_by_string(self):
+        from solana_discovery import token_info, corroborate_links, link_identity
+        value = {"data": {"id": "solana_"+KEY, "type": "token", "attributes": {"address": KEY, "name": "Coin", "symbol": "COIN",
+                 "websites": ["https://www.project.example/"], "twitter_handle": "ProjectHandle", "telegram_handle": None, "discord_url": "https://discord.gg/abc123"}}}
+        record, raw = capture(value, source_plan(MAIN_TARGET, surface="token_info")["primary"])
+        info = token_info(record, raw, MAIN_TARGET)
+        self.assertEqual(info["identities"], sorted({("host", "project.example"), ("twitter", "projecthandle"), ("discord", "abc123")}))
+        links = [{"url": u, "source": "dexscreener", "evidence": ["capture"]} for u in
+                 ("https://project.example/token", "https://x.com/projecthandle", "https://twitter.com/Other", "https://t.me/projecthandle")]
+        decided = corroborate_links(links, [info])
+        self.assertEqual([d["status"] for d in decided], ["corroborated", "corroborated", "unverified_indexer_profile", "unverified_indexer_profile"])
+        self.assertEqual(corroborate_links(links, [])[0]["status"], "unverified_indexer_profile")
+        self.assertEqual(link_identity("https://mobile.twitter.com/@Name"), ("twitter", "name"))
+        value["data"]["id"] = "solana_"+OTHER
+        record, raw = capture(value, source_plan(MAIN_TARGET, surface="token_info")["primary"])
+        with self.assertRaises(ValueError):
+            token_info(record, raw, MAIN_TARGET)
+
     def test_registry_is_context_and_future_adapters_are_not_enabled(self):
         network = registry("network")
         self.assertEqual(network["clusters"][0]["genesis_hash"], MAINNET)

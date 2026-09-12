@@ -10,9 +10,9 @@ python3 "$S/scripts/solana_bundle.py" verify "$FINAL" --profile solana-evidence-
 python3 "$S/scripts/solana_bundle.py" replay "$FINAL" --profile solana-evidence-v2 --trust-frozen-code
 ```
 
-`read` checks the inventory/hashes, then returns frozen Markdown, the reading
+`read` checks the inventory/hashes, then returns `report_path`, the compact reading
 checklist and ready-to-use citations without recomputing against the installed
-engine. This permits formatting after an installed version change. It distinguishes
+engine; the frozen Markdown stays in the report. This permits formatting after an installed version change. It distinguishes
 an incomplete checkpoint from a deliverable completed report.
 
 `verify` parses bounded JSON and checks confined regular files, exact inventory,

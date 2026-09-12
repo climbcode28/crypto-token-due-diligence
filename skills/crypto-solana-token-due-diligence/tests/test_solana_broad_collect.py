@@ -1,5 +1,5 @@
 from pathlib import Path
-import sys,tempfile,unittest,time,json,copy
+import sys,tempfile,unittest,unittest.mock,time,json,copy
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'scripts'))
 from broad_fixture import RichRpc,Web
 from solana_broad_collect import start,collect,status,STAGES
@@ -41,6 +41,47 @@ class BroadTests(unittest.TestCase):
         self.assertEqual(sales['verified_receipts'],1);sale=sales['receipts'][0]
         self.assertEqual(sale['input_atomic'],'1000');self.assertEqual(sale['output_atomic'],'500');self.assertEqual(sale['seller'],a['owner'])
         self.assertIsNone(sale['profit']);self.assertEqual(len([r for r in RichRpc.calls if r['method']=='getTransaction']),1)
+
+    def test_receipts_are_classified_before_sampling_and_the_swap_probe_is_reused(self):
+        from transaction_fixture import fixture
+        from solana_common import b58encode
+        from solana_transactions import SYSTEM
+        root,target,opts=self.setup_run();_,a,packet,_=fixture();tx=packet['response']['result']
+        tx['transaction']['message']['accountKeys']=[RichRpc.pool['pool'] if k==a['pool'] else k for k in tx['transaction']['message']['accountKeys']]
+        tx['blockTime']=RichRpc.stamp;RichRpc.receipt=tx
+        # A more recent receipt with no supported swap (the swap instruction points at the System program) is probed first and skipped.
+        other=copy.deepcopy(tx);sig=b58encode(bytes([77])*64);other['transaction']['signatures'][0]=sig
+        keys=other['transaction']['message']['accountKeys'];other['transaction']['message']['instructions'][a['swap_index']]['programIdIndex']=keys.index(SYSTEM)
+        RichRpc.receipts={sig:other}
+        result=start(root,target,**opts);self.assertFalse(result['diagnostics'],result['diagnostics']);validate(root/'draft',True)  # an unheadered probe is a plain observation
+        receipts=json.loads((root/'automatic-receipts.json').read_text());classification=json.loads((root/'receipt-classification.json').read_text())
+        self.assertEqual([(r['signature']==sig,r['direction'],r['route']) for r in receipts],[(False,'sell','direct')])
+        self.assertEqual((classification['probed'],classification['selected']),(2,1));self.assertEqual([r['swap'] for r in classification['rows']],[False,True])
+        self.assertEqual(len([r for r in RichRpc.calls if r['method']=='getTransaction']),2)  # one send per probe; the sample resumed the swap probe
+        facts=json.loads((root/'draft/facts.json').read_text())['facts']
+        self.assertEqual(next(f['data']['verified_receipts'] for f in facts if f['operation']=='sales'),1)
+        self.assertEqual(next(f['data']['verified_receipts'] for f in facts if f['operation']=='rebuys'),0)
+        self.assertEqual(next(f['data']['receipts'][0]['route'] for f in facts if f['operation']=='sales'),'direct')
+
+    def test_indexer_project_links_need_a_second_source_before_automatic_capture(self):
+        root,target,opts=self.setup_run();start(root,target,**opts)
+        decided=json.loads((root/'project-links.json').read_text())
+        self.assertEqual([(d['url'],d['status']) for d in decided],[('https://project.example/token','corroborated')])
+        self.assertIn('https://project.example/token',Web.calls);self.assertTrue(any(u.endswith('/info') for u in Web.calls))
+        root,target,opts=self.setup_run();Web.token_info=False;start(root,target,**opts)
+        decided=json.loads((root/'project-links.json').read_text())
+        self.assertEqual(decided[0]['status'],'unverified_indexer_profile');self.assertNotIn('https://project.example/token',Web.calls)
+
+    def test_lane_captured_public_quote_becomes_a_typed_quote_fact(self):
+        from solana_broad_collect import capture
+        from solana_quotes import quote_url
+        from solana_import import refresh
+        from pool_fixture import key
+        root,target,opts=self.setup_run();start(root,target,**opts)
+        url=quote_url('jupiter_v1_lite',target,key(3),'1000');capture(root,[url],'liquidity',opener_factory=Web);refresh(root)
+        facts=json.loads((root/'draft/facts.json').read_text())['facts'];quote=next(f for f in facts if f['operation']=='public_quote')
+        self.assertTrue(quote['usable']);self.assertEqual((quote['data']['source'],quote['data']['output_atomic'],quote['data']['provider_usd_value']),('jupiter_v1_lite','500','1.5'))
+        self.assertFalse(quote['data']['execution_observed'])
 
     def test_focused_scope_omits_lanes_markets_and_broad_dependencies(self):
         root,target,opts=self.setup_run('focused');r=start(root,target,**opts);self.assertFalse(r['lane_pointers']);self.assertFalse(Web.calls);self.assertFalse((root/'lanes').exists())
@@ -102,6 +143,9 @@ class BroadTests(unittest.TestCase):
         self.assertFalse(latest['usable']);self.assertEqual(latest['data']['mint']['mint_authority'],key(90))
         self.assertTrue(prior['usable']);self.assertEqual(prior['data']['selection_scope'],'earlier_pinned_snapshot_newer_unpinned')
         self.assertNotEqual(prior['data']['mint']['supply_atomic'],latest['data']['mint']['supply_atomic'])
+        # Aggregates take the latest usable snapshot and the authority graph is built from usable roots only.
+        sizes=next(r for r in f if r['evidence_id']=='auto-sizes');self.assertTrue(sizes['usable'])
+        graph=next(r for r in f if r['evidence_id']=='auto-controllers');self.assertTrue(graph['usable'])
 
     def test_unpinned_optional_epoch_does_not_invalidate_mint_authority_snapshot(self):
         from solana_import import Importer
@@ -130,3 +174,101 @@ class BroadTests(unittest.TestCase):
         self.assertEqual(marks[0]['phase'],marks[1]['phase']);self.assertNotEqual(marks[1]['phase'],marks[2]['phase'])
 
 if __name__=='__main__':unittest.main()
+
+
+class PublicProviderTests(unittest.TestCase):
+    """The live failure on the free public endpoint: one refused method must not cancel identity or expansion."""
+    setup_run=BroadTests.setup_run
+    def test_refused_largest_method_does_not_block_identity_rechecks_or_expansion(self):
+        import urllib.error,io
+        root,target,opts=self.setup_run();original=RichRpc.__call__
+        def refusing(rpc,request):
+            if request['method']=='getTokenLargestAccounts':
+                raise urllib.error.HTTPError('https://synthetic.invalid',429,'limited',{'Retry-After':'10','x-ratelimit-method-limit':'0'},io.BytesIO(b''))
+            return original(rpc,request)
+        with unittest.mock.patch.object(RichRpc,'__call__',refusing):r=start(root,target,**opts)
+        s=status(root);self.assertEqual([m['method'] for m in s['unavailable_methods']],['getTokenLargestAccounts'])
+        marks={m['phase']:json.loads(m['details']) for m in s['phases']}
+        self.assertEqual(marks['related_accounts_controllers']['state'],'finished');self.assertEqual(marks['pool_transaction_quote_dependencies']['state'],'finished')
+        f=json.loads((root/'draft/facts.json').read_text())
+        controls=next(x for x in f['facts'] if x['operation']=='controls');self.assertTrue(controls['usable'])
+        self.assertTrue(any(x['operation']=='pool' and x['usable'] for x in f['facts']))
+        holders=next(x for x in f['facts'] if x['operation']=='holders');self.assertTrue(holders['usable'])
+        self.assertEqual((holders['data']['discovery']['method'],holders['data']['discovery']['accounts_scanned']),('getProgramAccounts',1))
+        pool=next(x for x in f['facts'] if x['operation']=='pool' and x['data']['adapter']['id']=='raydium_cpmm');self.assertEqual(pool['data']['lp_custody']['observed_atomic'],'450')
+        self.assertTrue(any(c['method']=='getProgramAccounts' for c in RichRpc.calls));self.assertTrue(r['diagnostics'] and r['diagnostics'][0]['category']=='method_unavailable')
+        self.assertIn('facts_summary',r);self.assertIn('auto-controls [',r['facts_summary'])
+        self.assertEqual(s['failures'].get('method_unavailable'),1)  # One refused send; later same-method reads are never sent.
+        diagnostics=json.loads((root/'import-diagnostics.json').read_text());self.assertNotIn('baseline_critical_0_0',diagnostics['unsent_intents'])
+
+
+class LaneAndPresetTests(unittest.TestCase):
+    setup_run=BroadTests.setup_run
+
+    def test_lane_check_imports_the_lanes_own_capture_without_deadlocking(self):
+        import threading
+        from solana_broad_collect import capture,lane_check
+        root,target,opts=self.setup_run();start(root,target,**opts)
+        capture(root,['https://project.example/liquidity-page'],'liquidity',opener_factory=Web)
+        before={o['id'] for o in json.loads((root/'draft/manifest.json').read_text())['observations']}
+        outcome={}
+        def run():
+            try:outcome['result']=lane_check(root,'liquidity',allow_synthetic=True)
+            except Exception as exc:outcome['error']=exc
+        worker=threading.Thread(target=run,daemon=True);worker.start();worker.join(30)
+        self.assertFalse(worker.is_alive(),'lane-check must not block on its own draft lock')
+        self.assertTrue(outcome.get('result',{}).get('valid'),outcome)
+        after={o['id'] for o in json.loads((root/'draft/manifest.json').read_text())['observations']};self.assertGreater(len(after),len(before))
+
+    def test_pool_activity_preset_never_refetches_a_sampled_receipt(self):
+        from transaction_fixture import fixture
+        root,target,opts=self.setup_run();_,a,packet,_=fixture();tx=packet['response']['result']
+        tx['transaction']['message']['accountKeys']=[RichRpc.pool['pool'] if k==a['pool'] else k for k in tx['transaction']['message']['accountKeys']]
+        tx['blockTime']=RichRpc.stamp;RichRpc.receipt=tx;start(root,target,**opts)
+        facts=json.loads((root/'draft/facts.json').read_text());self.assertEqual(next(f['data']['verified_receipts'] for f in facts['facts'] if f['operation']=='sales'),1)
+        sent=len([c for c in RichRpc.calls if c['method']=='getTransaction'])
+        result=collect(root,{'id':'act','kind':'pool_activity','parameters':{'pool':RichRpc.pool['pool'],'limit':10,'receipts':2}},opts['config'],factory=RichRpc)
+        self.assertIsNone(result['preset_error']);self.assertEqual(len([c for c in RichRpc.calls if c['method']=='getTransaction']),sent)
+        facts=json.loads((root/'draft/facts.json').read_text());self.assertEqual(next(f['data']['verified_receipts'] for f in facts['facts'] if f['operation']=='sales'),1)
+        self.assertEqual(json.loads((root/'import-diagnostics.json').read_text())['errors'],[])
+        self.assertIn('pipeline-auto-sales',json.loads((root/'draft/notes/coordinator.json').read_text())['signal_assignments'])
+
+
+class ImporterBoundaryTests(unittest.TestCase):
+    """A later sample outside the verified network interval stays partial; the run keeps importing."""
+    setup_run=BroadTests.setup_run
+
+    def test_failed_final_network_recheck_keeps_run_importable(self):
+        from solana_import import refresh
+        root,target,opts=self.setup_run('focused');start(root,target,**opts)
+        before=json.loads((root/'draft/facts.json').read_text());self.assertTrue(next(x for x in before['facts'] if x['evidence_id']=='auto-controls')['usable'])
+        original=RichRpc.__call__;seen={'genesis':0}
+        def flaky(rpc,request):
+            if request['method']=='getGenesisHash':
+                seen['genesis']+=1
+                if seen['genesis']>=2:raise TimeoutError('fixture: provider stalled on the final network recheck')
+            return original(rpc,request)
+        with unittest.mock.patch.object(RichRpc,'__call__',flaky):
+            result=collect(root,{'id':'late','kind':'programs','parameters':{'addresses':[target['mint']]}},opts['config'],factory=RichRpc)
+        self.assertEqual(result['research_status'],'partial')
+        m=json.loads((root/'draft/manifest.json').read_text())
+        late=[s for s in m['samples'] if s['observation_id'].startswith('late_')];self.assertTrue(late)
+        self.assertTrue(all(s['status']=='partial' for s in late))
+        after=json.loads((root/'draft/facts.json').read_text())
+        # The newest snapshot sits outside the verified interval and stays unusable; the earlier usable one is retained.
+        self.assertFalse(next(x for x in after['facts'] if x['evidence_id']=='auto-controls')['usable'])
+        self.assertTrue(next(x for x in after['facts'] if x['evidence_id']=='prior-controls')['usable'])
+        self.assertTrue(next(x for x in after['facts'] if x['evidence_id']=='auto-sizes')['usable'])
+        again=refresh(root);self.assertEqual(again['research_status'],'partial')  # A second import never raises.
+        validate(root/'draft',True)
+
+    def test_capture_dimension_and_sample_dimensions_reach_the_attempt_ledger(self):
+        from solana_broad_collect import capture
+        root,target,opts=self.setup_run();start(root,target,**opts)
+        capture(root,['https://project.example/terms'],'project',dimension='utility_redemption_rights',opener_factory=Web)
+        from solana_import import refresh
+        refresh(root);m=json.loads((root/'draft/manifest.json').read_text())
+        dims={a['dimension'] for a in m['attempts']}
+        self.assertIn('utility_redemption_rights',dims);self.assertIn('canonical_lp_principal_custody',dims);self.assertIn('sellability_exit_depth',dims)
+        terms=[a for a in m['attempts'] if a['dimension']=='utility_redemption_rights'];self.assertEqual(terms[0]['owner'],'project')
+        with self.assertRaisesRegex(ValueError,'unknown capture dimension'):capture(root,['https://project.example/x'],'project',dimension='adoption',opener_factory=Web)

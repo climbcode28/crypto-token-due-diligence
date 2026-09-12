@@ -70,7 +70,7 @@ class LaunchTests(unittest.TestCase):
         rows=[{'signature':b58encode(bytes([i])*64),'slot':slot,'blockTime':1000,'err':None} for i,slot in ((91,101),(92,90))]
         p={'request':req,'status':'ok','response':response(req,rows)}
         r=history_pages(key1,[p],start_slot=95,end_slot=105)
-        self.assertTrue(r['window_covered']);self.assertEqual(len(r['signatures']),1)
+        self.assertTrue(r['window_covered']);self.assertEqual(len(r['signatures']),1);self.assertEqual(r['page_limit'],2)  # the request's limit, not a constant
         r=history_pages(key1,[p],start_slot=80,end_slot=105);self.assertFalse(r['window_covered'])
         with self.assertRaises(ValueError):history_pages(key1,[p,p],start_slot=80,end_slot=105)
         empty={'request':req,'status':'ok','response':response(req,[])}

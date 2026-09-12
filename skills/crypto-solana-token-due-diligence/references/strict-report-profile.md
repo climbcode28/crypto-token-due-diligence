@@ -1,7 +1,7 @@
 # Strict Solana evidence profile
 
-Use the explicit `solana-evidence-v2` profile for schema-2 reading. Default activation
-is a later release gate; schema-1 keeps its isolated `legacy-v1` rules and bytes.
+`solana-evidence-v2` is the default profile for schema-2 reading; schema-1 keeps its
+isolated `legacy-v1` rules and bytes.
 `solana_profile.validate` is offline/read-only and returns field-path errors. It
 checks necessary evidence relationships, not the economic truth of arbitrary prose.
 

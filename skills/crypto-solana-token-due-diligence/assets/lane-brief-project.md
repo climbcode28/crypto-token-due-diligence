@@ -46,8 +46,9 @@ and funding evidence. LaunchLab, DBC and stale layouts remain separate products.
 
 Use background public sources. The maintained batch command is
 `solana_broad_collect.py capture RUN --owner project --url URL [--url URL]
---allow-network --cost-policy free`. It registers ownership and charges actual
-sends/retries/redirects under the shared session. Reuse existing capture IDs rather
+--allow-network --cost-policy free`. Add `--dimension SURFACE` when a capture
+serves one coverage surface (for example `utility_redemption_rights` for terms). It
+registers ownership and charges actual sends/retries/redirects under the shared session. Reuse existing capture IDs rather
 than fetching the same URL again. You cannot overwrite another owner's evidence.
 Return exact repository/audit/program/creator leads with the captured source IDs;
 request coordinator import/targeted presets where needed.
@@ -66,6 +67,8 @@ observed basis, mechanism and consequence and must retain contrary evidence.
 Set all checklist items to `done`, `external_limit` or `pending` with concrete reasons,
 and list current `evidence_ids`. Answer every assigned original ask or record its
 precise gap. Run installed `solana_broad_collect.py lane-check RUN --owner project`
-(add `--allow-synthetic` only in synthetic rehearsals). New captures need coordinator
-`refresh` before self-check; request it without editing the shared manifest. Return
+(add `--allow-synthetic` only in synthetic rehearsals). The self-check imports your own new
+captures first, so cite them by capture ID; never edit the shared manifest. Your run
+context carries `note_contract` (header fields, required finding fields, allowed names
+and an example) and `skill_dir`. Return
 the note path, actual check result, observations/limits and prioritized next leads.

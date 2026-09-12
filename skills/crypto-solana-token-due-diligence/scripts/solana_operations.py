@@ -6,7 +6,7 @@ from solana_profile import check,strict_json,regular
 from solana_facts import atomic,encoded
 
 VERSION='1.0.0'
-METHODS={'getGenesisHash','getAccountInfo','getMultipleAccounts','getEpochInfo','getTokenLargestAccounts','getSignaturesForAddress','getTransaction','getBlock','GET'}
+METHODS={'getGenesisHash','getAccountInfo','getMultipleAccounts','getEpochInfo','getTokenLargestAccounts','getSignaturesForAddress','getTransaction','getBlock','getBlockTime','getProgramAccounts','GET'}
 CATEGORIES={'source_failure','transient_recovery','source_recovery','source_reuse','collection_summary'}
 RECOVERIES={'none','bounded_retry','alternate_public_source','retain_partial','reuse_capture'}
 OUTCOMES={'observed','unresolved','recovered'}
@@ -29,7 +29,7 @@ def validate_record(row,now=None):
     for item in proof:
         check(set(item)=={'path','sha256','status','source_class','method'},'feedback.proof','Unexpected proof fields.')
         check(re.fullmatch(r'evidence/[a-zA-Z0-9_.-]{1,180}',item['path']) is not None,'feedback.proof','Confined evidence path required.')
-        check(re.fullmatch('[0-9a-f]{64}',item['sha256']) is not None and item['status'] in ('ok','timeout','transport_failure','rpc_error','permission_denied','null'),'feedback.proof','Invalid evidence hash/status.')
+        check(re.fullmatch('[0-9a-f]{64}',item['sha256']) is not None and item['status'] in ('ok','timeout','transport_failure','rpc_error','node_lag','permission_denied','null'),'feedback.proof','Invalid evidence hash/status.')
         check(item['method']==row['method'] and item['source_class']==row['source_class'],'feedback.proof','Proof method/source applicability differs.')
     unsigned={k:v for k,v in row.items() if k!='id'};check(sha(encoded(unsigned))==row['id'],'feedback.id','Feedback content changed.')
     return row

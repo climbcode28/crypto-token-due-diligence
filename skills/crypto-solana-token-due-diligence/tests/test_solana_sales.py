@@ -57,8 +57,9 @@ class SaleTests(unittest.TestCase):
 
     def test_sample_cap_and_duplicate_receipts(self):
         target,a,p,b=fixture();c={'pool':a['pool'],'execution':decode_transaction(target,p,b)}
-        for candidates in ([c,c],[c,c,c]):
-            with self.assertRaises(ValueError):verify_sales(target,candidates)
+        with self.assertRaises(ValueError):verify_sales(target,[c,c,c])  # The sample cap is a contract violation.
+        duplicate=verify_sales(target,[c,c])  # A repeated receipt is one execution plus a row gap, never a dropped derivation.
+        self.assertEqual(duplicate['verified_receipts'],1);self.assertEqual(duplicate['receipts'][1]['status'],'unverified');self.assertIn('duplicate receipt',duplicate['receipts'][1]['gaps'][0])
         self.assertEqual(verify_sales(target,[])['verified_receipts'],0)
 
     def test_ephemeral_initialization_after_transfer_is_not_valid_custody(self):

@@ -140,5 +140,6 @@ def analyze(target, pool, observations, *, positions=None):
             for row,_,_ in rows:
                 row['principal'] = None
                 row['gaps'].append('sampled_position_shares_exceed_bin_supply')
-    sample.result['gaps'].append('pool_depth_and_total_principal_not_inferred_from_sampled_bins_or_vaults')
+    # A resolved sample is observed; depth limits are scope, not a missing dependency.
+    sample.result.setdefault('limitations',[]).append('pool_depth_and_total_principal_not_inferred_from_sampled_bins_or_vaults')
     return common.finish(sample)

@@ -120,6 +120,69 @@ class AccountTests(unittest.TestCase):
         self.assertEqual(value["supply_atomic"], str(2**60+17))
         self.assertEqual(extensions[28]["authority"], KEY)
 
+    def test_token_metadata_group_and_member_extensions_decode_from_documented_layouts(self):
+        # Layouts authored from the token-2022 / token-metadata / token-group interface sources, not from the decoder.
+        def borsh(text):
+            data = text.encode()
+            return len(data).to_bytes(4, "little")+data
+        pairs = borsh("website")+borsh("https://example.invalid")+borsh("kind")+borsh("test")
+        metadata = base58_bytes(OTHER, 32)+base58_bytes(KEY, 32)+borsh("Example Token")+borsh("EXM")+borsh("https://example.invalid/meta.json")+(2).to_bytes(4, "little")+pairs
+        group = base58_bytes(OTHER, 32)+base58_bytes(KEY, 32)+(3).to_bytes(8, "little")+(10).to_bytes(8, "little")
+        member = base58_bytes(KEY, 32)+base58_bytes(OTHER, 32)+(7).to_bytes(8, "little")
+        value = decode_mint(mint(extensions=tlv(19, metadata)+tlv(21, group)+tlv(23, member), program=TOKEN_2022), address=KEY)
+        self.assertTrue(value["extensions_valid"])
+        self.assertEqual(value["unknown_extensions"], [])
+        rows = {r["type"]: r for r in value["extensions"]}
+        self.assertEqual(rows[19]["name"], "token_metadata")
+        self.assertEqual((rows[19]["token_name"], rows[19]["token_symbol"], rows[19]["token_uri"]), ("Example Token", "EXM", "https://example.invalid/meta.json"))
+        self.assertEqual((rows[19]["authority"], rows[19]["mint"], rows[19]["mint_matches"], rows[19]["additional_metadata_count"]), (OTHER, KEY, True, 2))
+        self.assertEqual(len(rows[19]["additional_metadata_sha256"]), 64)
+        self.assertEqual((rows[21]["authority"], rows[21]["mint"], rows[21]["size"], rows[21]["max_size"]), (OTHER, KEY, 3, 10))
+        self.assertEqual((rows[23]["mint"], rows[23]["group"], rows[23]["member_number"]), (KEY, OTHER, 7))
+        self.assertNotIn("authority", rows[23])
+        req = request("getAccountInfo", [KEY, settings()], "mint-sample")
+        packet = {"request": req, "status": "ok", "response": response(req, {"context": {"slot": 10}, "value": mint(extensions=tlv(19, metadata), program=TOKEN_2022)})}
+        powers = {p["role"]: p["controller"] for p in controls(packet, TARGET)["powers"]}
+        self.assertEqual(powers["token_metadata_authority"], OTHER)
+        # Without a known address the embedded mint is recorded but not asserted.
+        loose = decode_mint(mint(extensions=tlv(19, metadata), program=TOKEN_2022))
+        self.assertEqual(loose["extensions"][0]["mint"], KEY)
+        self.assertNotIn("mint_matches", loose["extensions"][0])
+
+    def test_token_metadata_overruns_and_wrong_mint_are_errors_not_absence(self):
+        def borsh(text):
+            data = text.encode()
+            return len(data).to_bytes(4, "little")+data
+        good = base58_bytes(OTHER, 32)+base58_bytes(KEY, 32)+borsh("n")+borsh("s")+borsh("u")+(0).to_bytes(4, "little")
+        overrun = base58_bytes(OTHER, 32)+base58_bytes(KEY, 32)+(500).to_bytes(4, "little")+b"n"*12
+        trailing = good+b"\1"
+        other_mint = base58_bytes(OTHER, 32)+base58_bytes(OTHER, 32)+borsh("n")+borsh("s")+borsh("u")+(0).to_bytes(4, "little")
+        bad_utf8 = base58_bytes(OTHER, 32)+base58_bytes(KEY, 32)+(1).to_bytes(4, "little")+b"\xff"+borsh("s")+borsh("u")+(0).to_bytes(4, "little")
+        for payload, message in ((overrun, "exceeds entry"), (trailing, "trailing"), (other_mint, "mint mismatch"), (bad_utf8, "UTF-8")):
+            value = decode_mint(mint(extensions=tlv(19, payload), program=TOKEN_2022), address=KEY)
+            self.assertFalse(value["extensions_valid"])
+            self.assertFalse(value["extensions"][0]["decoded"])
+            self.assertIn(message, value["extensions"][0]["error"])
+            self.assertEqual(value["supply_atomic"], str(2**60+17))
+        short = decode_mint(mint(extensions=tlv(21, bytes(79)), program=TOKEN_2022))
+        self.assertFalse(short["extensions_valid"])
+        self.assertIn("invalid mint extension length", short["extensions"][0]["error"])
+
+    def test_real_pyusd_mint_bytes_decode_metadata_and_retain_every_control(self):
+        data = json.loads((Path(__file__).parent/"fixtures/acceptance/pyusd-live-mint.json").read_text())
+        raw = base64.b64decode(data["account"]["data"][0])
+        import hashlib
+        self.assertEqual(hashlib.sha256(raw).hexdigest(), data["sha256"])
+        value = decode_mint(data["account"], address=data["address"])
+        self.assertTrue(value["extensions_valid"])
+        self.assertEqual(value["unknown_extensions"], [])
+        self.assertEqual([r["type"] for r in value["extensions"]], [3, 12, 1, 4, 16, 14, 18, 19])
+        metadata = value["extensions"][-1]
+        self.assertEqual((metadata["token_name"], metadata["token_symbol"]), ("PayPal USD", "PYUSD"))
+        self.assertEqual(metadata["token_uri"], "https://token-metadata.paxos.com/pyusd_metadata/prod/solana/pyusd_metadata.json")
+        self.assertEqual((metadata["authority"], metadata["mint_matches"], metadata["additional_metadata_count"]), ("2apBGMsS6ti9RyF5TwQTDswXBWskiJP2LD4cUEDqYJjk", True, 0))
+        self.assertEqual(value["decimals"], 6)
+
     def test_controls_bind_exact_mint_and_never_close_uninvestigated_paths(self):
         req = request("getAccountInfo", [KEY, settings()], "mint-sample")
         packet = {"request": req, "status": "ok", "response": response(req, {"context": {"slot": 10}, "value": mint()})}

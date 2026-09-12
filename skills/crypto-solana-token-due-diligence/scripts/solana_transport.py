@@ -3,6 +3,7 @@
 No imports from EVM, no network at import/preflight. Invocation flags are not host
 permissions and never authorize paid access by themselves.
 """
+import http.client
 import json
 import math
 import os
@@ -96,7 +97,8 @@ class HttpTransport:
         self.timeout, self.max_bytes = seconds(timeout, "request timeout"), max_bytes
         self.deadline = None
         self.local = threading.local()
-        self.opener = urllib.request.build_opener(NoRedirect())
+        # No inherited environment proxy: RPC traffic goes only to the validated endpoint.
+        self.opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
         parts = urllib.parse.urlsplit(url)
         self.secrets = [url, *headers.values()]
         self.secrets += [v.split(" ", 1)[1] for v in headers.values() if " " in v]
@@ -245,6 +247,9 @@ def provider_availability(args):
 READ_METHODS = {"getGenesisHash", "getAccountInfo", "getMultipleAccounts", "getBlock",
     "getBlockTime", "getEpochInfo", "getTokenLargestAccounts", "getTokenSupply",
     "getSignaturesForAddress", "getTransaction", "getProgramAccounts", "getTokenAccountsByOwner"}
+# JSON-RPC errors that mean the answering node is behind the requested context, not that the
+# request is wrong: minContextSlot not reached, block not yet available, node unhealthy.
+NODE_LAG_CODES = {-32016, -32004, -32005}
 
 
 def session_request(session, transport, request, *, family=None, owner="ordinary", retry=False, strict=False):
@@ -266,7 +271,8 @@ def session_request(session, transport, request, *, family=None, owner="ordinary
         ticket = session.acquire(request["id"], family, request["method"], transport.namespace,
             owner=owner, accounts=accounts, max_response_bytes=transport.max_bytes, retry=retry)
     except LimitError as exc:
-        return {"request": request, "status": "budget_denied", "reason": str(exc), "response": None}
+        # Refused before any send, so not an attempt; `wait_until` lets the caller wait out a window.
+        return {"request": request, "status": "budget_denied", "reason": str(exc), "wait_until": exc.until, "response": None}
     status, response = "transport_failure", None
     transport.local.response_bytes = 0
     try:
@@ -279,18 +285,31 @@ def session_request(session, transport, request, *, family=None, owner="ordinary
             status = "redacted" if transport.last_redacted else "ok"
             if strict and status == "ok":
                 status = validate_response(request, response)["status"]
+            if isinstance(response, dict) and isinstance(response.get("error"), dict) and response["error"].get("code") in NODE_LAG_CODES:
+                status = "node_lag"  # Transient: the single retry applies after a short delay.
     except urllib.error.HTTPError as exc:
         status = "http_" + str(exc.code)
-        until = retry_after(exc.headers) if exc.code in (429, 503) else None
-        if until is not None:
-            session.defer_source(transport.namespace, until)
+        if exc.code in (429, 503):
+            limit = exc.headers.get("x-ratelimit-method-limit") if exc.headers is not None else None
+            if exc.code == 429 and isinstance(limit, str) and limit.strip() == "0":
+                # This tier refuses the method outright; other methods on the source continue.
+                session.disable_method(transport.namespace, request["method"])
+                status = "method_unavailable"
+            else:
+                # Public providers limit per method: back off only this method, never the source,
+                # and only for the wait the provider states; the collector paces its own retry.
+                until = retry_after(exc.headers)
+                if until is not None:
+                    session.defer_source(transport.namespace, until, method=request["method"])
         exc.close()
-    except OSError as exc:
-        # OSError includes network failures; retain only categories, never URL-bearing messages.
+    except (OSError, http.client.HTTPException) as exc:
+        # Network and HTTP-protocol failures; retain only categories, never URL-bearing messages.
         status = "timeout" if isinstance(exc, TimeoutError) else "transport_failure"
     except (ValueError, TypeError, UnicodeError, KeyError, IndexError):
         status = "invalid"
-    packet = {"request": request, "status": status, "response": response}
-    status = session.finish(ticket["id"], status, getattr(transport.local, "response_bytes", 0), packet)
-    packet["status"] = status
+    finally:
+        # Every acquired attempt is finished, so an unexpected failure never strands a concurrency slot.
+        packet = {"request": request, "status": status, "response": response}
+        status = session.finish(ticket["id"], status, getattr(transport.local, "response_bytes", 0), packet)
+        packet["status"] = status
     return packet

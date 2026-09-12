@@ -12,12 +12,29 @@ import uuid
 from solana_common import need, target_identity
 
 SCHEMA = 1
-TRANSIENT = {"timeout", "transport_failure", "http_429", "http_502", "http_503", "http_504"}
+TRANSIENT = {"timeout", "transport_failure", "http_429", "http_502", "http_503", "http_504", "node_lag"}
 OWNERS = {"ordinary", "liquidity", "project", "final", "contingency"}
+# Public mainnet free-tier windows per method per 10 s, measured on 2026-09-11 from the
+# x-ratelimit-method-limit header of api.mainnet-beta.solana.com; also recorded in
+# assets/network-registry.json. Unknown methods use the conservative default. A zero
+# window means the tier refuses the method; a synthetic session applies no table.
+METHOD_LIMITS = {"getBlock": 5, "getBlockTime": 8, "getSignaturesForAddress": 10, "getTransaction": 10,
+                 "getProgramAccounts": 10, "getTokenAccountsByOwner": 10, "getAccountInfo": 50,
+                 "getMultipleAccounts": 50, "getBlockHeight": 50, "getGenesisHash": 150, "getEpochInfo": 150,
+                 "getTokenSupply": 150, "getTokenLargestAccounts": 40}
+DEFAULT_METHOD_LIMIT = 40
+CONNECTION_WINDOW = 40
+WINDOW_SECONDS = 10
+WINDOW_MARGIN = 1.0  # Providers count from their own clock; sending at the exact edge still draws a 429.
+ATTEMPT_SECONDS = 60  # No transport waits longer; a lost worker's slot is reclaimable within a minute.
 
 
 class LimitError(ValueError):
-    """A typed refusal, never a passing research check."""
+    """A typed refusal, never a passing research check. `until` is an optional wait hint."""
+
+    def __init__(self, reason, until=None):
+        super().__init__(reason)
+        self.until = until
 
 
 def integer(value, name, minimum=0, maximum=2**63-1):
@@ -64,7 +81,7 @@ class Session:
                 need(target_identity(target) == self.meta["target"], "session target mismatch")
             if synthetic is not None:
                 need(type(synthetic) is bool and synthetic == self.meta["synthetic"], "session mode mismatch")
-            self._monotonic_end = time.monotonic() + max(0, self.meta["deadline_unix"] - time.time())
+            self._wall_base, self._mono_base = time.time(), time.monotonic()
         except Exception:
             self.db.close()
             raise
@@ -73,7 +90,7 @@ class Session:
     def create(cls, root, target, *, question, received_at, deadline_at, target_at=None,
                max_requests=120, max_bytes=64*1024*1024, reservations=None,
                synthetic=False, user_hard_deadline=False, focus=None, urls=None,
-               scope="broad", rpc_concurrency=3, web_origin_concurrency=2):
+               scope="broad", rpc_concurrency=3, web_origin_concurrency=2, method_limits=None):
         target = target_identity(target)
         received, deadline = epoch(received_at), epoch(deadline_at)
         desired = min(received + 420, deadline) if target_at is None else epoch(target_at)
@@ -85,6 +102,11 @@ class Session:
         integer(max_bytes, "byte ceiling", maximum=1024**3)
         integer(rpc_concurrency, "RPC concurrency", 1, 3)
         integer(web_origin_concurrency, "web concurrency", 1, 2)
+        if method_limits is None:
+            method_limits = {} if synthetic else dict(METHOD_LIMITS)
+        need(isinstance(method_limits, dict) and all(isinstance(k, str) and k for k in method_limits), "invalid method limits")
+        for value in method_limits.values():
+            integer(value, "method window", 0, 10000)
         grants = {"liquidity": 15, "project": 15, "final": 8, "contingency": 4} if reservations is None else dict(reservations)
         need(set(grants) <= OWNERS - {"ordinary"}, "invalid reservation owner")
         for amount in grants.values():
@@ -100,7 +122,8 @@ class Session:
             "deadline_unix": deadline, "collection_cutoff": min(received + 480, deadline - 120),
             "lane_cutoff": min(received + 240, deadline - 120), "synthetic": synthetic,
             "user_hard_deadline": user_hard_deadline, "max_requests": max_requests, "max_bytes": max_bytes,
-            "rpc_concurrency": rpc_concurrency, "web_origin_concurrency": web_origin_concurrency}
+            "rpc_concurrency": rpc_concurrency, "web_origin_concurrency": web_origin_concurrency,
+            "method_limits": method_limits}
         raw = encoded(metadata)  # Validate serializability before creating a directory.
         root = Path(root)
         root.mkdir(parents=True, exist_ok=False)
@@ -140,11 +163,18 @@ class Session:
             self.db.rollback()
             raise
 
+    def now(self):
+        """Wall time projected from monotonic elapsed time; a clock set backwards cannot reopen a cutoff."""
+        return max(time.time(), self._wall_base + (time.monotonic() - self._mono_base))
+
     def remaining_seconds(self, owner="ordinary"):
         cutoff = self.meta["collection_cutoff"]
         if owner in ("liquidity", "project"):
             cutoff = self.meta["lane_cutoff"]
-        return max(0, min(cutoff - time.time(), self._monotonic_end - time.monotonic()))
+        return max(0, cutoff - self.now())
+
+    def method_limit(self, method):
+        return (self.meta.get("method_limits") or {}).get(method, DEFAULT_METHOD_LIMIT)
 
     def counts(self):
         row = self.db.execute("SELECT count(*),coalesce(sum(response_bytes),0),"
@@ -162,6 +192,7 @@ class Session:
             return {**self.meta, **counts, "status": self.db.execute("SELECT status FROM session").fetchone()[0],
                 "remaining_requests": max(0, self.meta["max_requests"]-counts["started_attempts"]-counts["reserved_requests"]),
                 "grants": [dict(r) for r in self.db.execute("SELECT * FROM grants ORDER BY owner")],
+                "unavailable_methods": self.unavailable_methods(),
                 "failures": {r[0]: r[1] for r in self.db.execute("SELECT status,count(*) FROM attempts WHERE status NOT IN ('ok','started') GROUP BY status")},
                 "phases": [dict(r) for r in self.db.execute("SELECT * FROM marks ORDER BY id")]}
         finally:
@@ -200,6 +231,11 @@ class Session:
                 raise LimitError("retry_without_attempt")
             counts = self.counts()
             own = self.db.execute("SELECT remaining FROM grants WHERE owner=?", (owner,)).fetchone()
+            if owner == "final" and retry and not (own and own[0] > 0):
+                # Only a final recheck's single transient retry draws on the contingency reserve, never a lane.
+                spare = self.db.execute("SELECT remaining FROM grants WHERE owner='contingency'").fetchone()
+                if spare and spare[0] > 0:
+                    owner, own = "contingency", spare
             permitted = counts["started_attempts"] < self.meta["max_requests"]
             permitted &= counts["started_attempts"] + counts["reserved_requests"] < self.meta["max_requests"] if owner == "ordinary" else bool(own and own[0] > 0)
             if not permitted:
@@ -212,28 +248,34 @@ class Session:
             else:
                 running = self.db.execute("SELECT count(*) FROM attempts WHERE status='started' AND transport_kind='web' AND source=?", (source,)).fetchone()[0]
                 limit = self.meta["web_origin_concurrency"]
-            if running >= limit:
-                raise LimitError("concurrency")
             started = time.time()
-            if self.db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='source_backoff'").fetchone():
-                blocked = self.db.execute("SELECT until FROM source_backoff WHERE source=?", (source,)).fetchone()
-                if blocked and blocked[0] > started:
-                    raise LimitError("source_backoff")
+            if running >= limit:
+                raise LimitError("concurrency", started + 0.25)
+            blocked = self.blocked(source, method, started)
+            if blocked is not None:
+                raise blocked
             # Conservative public mainnet limits, shared across processes/restarts.
             # A fallback is not a fresh allowance: RPC totals span namespaces.
             if transport_kind == "rpc":
-                recent = self.db.execute("SELECT method FROM attempts WHERE transport_kind='rpc' AND started_at>?", (started-10,)).fetchall()
-                # HttpTransport opens a connection for each request; the public
-                # connection-rate ceiling (40/10s) is lower than total RPC 100/10s.
-                if len(recent) >= 40:
-                    raise LimitError("connection_rate_window")
-                if len(recent) >= 100 or sum(r[0] == method for r in recent) >= 40:
-                    raise LimitError("rate_window")
+                window = self.method_limit(method)
+                if window <= 0:
+                    raise LimitError("method_unavailable")
+                recent = self.db.execute("SELECT method,started_at FROM attempts WHERE transport_kind='rpc' AND started_at>? ORDER BY started_at,id",
+                                         (started-WINDOW_SECONDS-WINDOW_MARGIN,)).fetchall()
+                # HttpTransport opens a connection for each request; the public connection-rate
+                # ceiling (40/10s) binds before the total RPC ceiling. Each refusal names when
+                # the window frees so the caller can wait instead of failing the read.
+                if len(recent) >= CONNECTION_WINDOW:
+                    raise LimitError("connection_rate_window", recent[len(recent)-CONNECTION_WINDOW][1] + WINDOW_SECONDS + WINDOW_MARGIN)
+                same = [r[1] for r in recent if r[0] == method]
+                if len(same) >= window:
+                    raise LimitError("rate_window", same[len(same)-window] + WINDOW_SECONDS + WINDOW_MARGIN)
             if rate_limit is not None:
-                recent = self.db.execute("SELECT count(*) FROM attempts WHERE source=? AND started_at>?", (source, started-rate_limit[1])).fetchone()[0]
-                if recent >= rate_limit[0]:
-                    raise LimitError("source_rate_window")
-            deadline = min(started + remaining, self.meta["collection_cutoff"])
+                rows = self.db.execute("SELECT started_at FROM attempts WHERE source=? AND started_at>? ORDER BY started_at,id",
+                                       (source, started-rate_limit[1])).fetchall()
+                if len(rows) >= rate_limit[0]:
+                    raise LimitError("source_rate_window", rows[len(rows)-rate_limit[0]][0] + rate_limit[1])
+            deadline = min(started + remaining, self.meta["collection_cutoff"], started + ATTEMPT_SECONDS)
             cursor = self.db.execute("INSERT INTO attempts(request_id,family,method,source,owner,transport_kind,accounts,started_at,deadline,status,byte_grant) VALUES(?,?,?,?,?,?,?,?,?,'started',?)",
                 (request_id, family, method, source, owner, transport_kind, accounts, started, deadline, max_response_bytes))
             if owner != "ordinary":
@@ -254,12 +296,48 @@ class Session:
                 self.db.execute("INSERT INTO grants VALUES('final',?,?) ON CONFLICT(owner) DO UPDATE SET total=total+excluded.total,remaining=remaining+excluded.remaining", (additional, additional))
                 self.db.execute("INSERT INTO marks(phase,at,used,details) VALUES('final_reservation',?,?,?)", (time.time(), counts["started_attempts"], encoded({"trigger": trigger, "additional": additional})))
 
-    def defer_source(self, source, until):
+    def defer_source(self, source, until, method=None):
+        """Back off one source, or only one RPC method on it when the provider limits per method."""
         label(source)
         until = min(epoch(until), self.meta["deadline_unix"])
         with self.transaction():
-            self.db.execute("CREATE TABLE IF NOT EXISTS source_backoff(source TEXT PRIMARY KEY,until REAL NOT NULL)")
-            self.db.execute("INSERT INTO source_backoff VALUES(?,?) ON CONFLICT(source) DO UPDATE SET until=max(until,excluded.until)", (source, until))
+            if method is None:
+                self.db.execute("CREATE TABLE IF NOT EXISTS source_backoff(source TEXT PRIMARY KEY,until REAL NOT NULL)")
+                self.db.execute("INSERT INTO source_backoff VALUES(?,?) ON CONFLICT(source) DO UPDATE SET until=max(until,excluded.until)", (source, until))
+            else:
+                label(method)
+                self.db.execute("CREATE TABLE IF NOT EXISTS method_backoff(source TEXT NOT NULL,method TEXT NOT NULL,until REAL NOT NULL,PRIMARY KEY(source,method))")
+                self.db.execute("INSERT INTO method_backoff VALUES(?,?,?) ON CONFLICT(source,method) DO UPDATE SET until=max(until,excluded.until)", (source, method, until))
+
+    def disable_method(self, source, method, reason="provider_method_limit"):
+        """The provider refuses this method for this session; other methods continue. Not a token finding."""
+        label(source)
+        label(method)
+        label(reason)
+        with self.transaction():
+            self.db.execute("CREATE TABLE IF NOT EXISTS method_unavailable(source TEXT NOT NULL,method TEXT NOT NULL,reason TEXT NOT NULL,at REAL NOT NULL,PRIMARY KEY(source,method))")
+            self.db.execute("INSERT OR IGNORE INTO method_unavailable VALUES(?,?,?,?)", (source, method, reason, time.time()))
+
+    def unavailable_methods(self):
+        if not self.db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='method_unavailable'").fetchone():
+            return []
+        return [dict(r) for r in self.db.execute("SELECT source,method,reason,at FROM method_unavailable ORDER BY at,method")]
+
+    def blocked(self, source, method, now=None):
+        """The typed refusal (with its wait hint) that currently applies to this source/method, or None."""
+        now = time.time() if now is None else now
+        tables = {r[0] for r in self.db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        if "method_unavailable" in tables and self.db.execute("SELECT 1 FROM method_unavailable WHERE source=? AND method=?", (source, method)).fetchone():
+            return LimitError("method_unavailable")
+        if "source_backoff" in tables:
+            row = self.db.execute("SELECT until FROM source_backoff WHERE source=?", (source,)).fetchone()
+            if row and row[0] > now:
+                return LimitError("source_backoff", row[0])
+        if "method_backoff" in tables:
+            row = self.db.execute("SELECT until FROM method_backoff WHERE source=? AND method=?", (source, method)).fetchone()
+            if row and row[0] > now:
+                return LimitError("method_backoff", row[0])
+        return None
 
     def finish(self, attempt_id, status, response_bytes, response=None):
         label(status)

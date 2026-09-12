@@ -1,9 +1,8 @@
-# Solana evidence v2 contract (development)
+# Solana evidence v2 contract
 
-Profile `solana-evidence-v2`, packet/report schema **2**, session/note/adapter
-contracts **1**. Evidence, assessment and completion validation is implemented in Phase 12. Authoring,
-rendering and final delivery remain gated to their subsequent phases. The default remains
-`legacy-v1` until Phase 18 gates pass. Unknown or mismatched profiles fail; readers
+Profile `solana-evidence-v2` (the default), packet/report schema **2**, session/note/adapter
+contracts **1**. Evidence, assessment and completion validation, authoring, rendering and
+frozen delivery are all implemented. Unknown or mismatched profiles fail; readers
 never infer a profile from convenient fields or relabel old evidence. The installed
 `solana_legacy_v1.py` retains collector engine 1.0.0 semantics and original rendering.
 It does not make old incomplete engine snapshots executable.
@@ -209,6 +208,5 @@ Capture artifacts retain native numeric transport times while normalized evidenc
 uses matching ISO UTC times. This preserves original bytes and replay determinism.
 
 `source.capture` retains document capture metadata; derived operations can consume
-those raw bytes without turning publication into state. Runtime commands explicitly
-validate v2; unsupported authoring/rendering entry points remain gated until their
-phases. Default profile remains legacy-v1. No schema-1 evidence is rewritten.
+those raw bytes without turning publication into state. Runtime commands validate v2
+explicitly; `solana-evidence-v2` is the default profile. No schema-1 evidence is rewritten.

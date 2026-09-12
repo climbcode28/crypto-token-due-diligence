@@ -34,7 +34,8 @@ profit from gross output. Fee payer, seller, beneficiary and human remain separa
 
 You may use background public research within the shared grant. For a bounded batch
 of public captures, use installed `solana_broad_collect.py capture RUN --owner
-liquidity --url URL [--url URL] --allow-network --cost-policy free`. This command
+liquidity --url URL [--url URL] --allow-network --cost-policy free`. Add `--dimension SURFACE`
+when a capture serves one coverage surface. This command
 registers/deduplicates ownership and charges actual sends/retries/redirects. Reuse
 existing capture IDs. If an existing capture belongs elsewhere, cite it; never
 replace it or resend to evade ownership. All lanes share the original session.
@@ -58,7 +59,8 @@ asks need an answer or a precise gap.
 Set every checklist item to `done`, `external_limit` or `pending`, with a concrete
 reason, plus current `evidence_ids`. Check it with installed
 `solana_broad_collect.py lane-check RUN --owner liquidity`. In synthetic rehearsals
-only add `--allow-synthetic`. If newly captured sources need importing, return their
-IDs and request coordinator `refresh` before self-check; lanes cannot rewrite the
-shared draft. Self-check failure or missing evidence stays partial. Return the note
+only add `--allow-synthetic`. The self-check imports your own new captures first, so you
+can cite them by capture ID; lanes never edit the shared draft themselves. Your run
+context carries `note_contract` (header fields, required finding fields, allowed names
+and an example) and `skill_dir`. Self-check failure or missing evidence stays partial. Return the note
 path, self-check result, material observations/limits and targeted preset leads.

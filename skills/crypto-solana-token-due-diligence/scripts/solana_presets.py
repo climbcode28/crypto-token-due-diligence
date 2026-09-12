@@ -1,10 +1,14 @@
 """Bounded read plans. Discovery and sample contexts remain separate observations."""
-from solana_common import need, pubkey
+import base64
+
+from solana_common import need, pubkey, TOKEN_PROGRAM
 from solana_session import label
 from solana_wire import validate_request
 
 ACCOUNT_BATCH = 25
 RESPONSE_LIMIT = 1_000_000
+SCAN_SLICE = {"offset": 0, "length": 72}  # mint, spending owner and amount of an SPL token account
+LEAD_LIMIT = 20
 
 
 def settings(floor=None):
@@ -45,15 +49,46 @@ def mint_baseline(mint, *, largest=True):
     return rows
 
 
-def holding_sample(mint, largest_observation):
+def holder_scan(mint, token_program=TOKEN_PROGRAM, *, name="holderscan"):
+    """Bounded census of one SPL mint's fixed-size token accounts: a discovery lead, never a balance sample.
+
+    Used only when the provider refuses getTokenLargestAccounts. Token-2022 holdings have
+    variable sizes, so they keep an explicit gap instead of a partial filter.
+    """
+    pubkey(mint)
+    need(token_program == TOKEN_PROGRAM, "holder scan supports fixed-size SPL token accounts only")
+    return read(name, "getProgramAccounts", [token_program, {**settings(), "withContext": True, "dataSlice": dict(SCAN_SLICE),
+                 "filters": [{"dataSize": 165}, {"memcmp": {"offset": 0, "bytes": mint}}]}])
+
+
+def discovery_leads(mint, req, checked, limit=LEAD_LIMIT):
+    """Ranked holding leads from either discovery method; amounts are discovery-time observations."""
+    pubkey(mint)
+    if req["method"] == "getTokenLargestAccounts":
+        need(req["params"][0] == mint, "wrong discovery mint")
+        rows = [{"address": r["address"], "amount": r["amount"]} for r in checked["result"]["value"]]
+    else:
+        need(req["method"] == "getProgramAccounts", "unsupported holder discovery method")
+        options = req["params"][1]
+        need(options.get("dataSlice") == SCAN_SLICE and options["filters"][1]["memcmp"] == {"offset": 0, "bytes": mint}, "scan must target the exact mint prefix")
+        rows = []
+        for address, item in zip(checked["addresses"], checked["result"]["value"]):
+            raw = base64.b64decode(item["account"]["data"][0], validate=True)
+            need(len(raw) == SCAN_SLICE["length"], "scan row is not the requested slice")
+            rows.append({"address": address, "amount": str(int.from_bytes(raw[64:72], "little"))})
+        rows.sort(key=lambda r: (-int(r["amount"]), r["address"]))
+    return rows if limit is None else rows[:limit]
+
+
+def holding_sample(mint, discovery_observation):
     """Discovery rank and later balances remain distinct, with mint supply in each batch."""
     from solana_wire import validate_response
     pubkey(mint)
-    req = largest_observation["request"]
-    need(largest_observation.get("status") == "ok" and req["method"] == "getTokenLargestAccounts" and req["params"][0] == mint, "exact-mint largest discovery required")
-    checked = validate_response(req, largest_observation["response"])
-    need(checked["status"] == "ok", "largest discovery unresolved")
-    return account_batches([mint]+[r["address"] for r in checked["result"]["value"]],
+    req = discovery_observation["request"]
+    need(discovery_observation.get("status") == "ok" and req["method"] in ("getTokenLargestAccounts", "getProgramAccounts"), "exact-mint holder discovery required")
+    checked = validate_response(req, discovery_observation["response"])
+    need(checked["status"] == "ok", "holder discovery unresolved")
+    return account_batches([mint]+[r["address"] for r in discovery_leads(mint, req, checked)],
                            prefix="holdings", floor=checked["context_slot"])
 
 

@@ -60,9 +60,10 @@ For EVM `broad_collect.py start`, compute remaining seconds immediately before l
 in the existing shell call; use that as `--timeout` and `--timeout-ceiling` instead of
 fresh 600/1500-second windows. Keep the specialist's request caps and authorized provider
 flags. Its named-trigger/checkpoint completion rule still applies; no silent extension.
-For Solana, retain the original deadline, reserve two minutes for reconciliation and
-validation, and cap each collector's `--seconds` (maximum 55) by remaining time. At expiry,
-stop collection and follow the specialist's incomplete/checkpoint reporting rules.
+For Solana, pass the original `--received-at` and `--deadline-at` to
+`solana_broad_collect.py start`; the helper derives the collection and lane cutoffs and
+reserves two minutes for delivery. At expiry, stop collection and follow the
+specialist's incomplete/checkpoint reporting rules.
 Missing evidence must never become a pass to hit a time target.
 
 ## Optional offline helper

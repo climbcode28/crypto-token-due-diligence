@@ -25,16 +25,21 @@ all findings and concerns, eleven-surface coverage, complete typed observations 
 evidence ledger. Source text is escaped as data. Citation URLs must be safe public
 HTTPS; otherwise use the frozen artifact. Citations carry source/time/hash and make
 zero network requests. Relative links work inside the frozen report; `read` also
-returns absolute local `answer_link` values for the user-facing answer.
+returns absolute local `answer_link` values for the user-facing answer. The report opens
+with a Summary: labeled findings (✅ Good / 🟡 Potential Risk / 🔴 Bad, ⚪ Unverified) with
+adjacent citations and exactly four Conclusions bullets, mirroring the chat contract.
 
-A successful finalize/read returns its reading checklist and citations in the same
-call. Read all entries before answering. Keep exact quantities and units, spending
+A successful finalize/read returns `report_path`, its compact reading checklist and
+citations in the same call; the full Markdown stays in the frozen report. Read all
+checklist entries before answering. Keep exact quantities and units, spending
 owner versus beneficial owner, sample account/receipt counts, custody exclusions,
 LP principal versus fees, named controllers and bypass paths, quote versus execution,
 net proceeds versus gross/refunds/profit, economics/rights, assurance levels and the
 original focus. A short answer must not erase a material limitation or adverse fact.
-The checklist intentionally has no lossy text limit. Refer to the frozen report for
-supporting detail; do not assign standard unfinished research to the user as homework.
+The checklist keeps every material quantity and limit; only publication-derived details
+(indexer listings, repository metadata, quote routes) are capped with an explicit
+remainder note. Refer to the frozen report for supporting detail; do not assign standard
+unfinished research to the user as homework.
 
 Use [replay guidance](report-replay.md) for verification and trust boundaries, and
 [reporting scenarios](reporting-scenarios.md) to calibrate conclusions.

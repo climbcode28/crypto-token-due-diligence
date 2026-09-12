@@ -8,7 +8,7 @@ from solana_pipeline_note import build_note
 from solana_profile import (PROFILE,DIMENSIONS,AXES,Evidence,ProfileError,regular,strict_json,check,
     validate_report,findings as validate_findings,coverage as validate_coverage,decision as validate_decision)
 
-VERSION='1.0.0'
+VERSION='1.1.0'
 OWNERS=('coordinator','liquidity','project')
 CHECKLISTS={'liquidity':('discovery','custody','activity','exits','assigned_asks'),
  'project':('identity','delivery','audit_scope','economics','creator_history','contrary_evidence','assigned_asks')}
@@ -152,9 +152,22 @@ def assemble(root,note,*,lane_notes=None,allow_synthetic=False):
         if note.get('research_status')=='completed' and not resolved:error(errors,'note.conflict_resolutions',conflict['issue']+' '+repr(conflict['finding_ids']))
     for fid,value in note.get('signal_assignments',{}).items():
         if fid not in pipeline_rows:error(errors,'note.signal_assignments.'+fid,'Stale or non-pipeline finding; regenerate the scaffold and use a current ID.');continue
-        assignment={'signal':value} if value in SIGNALS else value
-        if not isinstance(assignment,dict) or set(assignment)-{'signal','impact','confidence','concern'}:error(errors,'note.signal_assignments.'+fid,'Use signal plus optional impact/confidence/concern.');continue
-        pipeline_rows[fid].update(copy.deepcopy(assignment))
+        assignment=copy.deepcopy({'signal':value} if value in SIGNALS else value)
+        if not isinstance(assignment,dict) or set(assignment)-{'signal','impact','confidence','concern','input_digests'}:error(errors,'note.signal_assignments.'+fid,'Use signal plus optional impact/confidence/concern and the fact input_digests.');continue
+        digests=assignment.pop('input_digests',None)
+        if assignment.get('signal') is not None:
+            # A signal binds to the fact bytes it judged; a regenerated fact needs re-review, never a silent carry-over.
+            expected={r['evidence_id']:e.rows[r['evidence_id']]['sha256'] for r in pipeline_rows[fid]['support']}
+            if digests!=expected:error(errors,'note.signal_assignments.'+fid+'.input_digests','Bind the signal to the current fact digest(s) '+json.dumps(expected,sort_keys=True)+'; a changed fact needs re-review.');continue
+        pipeline_rows[fid].update(assignment)
+    # Field-level restatements of one fact inherit that fact's judgment unless assigned explicitly,
+    # so a coordinator judges each fact once rather than every typed field.
+    from solana_pipeline_note import finding_id
+    for fid,row in pipeline_rows.items():
+        parent=finding_id(row['support'][0]['evidence_id']) if row.get('support') else None
+        if row.get('signal') is None and parent and parent!=fid and parent in pipeline_rows and pipeline_rows[parent].get('signal') is not None:
+            for k in ('signal','confidence','concern'):  # Severity (impact) stays on the parent fact only.
+                if pipeline_rows[parent].get(k) is not None:row[k]=copy.deepcopy(pipeline_rows[parent][k])
     for i,override in enumerate(note.get('overrides',[])):
         at='note.overrides['+str(i)+']'
         def apply_override():

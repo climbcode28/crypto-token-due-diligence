@@ -4,7 +4,7 @@ from pathlib import Path
 from solana_common import sha,need
 from solana_profile import Evidence,strict_json,regular,PROFILE
 
-VERSION='1.1.0'
+VERSION='1.2.0'
 CATEGORIES={'mint':'controls','controls':'controls','holders':'holders','program':'programs','controllers':'programs',
  'pool':'pools','local_quote':'quotes','public_quote':'quotes','quote_sizes':'quotes','transaction':'transactions',
  'sales':'transactions','rebuys':'transactions','history':'launch','launch':'launch','creator_activity':'creator',
@@ -60,8 +60,17 @@ def describe(operation,data):
         return 'Illustrative '+operation.replace('_',' ')+' with exact input/output units and retained fee/context limits. Estimate or source quote; no trade was executed.'
     if operation in ('discovery_pools','repository_metadata','repository_revision','repository_tree'):
         return 'Captured '+operation.replace('_',' ')+' publication with its original source and capture time. These metrics do not establish organic use, universal rank, authorship, safety or delivered functionality.'
-    if operation=='source_assurance':return 'Program assurance levels remain separate: source publication, third-party hash statement, byte correspondence and independent build reproduction.'
+    if operation=='source_assurance':
+        return ('Program '+str(data.get('program'))+' assurance levels remain separate: publication '+str(data.get('publication'))+', third-party verification '+str(data.get('third_party_verification'))+
+            ', byte correspondence '+str(data.get('byte_correspondence'))+', independent reproduction '+str(data.get('independent_reproduction'))+'.')
     if operation=='transaction':return 'Historical transaction status and supported instruction effects. Fee payer, signer, seller and beneficial owner remain distinct.'
+    if operation=='program':
+        return ('Program '+str(data.get('address'))+': loader '+str(data.get('loader'))+', upgradeability '+str(data.get('upgradeability'))+', upgrade authority '+
+            ('absent' if data.get('upgrade_authority') is None else str(data['upgrade_authority']))+', code capture '+str(data.get('code_capture'))+'.')
+    if operation=='controllers':
+        nodes=data.get('nodes',[]);observed=sum(1 for n in nodes if n.get('status')=='observed')
+        return ('Controller graph from '+', '.join(data.get('roots',[]))+': '+str(observed)+' of '+str(len(nodes))+' reachable accounts observed; status '+str(data.get('status'))+
+            '; safe/locked conclusion '+str(data.get('safe_or_locked_conclusion'))+'.')
     return 'Typed '+operation.replace('_',' ')+' facts within the recorded subject, time and evidence scope.'
 
 
@@ -79,7 +88,7 @@ def build(root,allow_synthetic=False):
         if not row['usable']:row['limits'].insert(0,{'path':'evidence','value':'Dependency is not usable; computed values cannot support a resolved finding.'})
         rows.append(row)
         for alias in (eid,d['operation'],category+':'+obs['subject']['address']):aliases.setdefault(alias,[]).append(eid)
-    missing=[{'id':eid,'status':o['status'],'subject':o['subject'],'sample_id':o.get('sample_id')} for eid,o in sorted(e.rows.items()) if eid not in e.usable and o['kind']!='derived']
+    missing=[{'id':eid,'status':o['status'],'subject':o['subject'],'sample_id':o.get('sample_id'),'reason':e.degraded.get(eid)} for eid,o in sorted(e.rows.items()) if eid not in e.usable and o['kind']!='derived']
     for eid in e.rows:aliases.setdefault(eid,[eid])
     return {'facts_version':VERSION,'profile':PROFILE,'investigation_id':m['investigation_id'],'target':e.target,
         'manifest_sha256':sha(raw),'question':m['intake']['question'],'focus':m['intake']['focus'],'urls':m['intake']['urls'],
@@ -94,7 +103,8 @@ def compact(facts,categories=None,limit=12*1024):
     lines=['Solana facts '+facts['investigation_id'],json.dumps(facts['totals'],sort_keys=True),'All quantities retain typed units. Full facts.json is the detail source.']
     omitted=[]
     for row in facts['facts']:
-        title=row['id']+' ['+row['category']+'; '+str(row['status'])+'; usable='+str(row['usable'])+']'
+        # The title is the citeable evidence ID; program/controller/assurance rows name their subject.
+        title=row['evidence_id']+' ['+row['category']+'; '+str(row['status'])+'; usable='+str(row['usable'])+(('; '+row['subject']['address']) if row['operation'] in ('program','controllers','source_assurance') else '')+'; digest='+row['input_digests'][row['evidence_id']]+']'
         # Material controls and coverage limits always appear, even beyond the soft display target.
         critical=json.dumps({'attention':row['attention'],'limits':row['limits']},sort_keys=True,ensure_ascii=False)
         if row['category'] not in selected:

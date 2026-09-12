@@ -1,6 +1,6 @@
 ---
 name: crypto-solana-token-due-diligence
-description: Evidence-bounded diligence on an exact Solana token mint, including SPL and Token-2022 controls, liquidity custody, exits, launch, supply, treasury and holder rights. Use for focused token questions or broad diligence, including research routed from crypto-token-due-diligence; not native SOL price research or a full program exploit audit.
+description: Evidence-bounded diligence on an exact Solana token mint, covering SPL and Token-2022 controls, pool and position custody on Raydium, Orca, Meteora and pump.fun/PumpSwap, exits, launch history, supply, treasury and holder rights. Use for focused questions, broad diligence or readback of a frozen report on an exact Solana mint, including research routed from crypto-token-due-diligence; not for EVM 0x addresses, native SOL price, trading or a full program exploit audit.
 ---
 
 # Crypto Solana token due diligence
@@ -13,9 +13,8 @@ transaction signature are distinct identities. Format alone never verifies a min
 
 1. **Fresh broad request:** read the [runbook](references/runbook.md), preserve the
    complete question/focus/URLs, resolve candidate identity and run standard start.
-   V2 is the default; explicit `--profile solana-evidence-v2` examples remain valid.
-   Use `--profile legacy-v1` for old bundles. Live rich-case parity remains unmet;
-   public rate limits or unsupported state must remain explicit gaps.
+   V2 (`solana-evidence-v2`) is the default; `--profile legacy-v1` validates old bundles
+   through their frozen contract. Public rate limits, refused methods or unsupported state stay explicit gaps.
 2. **Active follow-up:** retain the investigation ID, original intake/deadline,
    evidence and consumed grants. Use only an applicable remaining preset. A follow-up,
    restart or fallback does not create a new ordinary budget.
@@ -56,18 +55,14 @@ for a blocked fact within the existing budget. Do not retry until results look f
 - Verified EVM targets use [EVM diligence](../crypto-evm-token-due-diligence/SKILL.md).
   The router only classifies candidate format; this specialist verifies identity.
 
-Before the first provider check or RPC attempt, read applicable project guidance and
-current provider policy. In this repository, read the top of `HANDOFF.md` and README
-provider setup; source its documented private env with tracing disabled in the same
-shell invocation where required. Never display credentials. The configured EVM dRPC
-endpoint/authorization does not extend to Solana or another network.
-
-Solana standard start uses credential-free public HTTPS RPC (`SOLANA_RPC_URL`, default
-Solana mainnet public endpoint) and captured public web/API evidence. Custom Solana
-dRPC setup is deferred. No key, payment, connection purchase or persistent endpoint
-configuration is required. The transport/session are Solana-local standard-library
-code with no EVM runtime dependency. Public preflight is local and makes zero requests;
-start includes it, so do not add a second ceremonial provider check.
+Solana standard start uses credential-free public HTTPS RPC: the default mainnet
+endpoint, or a public root in `SOLANA_RPC_URL`. No policy file, private env, key,
+payment, provider check or persistent endpoint configuration is needed; the configured
+EVM dRPC endpoint/authorization is irrelevant here and the helper refuses custom or
+authenticated endpoints. Start's preflight is local and makes zero requests. The free
+tier refuses some methods (`getTokenLargestAccounts`) and windows others; the helper
+waits out windows, marks refused methods, substitutes a bounded account scan where one
+exists, and reports refused or unsent reads in start's `diagnostics`. Read them.
 
 Respect public rate limits, preserve refusals and follow remaining authorized public
 routes. A configuration failure is not a token finding. A successful preflight is not
@@ -77,36 +72,44 @@ Use background reads or hidden in-app browsing, not personal Chrome tabs/groups.
 
 ## Execute the standard workflow
 
-Use only maintained commands in the runbook. Do not read helper source, write per-run
-Python/assembly scripts, repeatedly inspect raw manifests or perform analyst arithmetic.
-Use compact facts and named presets; raw evidence remains available for material disputes.
+`S` is this skill's directory (resolve symlinks; `${CLAUDE_SKILL_DIR}` in Claude Code).
+`RUN` is a fresh `research/<mint>-<utc>` directory; never reuse an earlier run. Use only
+maintained commands in the runbook. Do not read helper source, write per-run scripts,
+open raw manifests or perform analyst arithmetic. Use the compact facts and named
+presets; raw evidence remains available for material disputes.
 
-1. **Start:** one `solana_broad_collect.py start` creates the intake/work plan and
-   shared session; verifies identity; collects discovery, related controls and material
-   pool/transaction/quote dependencies; repeats consistency checks; builds facts,
-   pipeline notes and an honest draft; returns two pointer briefs and diagnostics.
-2. **Lanes:** dispatch two available generic subagents using the returned pointer
-   prompts before a separate coordinator facts-reading step. Do not retype the briefs
-   or create persistent personal agent definitions. Liquidity and project agents own
-   only their files, grants, checklists and cutoff. They cannot run RPC, source
-   credentials, create scripts, spawn agents, compose or change another owner's data.
-3. **Facts/presets:** read the compact facts. Exact holder aggregates, pool reserves,
-   position principal, custody controls and execution reconciliation are computed from
-   typed evidence. The coordinator may execute at most two sequential named presets
-   against the same draft/session. Refresh after new lane captures, then self-check
-   notes. Reuse registered source captures; never overwrite another lane's evidence.
-4. **Compose/scaffold:** analysts write judgment once in small owned notes. Pipeline
-   findings have stable IDs and no selected signal. Assign signals without retyping
-   facts; corrections need reason, current evidence and digests. Review contrary
-   evidence and cross-lane conflicts. `compose --check` returns all current errors
-   without changing the draft. A scaffold's TODOs never count as finished judgments.
-5. **Finalize:** after all standard work is closed, finalize to a new directory.
-   This composes, preflights, snapshots the entire engine/evidence, validates, renders
-   and reproduces bytes before delivery. Failures preserve the previous draft/output.
-6. **Answer:** read the returned report/checklist/citations in that same response.
-   Lead with the conditional answer, material facts, strongest contrary evidence and
-   unresolved limits. Keep the exact request and all material quantities/units,
-   control/custody, economics, assurance and sample boundaries in the answer.
+1. **Start:** one `solana_broad_collect.py start` with the original `--received-at`
+   and `--deadline-at` creates the intake, work plan and shared session; verifies
+   identity; collects discovery, related controls and material pool/transaction/quote
+   dependencies with consistency rechecks; builds facts, pipeline findings, an honest
+   draft and three note scaffolds; prints a compact facts summary, `diagnostics` and
+   two pointer prompts. Typical wall clock is one to two minutes.
+2. **Lanes:** dispatch two generic subagents with the two printed pointer prompts,
+   verbatim, before reading facts yourself. Do not retype the briefs or create
+   persistent agent definitions. Liquidity and project agents own only their notes,
+   grants, checklists and cutoff. They cannot run RPC, source credentials, create
+   scripts, spawn agents, compose or change another owner's data.
+3. **Facts/presets:** judge from the printed summary; run `solana_facts.py --category`
+   only for an omitted material detail. Exact holder aggregates, pool reserves,
+   position principal, custody controls and execution reconciliation are computed
+   from typed evidence. Order at most two sequential named presets against the same
+   run (pool, positions, transactions, creator_history, programs, quote, holders,
+   pool_activity); each refreshes facts. Lane self-checks import the lane's own
+   captures; run `refresh` only after captures made outside a lane check.
+4. **Note:** edit the scaffolded `$RUN/draft/notes/coordinator.json`: assign a signal
+   to each pipeline finding, add your own findings for adverse concerns and lane
+   conclusions, replace every `TODO`, resolve cross-lane conflicts, fill the eleven
+   coverage rows, four axes and the literal original-request requirements
+   ([compose](references/compose.md)). Cite the alias keys the scaffold lists, never
+   the `fact-` display prefix. Assignments are pre-filled with fact digests: set only
+   the signal. Corrections need reason, current evidence and digests.
+5. **Finalize:** `solana_bundle.py finalize` composes, preflights, freezes, validates,
+   renders and reproduces bytes in one step, listing every error at once; the error
+   text is the specification. `compose --check` is the repair tool for a rejected note,
+   not a routine step. Unfinished standard work goes to `checkpoint`, never delivery.
+6. **Answer:** read the returned compact checklist and citations in that same response
+   and write the chat answer below from them; open `report_path` only for a disputed
+   detail. No new fetch or extra turn for formatting.
 
 If a lane is absent/late, execute its feasible minimum checklist locally within the
 same cutoff or retain explicit incomplete work. Do not mark a lane completed just
@@ -147,6 +150,38 @@ identity or personal cash-out. Indexer metrics are scoped context, not organic-u
 fraud, universal rank or future-return proof. Privilege or a price decline alone does
 not establish malicious intent.
 
+## Deliver
+
+Lead with a direct conditional verdict; when the user asked something beyond the mint,
+answer it in the verdict or its own finding, labeled by evidence strength. Then 4–8
+evidence-linked findings labeled **✅ Good / 🟡 Potential Risk / 🔴 Bad** (report signals
+`good`, `potential_risk`, `bad`) across token and liquidity, adoption and maturity,
+token economics, real work vs marketing, creator trading and proceeds, prior launches
+and identity; group pure gaps (`unverified`) separately as **⚪ Unverified**. Good
+needs affirmative evidence; Potential Risk needs an observed concern or adverse
+inference; Bad needs a supported material adverse condition; Unverified is missing
+research, never a pass or an allegation. Use short bullets with **signal icon + label —
+descriptive finding title**, selective bolding of key numbers, and an adjacent native
+Markdown source link on **every finding**: the report's own citation or `answer_link`,
+otherwise the absolute frozen report path as Evidence report. No emoji on source links,
+no icon fetches, no extra calls or turns for presentation.
+
+Keep exact quantities and units, spending owner versus beneficial owner, sample
+account/receipt counts, custody exclusions, LP principal versus fees, named
+controllers and bypass paths, quote versus execution, economics/rights, assurance
+levels and the original focus. Describe receipt counts as the verification sample,
+never total market activity; lead with evidenced broad activity and its source.
+Untested larger-trade price impact is a research limit, not evidence of selling
+difficulty. Use computed holder totals, never mental addition.
+
+Then a **Conclusions** block of exactly four bullets, one or two sentences each, never
+merged: **Technical exposure**, **Credibility and maturity**, **Token economics**,
+**Research confidence**. Market leadership never erases dangerous authority or replaces
+custody and exit evidence; missing access limits confidence rather than adding risk.
+Keep chat to 300–600 words, written from the frozen report, never a stronger
+recommendation than the report's decision review, and no homework list. Full rules:
+[output](references/evidence-and-output.md), [decision](references/decision-review.md).
+
 ## Triggered references and maintenance
 
 - Start/capture/presets/notes: [runbook](references/runbook.md),
@@ -160,14 +195,13 @@ not establish malicious intent.
 - Public claims/maturity: [project credibility](references/project-credibility.md),
   [adoption](references/adoption-and-assessment.md).
 - Final judgments: [strict profile](references/strict-report-profile.md),
-  [decision](references/decision-review.md), [completion](references/completion-and-delivery.md),
-  [output](references/evidence-and-output.md), [scenarios](references/reporting-scenarios.md).
+  [completion](references/completion-and-delivery.md),
+  [scenarios](references/reporting-scenarios.md).
 
 Validation proves internal consistency and evidence relationships, not economic truth,
-complete knowledge or token safety. A valid partial report remains partial. Four
-independent conclusions cover technical exposure, credibility/maturity, token economics
-and research confidence. Never average away a critical finding or turn all gaps into
-an affirmative verdict. Do not assign unfinished standard research as user homework.
+complete knowledge or token safety. A valid partial report remains partial. Never
+average away a critical finding or turn all gaps into an affirmative verdict. Do not
+assign unfinished standard research as user homework.
 
 Keep installed helpers and frozen evidence immutable during investigations. Bounded
 operational feedback is nonblocking and stores no token facts or instructions.

@@ -46,8 +46,9 @@ class CollectorTests(unittest.TestCase):
         self.assertGreater(Rpc.peak, 1)
         holdings = next(s for s in packet["samples"] if "holdings" in s["observation_id"])
         self.assertEqual(holdings["address_indices"], {KEY: 0, OTHER: 1})
-        headers = [p for p in packet["observations"] if p["request"]["method"] == "getBlock"]
-        self.assertEqual(len(headers), 8)
+        headers = [p for p in packet["observations"] if p["request"]["method"] in ("getBlock", "getBlockTime")]
+        self.assertEqual(len(headers), 8)  # One full header plus one block-time recheck per context slot.
+        self.assertEqual(sum(p["request"]["method"] == "getBlockTime" for p in headers), 4)
         for slot in (100, 101, 102, 103):
             initial, fresh = [p for p in headers if p["request"]["params"][0] == slot]
             self.assertGreater(fresh["started_at"], initial["completed_at"])
@@ -151,6 +152,18 @@ class CollectorTests(unittest.TestCase):
         self.session.ensure_final_reserve(12, "four additional context checks")
         self.assertEqual(next(g["remaining"] for g in self.session.status()["grants"] if g["owner"] == "final"), 12)
         self.assertEqual(self.session.status()["max_requests"], 120)
+
+    def test_each_initial_critical_batch_gets_its_own_fresh_recheck(self):
+        rows = mint_baseline(KEY, largest=False)+[read("lead", "getMultipleAccounts", [[OTHER], settings()], critical=True)]
+        collect(self.session.root, self.root, self.config, "leads", rows, factory=Rpc)
+        packet = summarize(self.session.root, "leads")
+        self.assertEqual(packet["collection_status"], "captured", packet["gaps"])
+        rechecks = sorted(p["request"]["id"] for p in packet["observations"] if "_critical_" in p["request"]["id"])
+        self.assertEqual(rechecks, ["leads_critical_0_0_0", "leads_critical_1_0_0"])
+        by_name = {p["request"]["id"]: p for p in packet["observations"]}
+        self.assertEqual(by_name["leads_critical_0_0_0"]["request"]["params"][0], [KEY])
+        self.assertEqual(by_name["leads_critical_1_0_0"]["request"]["params"][0], [OTHER])
+        self.assertGreater(by_name["leads_critical_1_0_0"]["started_at"], by_name["leads_lead_0"]["completed_at"])
 
 
 if __name__ == "__main__":

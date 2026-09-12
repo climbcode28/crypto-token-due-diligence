@@ -22,14 +22,25 @@
     "Strict endpoint/header/JSON validation",
     "Conservative response cap includes no uncharged overflow probe",
     "Counts late-read bytes before rejecting response",
-    "Durable per-attempt responses, per-family retries, original absolute timing, byte reservations and per-origin concurrency"
+    "Durable per-attempt responses, per-family retries, original absolute timing, byte reservations and per-origin concurrency",
+    "Per-method provider backoff and refused-method marking (x-ratelimit-method-limit: 0) instead of source-wide deferral",
+    "Typed refusals carry the time a window frees; the collector waits within remaining time instead of failing the read",
+    "http.client.HTTPException finishes the attempt as transport_failure; every acquired attempt is finished",
+    "Node-lag JSON-RPC errors (-32016/-32004/-32005) are transient; environment proxies disabled; cutoff guard uses projected wall time",
+    "Holder discovery falls back to a bounded, sliced getProgramAccounts census of fixed-size SPL holdings when the provider refuses getTokenLargestAccounts; program metadata is read in one sliced batch; start reports refused methods, unsent reads and unresolved stages",
+    "Token-2022 TokenMetadata (19), TokenGroup (21) and TokenGroupMember (23) decode with bounded Borsh lengths and embedded-mint binding; the metadata update authority is a surfaced power; holder samples demote only for holding-side unknowns; ratios name their rounding; DAMM v2 delegate bits 0/7; Pump allocations limited to evidenced lengths",
+    "Per-operation derivation versions (genuine older bundles report an engine difference, not a recompute failure); boundary conditions (history or state outside the verified network bracket, changed or stale headers, missing critical recheck) degrade evidence to unusable instead of failing the import; mint stability ignores a supply tick; digest-bound signal assignments; concern shape validated for every finding; compact read/finalize payload with a labeled summary and four Conclusions in report.md",
+    "Sale verification accepts router/aggregator CPI swaps scoped by stack height, declared protocol fee sinks, Token-2022 legs with both checked boundaries and single-boundary trader accounts reconciled against the vault; receipts are classified before the header budget is spent; indexer project links need a second indexer; Jupiter lite quotes and launch history are derived automatically",
+    "Importer pins samples only inside the verified network interval on the same provider; attempts carry the coverage surface of their sample, preset or declared capture dimension; aggregates use the latest usable packet per address; one recheck batch per initial critical read",
+    "Legacy Whirlpool swap instruction decoded (11 accounts, 42-byte data, mints bound through balances); field-level pipeline restatements inherit the fact judgment and are counted, not repeated, in the reading checklist; checkpoints compose a valid note and report note_status; citations limited to referenced evidence"
   ],
   "regression_vectors": [
     "retry budgets and reserved rechecks",
     "secret echoes and refused redirects",
     "late body and exhausted grants",
     "parallel-process acquisition",
-    "restart identity and finalized-directory refusal"
+    "restart identity and finalized-directory refusal",
+    "refused public method and per-method backoff (test_solana_public_limits, test_solana_broad_collect.PublicProviderTests)"
   ],
   "web_capture_port": {
     "source": "skills/crypto-evm-token-due-diligence/scripts/web_capture.py",

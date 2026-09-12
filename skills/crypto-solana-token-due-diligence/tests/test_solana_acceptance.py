@@ -5,7 +5,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'scripts'))
 from facts_fixture import rich
 from profile_fixture import Bundle,BASE,utc
 from delivery_fixture import complete
-from compose_fixture import save
+from compose_fixture import save,assign
 from solana_facts import build,encoded
 from solana_pipeline_note import generate
 from solana_profile import validate
@@ -87,7 +87,7 @@ class AcceptanceTests(unittest.TestCase):
         b.document('market',status='ok',body=encoded(body));capture=b.obs('market')['source']['capture'];capture['url']=capture['final_url']='https://api.dexscreener.com/token-pairs/v1/solana/'+b.target['mint']
         result=pools(capture,encoded(body),b.target);b.derived('market-facts','discovery_pools',{'capture':'market'},['market'],result);b.obs('market-facts')['captured_at']=utc(BASE+55)
         b.document('release',status='ok',body=b'Synthetic primary publication: v1.4 release dated 2026-08-01; delivered API endpoint and source tag are published. Audit covers v1.2 only; buybacks remain discretionary.')
-        b.save();n['signal_assignments']={f['id']:'unverified' for f in generate(b.root,True)['findings']}
+        b.save();n['signal_assignments']=assign(b,'unverified')
         n['findings'].append({'id':'coordinator-delivery','dimension':'development_disclosure','claim':'source_analysis','strength':'direct','signal':'good',
             'text':'The primary source publishes a dated v1.4 release and API endpoint. Its audit names v1.2; this does not establish deployed byte correspondence.',
             'support':['release'],'limitations':['Publication is directly observed; operation, audit applicability and deployed build remain separate.']})
@@ -97,7 +97,8 @@ class AcceptanceTests(unittest.TestCase):
         n['decision']['axes']['token_economics']['text']='Discretionary buybacks do not create a holder redemption right; the user did not ask for equity-like rights.'
         n['decision']['finding_ids']+=['coordinator-delivery','coordinator-economics'];n['decision']['axes']['credibility_maturity']['finding_ids'].append('coordinator-delivery');n['decision']['axes']['token_economics']['finding_ids'].append('coordinator-economics');save(b,n)
         output=finalize(b.root,root/'final',allow_synthetic=True)
-        self.assertTrue(output['deliverable']);self.assertIn('dated v1',output['markdown']);self.assertIn('500000',output['markdown']);self.assertIn('1000000',output['markdown']);self.assertIn('discretionary',output['markdown'])
+        markdown=Path(output['report_path']).read_text();self.assertNotIn('markdown',output)
+        self.assertTrue(output['deliverable']);self.assertIn('dated v1',markdown);self.assertIn('500000',markdown);self.assertIn('1000000',markdown);self.assertIn('discretionary',markdown)
         self.assertEqual(output['research_status'],'completed');self.assertTrue(any(c['kind']=='source' for c in output['citations']))
 
     def test_adverse_control_remains_in_summary_relevant_axis_and_frozen_reading(self):
@@ -106,7 +107,8 @@ class AcceptanceTests(unittest.TestCase):
         n['decision']['axes']['research_confidence']['text']='The authority is directly sampled; externally unavailable paths retain explicit unknowns.';save(b,n)
         output=finalize(b.root,root/'final',allow_synthetic=True);_,r=validate(root/'final',True)
         self.assertIn('coordinator-controls-finding',r['summary_ids']);self.assertIn('coordinator-controls-finding',r['decision']['axes']['technical_exposure']['finding_ids'])
-        self.assertIn('dilute holders',output['markdown']);self.assertTrue(any(x.get('impact')=='high' for x in output['reading_checklist']))
+        markdown=Path(output['report_path']).read_text();self.assertIn('dilute holders',markdown);self.assertTrue(any(x.get('impact')=='high' for x in output['reading_checklist']))
+        self.assertIn('| token\\_controls | 🟡 **Potential Risk** |',markdown);self.assertIn('**Conclusions**',markdown);self.assertEqual(markdown.count('- **Technical exposure:**'),1)
 
     def test_out_of_range_missing_bins_and_multisig_bypass_are_not_blanket_safety(self):
         from concentrated_fixture import fixture,batch

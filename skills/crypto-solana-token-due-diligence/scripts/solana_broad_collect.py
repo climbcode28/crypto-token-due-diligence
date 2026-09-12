@@ -16,7 +16,7 @@ from solana_facts import encoded,atomic,build,compact
 from solana_profile import regular,strict_json,PROFILE,DIMENSIONS,Evidence,validate_report
 from solana_compose import CHECKLISTS,empty_coverage,expand_finding,note_header,validate_imports,ComposeError,preflight
 
-VERSION='1.1.0'
+VERSION='1.2.0'
 ASSETS=Path(__file__).resolve().parents[1]/'assets'
 STAGES=('identity_discovery','related_accounts_controllers','pool_transaction_quote_dependencies','final_consistency_checks')
 
@@ -67,15 +67,16 @@ def stage(root,name,fn):
     return result,error
 
 
-def capture(root,urls,owner='ordinary',*,opener_factory=None):
+def capture(root,urls,owner='ordinary',*,dimension=None,opener_factory=None):
     need(owner in ('ordinary','liquidity','project'),'capture owner not supported')
+    need(dimension is None or dimension in DIMENSIONS,'unknown capture dimension')
     s=Session(root)
     try:
         need(opener_factory is None or s.meta['synthetic'],'test web opener requires synthetic session')
         existing={r['url']:dict(r) for r in s.db.execute('SELECT * FROM web_sources')} if s.db.execute("SELECT count(*) FROM sqlite_master WHERE name='web_sources'").fetchone()[0] else {}
         shared=[existing[u] for u in urls if u in existing]
         new=[u for u in urls if u not in existing]
-        rows=register_urls(s,new,owners={u:owner for u in new},cap=12) if new else []
+        rows=register_urls(s,new,owners={u:owner for u in new},dimensions={u:dimension for u in new} if dimension else None,cap=12) if new else []
         # Existing ownership never changes and an existing capture is reused by reference.
         ids=[r['source_id'] for r in rows if r['status']=='pending']+[r['id'] for r in shared if r['owner']==owner and r['status']=='pending']
     finally:s.close()
@@ -92,6 +93,17 @@ def market_documents(root,target):
         for source in ('dexscreener','geckoterminal'):
             try:results.append(pools(record,(Path(root)/record['raw']).read_bytes(),target,source=source));break
             except (ValueError,KeyError,TypeError):continue
+    return results
+
+
+def token_info_documents(root,target):
+    from solana_discovery import token_info
+    results=[]
+    for path in sorted((Path(root)/'web-captures').glob('*.json')):
+        record=json.loads(path.read_text())
+        if record.get('status')!='ok' or not record.get('raw'):continue
+        try:results.append(token_info(record,(Path(root)/record['raw']).read_bytes(),target))
+        except (ValueError,KeyError,TypeError):continue
     return results
 
 
@@ -162,6 +174,39 @@ def initial_related(root,config,factory,*,include_market=True):
     return {'pool_candidates':leads,'queried_related_accounts':len(set(addresses))}
 
 
+def lp_holder_leads(root,config,sample,lp_mint,kind,*,factory,limit=6):
+    """Largest LP accounts, or a bounded SPL census when the provider refuses the largest-accounts method."""
+    from solana_presets import holder_scan,discovery_leads
+    from solana_wire import validate_response
+    packet=execute(root,config,sample,read('largest','getTokenLargestAccounts',[lp_mint,{'commitment':'finalized'}]),factory=factory)
+    if packet.get('status')=='ok':return [r['address'] for r in packet['response']['result']['value'][:limit]]
+    refused=packet.get('status')=='method_unavailable' or packet.get('reason')=='method_unavailable'
+    if not refused or kind not in ('raydium_amm_v4','raydium_cpmm'):return []  # Token-2022 LP mints keep an explicit gap.
+    scan=execute(root,config,sample,holder_scan(lp_mint,name='scan'),factory=factory)
+    if scan.get('status')!='ok':return []
+    try:checked=validate_response(scan['request'],scan['response'])
+    except ValueError:return []
+    return [r['address'] for r in discovery_leads(lp_mint,scan['request'],checked,limit=limit)] if checked['status']=='ok' else []
+
+
+def provider_diagnostics(root):
+    """What a coordinator must know without reading ledgers: refused methods, unsent reads, unresolved stages."""
+    root=Path(root);rows=[];s=status(root)
+    methods=sorted({m['method'] for m in s.get('unavailable_methods',[])})
+    if methods:rows.append({'stage':'provider','category':'method_unavailable','methods':methods,'reason':'The public RPC tier refuses these methods for this session; dependent facts keep explicit gaps unless a bounded scan or preset substitutes.'})
+    path=root/'import-diagnostics.json'
+    if path.exists():
+        d=strict_json(path.read_bytes(),path.name)
+        if d.get('unsent_intents'):rows.append({'stage':'collection','category':'unsent_reads','count':len(d['unsent_intents']),'reads':d['unsent_intents'][:12],'reason':d.get('unsent_meaning')})
+    for mark in s['phases']:
+        try:details=json.loads(mark['details'])
+        except ValueError:continue
+        state=details.get('state') or details.get('status')
+        if state in ('identity_unresolved','omitted_focused_scope','network_unresolved','consistency_unresolved','partial'):
+            error=details.get('error');rows.append({'stage':mark['phase'],'category':state,'sample':details.get('sample'),'reason':error.get('reason') if isinstance(error,dict) else None})
+    return rows
+
+
 def automatic_dependencies(root,config,factory):
     from adapters import pool_adapter
     from solana_programs import observed_account,decode_program
@@ -180,32 +225,38 @@ def automatic_dependencies(root,config,factory):
         try:
             module=pool_adapter(kind);value,_=observed_account(pool,objects[accounts[pool]])
             state=module.decode_pool(pool,value) if kind in ('raydium_clmm','orca_whirlpool','meteora_dlmm','meteora_damm_v2') else module.decode_pool(value)
-            holders=[]
-            if state.get('lp_mint'):
-                packet=execute(root,config,'lpleads'+str(n),read('largest','getTokenLargestAccounts',[state['lp_mint'],{'commitment':'finalized'}]),factory=factory)
-                if packet.get('status')=='ok':holders=[r['address'] for r in packet['response']['result']['value'][:6]]
+            holders=lp_holder_leads(root,config,'lpleads'+str(n),state['lp_mint'],kind,factory=factory) if state.get('lp_mint') else []
             rows=dependency_rows(root,pool,kind,lp_accounts=holders);collect_sample(root,root,config,'pool'+str(n),rows,factory=factory)
             automatic.append({'pool':pool,'adapter':kind,'lp_accounts':holders})
             results.append({'pool':pool,'adapter':kind,'status':'sampled'})
         except (ValueError,KeyError,TypeError) as exc:results.append({'pool':pool,'adapter':kind,'status':'partial','reason':str(exc) if isinstance(exc,ValueError) else type(exc).__name__})
     atomic(Path(root)/'automatic-leads.json',encoded(automatic))
     # A small recent candidate sample is not archive coverage or proof of selling.
-    # Historical effects must independently establish the exact target/pool flow.
-    receipts=[]
+    # Recent pool signatures are probed one at a time and classified before the receipt budget
+    # is spent on headers: only receipts carrying a supported swap at the exact pool are sampled
+    # (at most two, from at most four probes). Historical effects still verify the actual flow.
+    from solana_transactions import classify_receipt
+    s=Session(root);target=s.meta['target'];s.close()
+    receipts=[];classified=[];probed=set()
+    def transaction_read(sig):return read('receipt_'+sha(sig.encode())[:8],'getTransaction',[sig,{'commitment':'finalized','encoding':'json','maxSupportedTransactionVersion':0}])
     for n,lead in enumerate(automatic):
+        if len(receipts)==2 or len(probed)==4:break
         packet=execute(root,config,'activity'+str(n),read('history','getSignaturesForAddress',
             [lead['pool'],{'commitment':'finalized','limit':10}]),factory=factory)
-        if packet.get('status')=='ok':
-            for row in packet['response']['result']:
-                if row['err'] is None and row['signature'] not in [r['signature'] for r in receipts]:
-                    receipts.append({'pool':lead['pool'],'signature':row['signature']})
-                if len(receipts)==2:break
-        if len(receipts)==2:break
+        if packet.get('status')!='ok':continue
+        for row in packet['response']['result']:
+            if len(receipts)==2 or len(probed)==4:break
+            if row['err'] is not None or row['signature'] in probed:continue
+            probed.add(row['signature'])
+            # The probe shares the receipts sample's read name, so the later sample resumes it without a second send.
+            probe=execute(root,config,'receipts',transaction_read(row['signature']),factory=factory)
+            kind=classify_receipt(target,probe,lead['pool']);classified.append({'pool':lead['pool'],**kind})
+            if kind['swap']:receipts.append({'pool':lead['pool'],'signature':row['signature'],'direction':kind['direction'],'route':kind['route']})
     atomic(Path(root)/'automatic-receipts.json',encoded(receipts))
+    atomic(Path(root)/'receipt-classification.json',encoded({'probed':len(probed),'selected':len(receipts),'maximum_probes':4,'rows':classified,
+        'scope':'recent-signature classification only; a probe without a supported pool swap is not evidence of no trading'}))
     if automatic:
-        from solana_presets import historical_sample
-        s=Session(root);mint=s.meta['target']['mint'];s.close()
-        collect_sample(root,root,config,'receipts',mint_baseline(mint,largest=False)+historical_sample([r['signature'] for r in receipts]),factory=factory)
+        collect_sample(root,root,config,'receipts',mint_baseline(target['mint'],largest=False)+[transaction_read(r['signature']) for r in receipts],factory=factory)
     # Capture known ProgramData authority metadata without pretending the slice is a
     # complete executable or silently exceeding the public response-byte allowance.
     accounts,objects,_=importer_view(root);programdata=[]
@@ -218,7 +269,8 @@ def automatic_dependencies(root,config,factory):
         except ValueError:pass
     if programdata:
         s=Session(root);mint=s.meta['target']['mint'];s.close()
-        rows=mint_baseline(mint,largest=False)+[read('programdata'+str(i),'getAccountInfo',[a,{**settings(),'dataSlice':{'offset':0,'length':45}}]) for i,a in enumerate(list(dict.fromkeys(programdata))[:4])]
+        # One sliced batch shares a context slot: program metadata costs one header pair, not one per program.
+        rows=mint_baseline(mint,largest=False)+[read('programdata','getMultipleAccounts',[list(dict.fromkeys(programdata))[:4],{**settings(),'dataSlice':{'offset':0,'length':45}}])]
         collect_sample(root,root,config,'programs',rows,factory=factory)
     return results
 
@@ -235,7 +287,19 @@ def write_briefs(root):
         note_path=root/'draft/notes'/(owner+'.json')
         contents=(ASSETS/('lane-brief-'+owner+'.md')).read_text()
         intake={k:meta[k] for k in ('investigation_id','target','question','focus','urls','scope','received_at','target_at','deadline_at','lane_cutoff','collection_cutoff')}
-        context={'intake':intake,'owner':owner,'run_root':str(root),'draft':str(root/'draft'),'note_path':str(note_path),'checklist':CHECKLISTS[owner],
+        skill_dir=Path(__file__).resolve().parents[1]
+        contract={'note_exists':'Start already wrote the scaffold at note_path with the header filled in; edit it in place and keep the header.',
+            'header_fields':['note_version','profile','owner','investigation_id','target','question','focus'],
+            'finding_fields':{'required':['id (prefix '+owner+'-)','dimension','claim','strength','text','support'],'optional':['signal','confidence','limitations','subject','counterevidence']},
+            'dimensions':list(DIMENSIONS),'claims':['state_observation','historical_execution','source_analysis','inference','coverage_gap'],
+            'strengths':['direct','corroborated','bounded','unresolved'],'signals':['good','potential_risk','bad','unverified'],
+            'checklist_status':['done','external_limit','pending'],'checklist_keys':list(CHECKLISTS[owner]),
+            'adverse_signals':'potential_risk and bad require impact (low/medium/high/critical) and a concern object {basis, mechanism, consequence}; a finding whose support has a pool or program subject must declare that subject or list it in participants.',
+            'capture_dimension':'Add --dimension <surface> to a capture whose purpose is one coverage surface (for example utility_redemption_rights for terms pages) so that surface records an attempt.',
+            'citeable_ids':'Use the keys of alias_hints in your note or the evidence IDs shown in facts (for example baseline_mint_0, auto-controls, or category:address); the fact- display prefix is not an ID. Your own captures are cited by their capture id after lane-check imports them.',
+            'example_finding':{'id':owner+'-example','dimension':'token_controls' if owner=='project' else 'canonical_lp_principal_custody','claim':'state_observation','strength':'bounded','signal':'unverified','text':'One sentence stating exactly what was observed and its limit.','support':['auto-controls'],'limitations':['What remains unresolved.']},
+            'reference':str(skill_dir/'references/compose.md')}
+        context={'intake':intake,'owner':owner,'run_root':str(root),'draft':str(root/'draft'),'note_path':str(note_path),'skill_dir':str(skill_dir),'note_contract':contract,'checklist':CHECKLISTS[owner],
             'commands':{'facts':[sys.executable,str(Path(__file__).with_name('solana_facts.py')),str(root/'draft'),'--check'],
                 'capture':[sys.executable,str(Path(__file__)),'capture',str(root),'--owner',owner,'--allow-network','--cost-policy','free','--url','PUBLIC_URL'],
                 'self_check':[sys.executable,str(Path(__file__)),'lane-check',str(root),'--owner',owner]+(['--allow-synthetic'] if meta['synthetic'] else [])},
@@ -276,13 +340,18 @@ def start(root,target,*,question,received_at,deadline_at,focus=None,urls=None,sc
     def identity_discovery():
         requested=list(urls or [])
         if scope=='broad' or any(d in surfaces for d in ('canonical_lp_principal_custody','sellability_exit_depth','development_disclosure')):
-            if target['genesis_hash']==MAINNET:requested+=list(source_plan(target).values())
+            if target['genesis_hash']==MAINNET:requested+=list(source_plan(target).values())+([source_plan(target,surface='token_info')['primary']] if scope=='broad' else [])
         with ThreadPoolExecutor(max_workers=2) as pool:
             web=pool.submit(capture,root,requested,opener_factory=opener_factory) if requested else None
             collect_sample(root,root,config,'baseline',mint_baseline(target['mint'],largest=scope=='broad' or 'current_concentration' in surfaces),factory=factory,expand_largest=scope=='broad' or 'current_concentration' in surfaces)
             result=web.result() if web else None
-        links=[r['url'] for d in market_documents(root,target) for r in d['project_links']]
-        proposed=list(dict.fromkeys(links))[:4]
+        # Indexer project links are fetched only when a second indexer names the same identity;
+        # single-indexer profiles stay recorded as unverified and are never crawled automatically.
+        from solana_discovery import corroborate_links
+        links=[r for d in market_documents(root,target) for r in d['project_links']]
+        decided=corroborate_links(links,token_info_documents(root,target))
+        atomic(root/'project-links.json',encoded(decided))
+        proposed=[d['url'] for d in decided if d['status']=='corroborated'][:4]
         if scope=='broad' and proposed:capture(root,proposed,opener_factory=opener_factory)
         return result
     _,error=stage(root,STAGES[0],identity_discovery)
@@ -305,13 +374,18 @@ def start(root,target,*,question,received_at,deadline_at,focus=None,urls=None,sc
             s=Session(root);s.mark(name,{'state':'identity_unresolved' if not have_identity else 'omitted_focused_scope','surfaces':surfaces});s.close()
     result,error=stage(root,STAGES[3],lambda:refresh(root))
     if error:diagnostics.append(error)
+    diagnostics+=provider_diagnostics(root)
     if (root/'draft/manifest.json').exists():
         from solana_scaffold import write
         for owner in (('coordinator','liquidity','project') if scope=='broad' else ('coordinator',)):
             if not (root/'draft/notes'/(owner+'.json')).exists():
                 try:write(root/'draft',owner,synthetic)
                 except ValueError as exc:diagnostics.append({'stage':'scaffold','reason':str(exc)})
-    output={'run':str(root),'draft':str(root/'draft'),'profile':PROFILE,'investigation_id':meta['investigation_id'],'research_status':'partial',
+    summary=None
+    if (root/'draft/facts.json').exists():
+        try:summary=compact(strict_json((root/'draft/facts.json').read_bytes(),'facts.json'),['controls','pools','holders','quotes','transactions','programs','launch','maturity','source_assurance'],limit=6000)
+        except (ValueError,KeyError,TypeError):summary=None
+    output={'run':str(root),'draft':str(root/'draft'),'profile':PROFILE,'investigation_id':meta['investigation_id'],'research_status':'partial','facts_summary':summary,
       'collection':result or first,'diagnostics':diagnostics,'lane_pointers':pointers,'next':'Dispatch both pointers before a separate facts-reading step; then complete notes and compose.' if scope=='broad' else 'Answer the focused request with its dependencies and limits; no final broad delivery.',
       'session':status(root)}
     atomic(root/'start-result.json',encoded(output));return output
@@ -348,7 +422,13 @@ def _collect(root,spec,config,*,factory=HttpTransport):
     elif kind=='creator_history':rows=creator_history(args['keys'],before=args.get('before'))
     elif kind=='programs':rows=account_batches([target['mint']]+[pubkey(a) for a in args['addresses']],prefix='programs',critical=True)
     elif kind=='quote':rows=quote_sample(args['adapter'],args['pool'],objects[accounts[args['pool']]])
-    else:raise ValueError('Supported presets: pool, positions, transactions, creator_history, programs, quote.')
+    elif kind=='holders':rows=mint_baseline(target['mint'],largest=True)
+    elif kind=='pool_activity':
+        pool=pubkey(args['pool']);need(pool in accounts,'Pool lead has not been captured.')
+        limit=args.get('limit',10);receipts=args.get('receipts',2)
+        need(type(limit) is int and 1<=limit<=25 and type(receipts) is int and 0<=receipts<=4,'Activity limit 1-25 signatures and at most four receipts.')
+        rows=[]
+    else:raise ValueError('Supported presets: pool, positions, transactions, creator_history, programs, quote, holders, pool_activity.')
     if not any(r['critical'] and target['mint'] in (r['params'][0] if r['method']=='getMultipleAccounts' else [r['params'][0]]) for r in rows):rows=mint_baseline(target['mint'],largest=False)+rows
     validate_plan(rows)
     s=Session(root)
@@ -364,9 +444,23 @@ def _collect(root,spec,config,*,factory=HttpTransport):
         if lead_rows is not None:
             collect_sample(root,root,config,ident+'lead',lead_rows,factory=factory)
             planned=dependency_rows(root,pool,args['adapter'],lp_accounts=args.get('lp_accounts'),positions=args.get('positions'))
-        return collect_sample(root,root,config,ident,planned,factory=factory)
+        if kind=='pool_activity':
+            # Recent signatures are candidates only; receipts must independently establish the exact flow.
+            packet=execute(root,config,ident,read('activity','getSignaturesForAddress',[pool,{'commitment':'finalized','limit':limit}]),factory=factory)
+            need(packet.get('status')=='ok','Pool activity read unresolved: '+str(packet.get('reason') or packet.get('status')))
+            path=root/'automatic-receipts.json';known=json.loads(path.read_text()) if path.exists() else []
+            probes=root/'receipt-classification.json';seen={k['signature'] for k in known}
+            if probes.exists():seen|={r['signature'] for r in json.loads(probes.read_text()).get('rows',[])}
+            # A signature already sampled or probed is never fetched twice: it would duplicate the receipt and waste the window.
+            signatures=[r['signature'] for r in packet['response']['result'] if r['err'] is None and r['signature'] not in seen][:receipts]
+            atomic(path,encoded(known+[{'pool':pool,'signature':x} for x in signatures if x not in {k['signature'] for k in known}]))
+            if not signatures:return None
+            planned=mint_baseline(target['mint'],largest=False)+historical_sample(signatures)
+        return collect_sample(root,root,config,ident,planned,factory=factory,expand_largest=kind=='holders')
     _,error=stage(root,'preset_'+ident,run_preset)
-    result=refresh(root);result['preset_error']=error;return result
+    result=refresh(root);result['preset_error']=error
+    from solana_scaffold import sync_assignments
+    result['assignments_synced']=sync_assignments(root/'draft');return result
 
 
 def lane_check(root,owner,*,allow_synthetic=False):
@@ -374,7 +468,14 @@ def lane_check(root,owner,*,allow_synthetic=False):
     try:meta=s.meta
     finally:s.close()
     need(owner in CHECKLISTS and meta['scope']=='broad','Known broad lane required.')
-    m=strict_json(regular(draft,'manifest.json').read_bytes(),'manifest.json');e=Evidence(draft,m,allow_synthetic);facts=build(draft,allow_synthetic)
+    m=strict_json(regular(draft,'manifest.json').read_bytes(),'manifest.json');known={o['id'] for o in m['observations']}
+    captures=[json.loads(p.read_text()) for p in sorted((root/'web-captures').glob('*.json'))]
+    if any(c.get('owner')==owner and c.get('captured_at') and c.get('id') not in known for c in captures):
+        # A lane's own registered captures are imported mechanically so a one-shot lane can cite them.
+        # refresh() takes the draft lock itself; taking it here as well would deadlock on flock.
+        refresh(root)
+        m=strict_json(regular(draft,'manifest.json').read_bytes(),'manifest.json')
+    e=Evidence(draft,m,allow_synthetic);facts=build(draft,allow_synthetic)
     n=strict_json(regular(draft,'notes/'+owner+'.json').read_bytes(),'lane note');errors=[];note_header(n,owner,m,errors,'note');validate_imports(draft,n,owner,e,errors,'note')
     rows=[]
     for i,value in enumerate(n.get('findings',[])):
@@ -398,7 +499,7 @@ def lane_check(root,owner,*,allow_synthetic=False):
 def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('action',choices=('start','collect','brief','capture','lane-check','refresh','status'));p.add_argument('root',type=Path)
     p.add_argument('--mint');p.add_argument('--genesis-hash',default=MAINNET);p.add_argument('--question');p.add_argument('--received-at');p.add_argument('--deadline-at');p.add_argument('--focus',action='append',default=[]);p.add_argument('--url',action='append',default=[])
-    p.add_argument('--scope',choices=('broad','focused'),default='broad');p.add_argument('--surface',action='append');p.add_argument('--owner',choices=('ordinary','liquidity','project'),default='ordinary');p.add_argument('--request',type=Path)
+    p.add_argument('--scope',choices=('broad','focused'),default='broad');p.add_argument('--surface',action='append');p.add_argument('--owner',choices=('ordinary','liquidity','project'),default='ordinary');p.add_argument('--dimension',choices=DIMENSIONS);p.add_argument('--request',type=Path)
     p.add_argument('--allow-network',action='store_true');p.add_argument('--cost-policy',choices=('free',));p.add_argument('--rpc-url-env',default='SOLANA_RPC_URL');p.add_argument('--allow-synthetic',action='store_true');a=p.parse_args()
     try:
         if a.action in ('start','collect'):config=public_config(allow_network=a.allow_network,cost_policy=a.cost_policy,rpc_url_env=a.rpc_url_env)
@@ -410,9 +511,11 @@ def main():
         elif a.action=='brief':result={'lane_pointers':write_briefs(a.root)}
         elif a.action=='capture':
             need(a.allow_network and a.cost_policy=='free','Public capture requires --allow-network --cost-policy free.')
-            result=capture(a.root,a.url,a.owner)
+            result=capture(a.root,a.url,a.owner,dimension=a.dimension)
         elif a.action=='lane-check':result=lane_check(a.root,a.owner,allow_synthetic=a.allow_synthetic)
-        elif a.action=='refresh':result=refresh(a.root)
+        elif a.action=='refresh':
+            from solana_scaffold import sync_assignments
+            result=refresh(a.root);result['assignments_synced']=sync_assignments(Path(a.root).resolve()/'draft')
         else:result=status(a.root)
         print(json.dumps(result,ensure_ascii=False));return 0
     except (ValueError,OSError,KeyError,TypeError,IndexError) as exc:

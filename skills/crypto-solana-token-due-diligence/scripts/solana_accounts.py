@@ -8,9 +8,11 @@ from solana_common import (need, natural, pubkey, b58encode, sha, coption_key,
     TOKEN_PROGRAM, TOKEN_2022, target_identity)
 from solana_wire import account as wire_account, validate_response, amount
 
-LAYOUT_VERSION = "1.0.0"
+LAYOUT_VERSION = "1.1.0"
 ACCOUNT_TYPES = {2, 5, 7, 8, 11, 13, 15, 17, 27}
 MINT_TYPES = set(range(1, 29))-ACCOUNT_TYPES
+METADATA_STRING_BOUND = 4096
+METADATA_PAIR_BOUND = 64
 
 
 def boolean(value):
@@ -18,7 +20,44 @@ def boolean(value):
     return bool(value)
 
 
-def _extension(kind, raw, holding):
+def _borsh_string(raw, offset, label):
+    need(offset+4 <= len(raw), "truncated token metadata "+label+" length")
+    size = int.from_bytes(raw[offset:offset+4], "little")
+    need(size <= METADATA_STRING_BOUND and offset+4+size <= len(raw), "token metadata "+label+" exceeds entry")
+    try:
+        value = raw[offset+4:offset+4+size].decode("utf-8")
+    except UnicodeDecodeError:
+        raise ValueError("token metadata "+label+" is not UTF-8") from None
+    return value, offset+4+size
+
+
+def _token_metadata(raw, address):
+    """Token-2022 extension 19 (Borsh): update authority, mint, name, symbol, uri, additional (key, value) pairs.
+
+    Every length is bounded by the TLV entry; the embedded mint must be the account itself when known.
+    """
+    need(len(raw) >= 80, "token metadata entry too short")
+    row = {"authority": optional_key(raw[:32]), "mint": b58encode(raw[32:64])}
+    offset = 64
+    for label in ("name", "symbol", "uri"):
+        row["token_"+label], offset = _borsh_string(raw, offset, label)
+    need(offset+4 <= len(raw), "truncated additional metadata count")
+    count = int.from_bytes(raw[offset:offset+4], "little")
+    need(count <= METADATA_PAIR_BOUND, "additional metadata pairs exceed bound")
+    start = offset
+    offset += 4
+    for _ in range(count):
+        _, offset = _borsh_string(raw, offset, "additional key")
+        _, offset = _borsh_string(raw, offset, "additional value")
+    need(offset == len(raw), "trailing token metadata bytes")
+    row.update(additional_metadata_count=count, additional_metadata_sha256=sha(raw[start:]))
+    if address is not None:
+        need(row["mint"] == pubkey(address), "token metadata mint mismatch")
+        row["mint_matches"] = True
+    return row
+
+
+def _extension(kind, raw, holding, address=None):
     row = {"type": kind, "length": len(raw), "sha256": sha(raw), "decoded": False}
     if holding:
         specs = {2: ("transfer_fee_amount", 8), 7: ("immutable_owner", 0),
@@ -39,16 +78,27 @@ def _extension(kind, raw, holding):
     row = legacy_extension(kind, raw)
     if row["decoded"]:
         return row
+    if kind == 19:
+        row.update(name="token_metadata", decoded=True, **_token_metadata(raw, address))
+        return row
     specs = {4: ("confidential_transfer_mint", 65), 10: ("interest_bearing_config", 52),
              16: ("confidential_transfer_fee_config", 129), 18: ("metadata_pointer", 64),
-             20: ("group_pointer", 64), 22: ("group_member_pointer", 64),
-             25: ("scaled_ui_amount", 56), 28: ("permissioned_burn", 32)}
+             20: ("group_pointer", 64), 21: ("token_group", 80), 22: ("group_member_pointer", 64),
+             23: ("token_group_member", 72), 25: ("scaled_ui_amount", 56), 28: ("permissioned_burn", 32)}
     if kind not in specs:
         return row
     name, size = specs[kind]
     need(len(raw) == size, "invalid mint extension length")
+    if kind == 23:
+        # A member has no authority of its own; its group is the controlling relationship.
+        row.update(name=name, decoded=True, mint=b58encode(raw[:32]), group=b58encode(raw[32:64]),
+                   member_number=int.from_bytes(raw[64:72], "little"))
+        return row
     row.update(name=name, decoded=True, authority=optional_key(raw[:32]))
-    if kind in (18, 20, 22):
+    if kind == 21:
+        row.update(mint=b58encode(raw[32:64]), size=int.from_bytes(raw[64:72], "little"),
+                   max_size=int.from_bytes(raw[72:80], "little"))
+    elif kind in (18, 20, 22):
         row["address"] = optional_key(raw[32:64])
     elif kind == 4:
         row.update(auto_approve_new_accounts=boolean(raw[32]), auditor_key_hex=raw[33:].hex(), balance_visibility="encrypted")
@@ -67,7 +117,7 @@ def _extension(kind, raw, holding):
     return row
 
 
-def _extensions(raw, base, owner, holding):
+def _extensions(raw, base, owner, holding, address=None):
     rows, errors, seen = [], [], set()
     if owner == TOKEN_PROGRAM or len(raw) == base:
         return rows, errors
@@ -88,7 +138,7 @@ def _extensions(raw, base, owner, holding):
             need(offset+size <= len(raw), "truncated extension payload")
             payload = raw[offset:offset+size]
             try:
-                rows.append(_extension(kind, payload, holding))
+                rows.append(_extension(kind, payload, holding, address))
             except ValueError as exc:
                 rows.append({"type": kind, "length": size, "sha256": sha(payload), "decoded": False, "error": str(exc)})
                 errors.append(str(exc))
@@ -112,12 +162,13 @@ def _raw(account, size):
     return raw
 
 
-def decode_mint(account):
+def decode_mint(account, *, address=None):
+    """`address`, when known, binds embedded self-references (token metadata) to this account."""
     raw = _raw(account, 82)
     # Decode base observations independently, so bad TLV evidence cannot erase them.
     base = {**account, "data": [base64.b64encode(raw[:82]).decode(), "base64"], "space": 82}
     row = legacy_mint(base)
-    rows, errors = _extensions(raw, 82, account["owner"], False)
+    rows, errors = _extensions(raw, 82, account["owner"], False, address)
     row.update(data_sha256=sha(raw), layout_version=LAYOUT_VERSION, extensions=rows,
                extension_errors=errors, extensions_valid=not errors,
                unknown_extensions=[r["type"] for r in rows if not r["decoded"]])
@@ -179,7 +230,8 @@ def ratio(numerator, denominator, places=4):
     scale = 10**places
     rounded = (numerator*100*scale*2+denominator)//(2*denominator)
     return {"numerator_atomic": str(numerator), "denominator_atomic": str(denominator),
-            "percent_display": str(rounded//scale)+"."+str(rounded%scale).zfill(places)}
+            "percent_display": str(rounded//scale)+"."+str(rounded%scale).zfill(places),
+            "rounding": "half_up", "places": places}
 
 
 def controls(mint_packet, target, *, epoch_packet=None):
@@ -191,7 +243,7 @@ def controls(mint_packet, target, *, epoch_packet=None):
     need(checked["status"] == "ok" and req["method"] in ("getAccountInfo", "getMultipleAccounts"), "mint account observation required")
     need("dataSlice" not in req["params"][1] and target["mint"] in checked["addresses"], "full exact-mint observation required")
     values = checked["result"]["value"] if req["method"] == "getMultipleAccounts" else [checked["result"]["value"]]
-    mint = decode_mint(values[checked["address_indices"][target["mint"]]])
+    mint = decode_mint(values[checked["address_indices"][target["mint"]]], address=target["mint"])
     powers = [{"role": role, "controller": mint[role], "evidence": [req["id"]], "controller_status": "unresolved" if mint[role] is not None else "absent_in_sample"}
               for role in ("mint_authority", "freeze_authority")]
     for extension in mint["extensions"]:
@@ -212,7 +264,10 @@ def aggregate_holders(discovery, sample, target, *, custody_exclusions=None):
     need(discovery.get("status") == sample.get("status") == "ok", "successful discovery and sample required")
     d, s = validate_response(discovery["request"], discovery["response"]), validate_response(sample["request"], sample["response"])
     need(d["status"] == s["status"] == "ok", "valid discovery and sample required")
-    need(discovery["request"]["method"] == "getTokenLargestAccounts" and discovery["request"]["params"][0] == target["mint"], "wrong discovery mint")
+    from solana_presets import discovery_leads, LEAD_LIMIT
+    method = discovery["request"]["method"]
+    scanned = discovery_leads(target["mint"], discovery["request"], d, limit=None)  # binds the discovery to the exact mint
+    leads = scanned[:LEAD_LIMIT]
     need(sample["request"]["method"] == "getMultipleAccounts" and "dataSlice" not in sample["request"]["params"][1], "full same-context batch required")
     need(s["context_slot"] >= d["context_slot"], "holdings sample predates rank discovery")
     indexed = dict(zip(s["addresses"], s["result"]["value"]))
@@ -223,8 +278,9 @@ def aggregate_holders(discovery, sample, target, *, custody_exclusions=None):
     need(isinstance(custody_exclusions, dict) and set(custody_exclusions) <= indexed.keys(), "unrequested custody exclusion")
     for address, evidence in custody_exclusions.items():
         need(isinstance(evidence, dict) and set(evidence) == {"reason", "evidence"} and evidence["reason"] and isinstance(evidence["evidence"], list) and evidence["evidence"], "custody exclusion requires evidence")
-    discovered = {r["address"]: (i+1, r) for i, r in enumerate(d["result"]["value"])}
-    need(all(r["decimals"] == mint["decimals"] for _, r in discovered.values()), "discovery decimals disagree with mint")
+    discovered = {r["address"]: (i+1, r) for i, r in enumerate(leads)}
+    if method == "getTokenLargestAccounts":
+        need(all(r["decimals"] == mint["decimals"] for r in d["result"]["value"]), "discovery decimals disagree with mint")
     need(set(indexed)-{target["mint"]} <= discovered.keys(), "unrequested holdings account")
     observed_total, excluded_total, withheld_total = 0, 0, 0
     withheld_unknown = False
@@ -260,8 +316,13 @@ def aggregate_holders(discovery, sample, target, *, custody_exclusions=None):
             "balance_changed_since_discovery": lead["amount"] != holding["amount_atomic"],
             "custody_exclusion": custody_exclusions.get(address), **holding})
     need(observed_total+withheld_total <= supply, "sample amounts exceed same-context supply")
-    return {"target": target, "status": "partial" if missing or withheld_unknown or not mint["extensions_valid"] or mint["unknown_extensions"] else "sampled",
+    # Only holding-side unknowns can hide balances; an unknown mint extension is a control gap, not a quantity gap.
+    return {"target": target, "status": "partial" if missing or withheld_unknown or not mint["extensions_valid"] else "sampled",
         "discovery_slot": d["context_slot"], "sample_slot": s["context_slot"],
+        "discovery": {"method": method, "leads": len(leads),
+            "accounts_scanned": len(scanned) if method == "getProgramAccounts" else None,
+            "scanned_amount_atomic": str(sum(int(r["amount"]) for r in scanned)) if method == "getProgramAccounts" else None,
+            "scope": "provider-reported census of fixed-size SPL accounts at the discovery slot" if method == "getProgramAccounts" else "largest-account sample of at most 20 token accounts"},
         "evidence": [discovery["request"]["id"], sample["request"]["id"]], "mint": mint,
         "supply_atomic": str(supply), "observed_base_amount_atomic": str(observed_total),
         "known_withheld_amount_atomic": str(withheld_total), "additional_withheld_or_confidential_unknown": withheld_unknown,

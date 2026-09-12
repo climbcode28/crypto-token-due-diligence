@@ -1,6 +1,14 @@
 from solana_scaffold import scaffold
 from solana_facts import encoded
 from solana_compose import CHECKLISTS
+from solana_pipeline_note import generate
+
+
+def assign(b,signal,ids=None):
+    """Digest-bound signal assignments for the current pipeline findings (all of them unless ids are given)."""
+    digests={o['id']:o['sha256'] for o in b.m['observations']}
+    return {f['id']:{'signal':signal,'input_digests':{r['evidence_id']:digests[r['evidence_id']] for r in f['support']}}
+            for f in generate(b.root,True)['findings'] if ids is None or f['id'] in ids}
 
 
 def note(b):
