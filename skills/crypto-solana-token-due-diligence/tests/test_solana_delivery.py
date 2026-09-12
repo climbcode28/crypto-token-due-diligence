@@ -25,21 +25,50 @@ class DeliveryTests(unittest.TestCase):
         self.assertIn('## Summary',markdown);self.assertIn('🟡 **Potential Risk**',markdown);self.assertIn('**Conclusions**',markdown)
         for axis in ('Technical exposure','Credibility and maturity','Token economics','Research confidence'):self.assertEqual(markdown.count('- **'+axis+':**'),1)
         verdict=next(x for x in result['reading_checklist'] if x['kind']=='verdict');self.assertEqual(set(verdict['axes']),{'technical_exposure','credibility_maturity','token_economics','research_confidence'})
-        finding=next(x for x in result['reading_checklist'] if x['kind']=='finding' and x['signal']=='potential_risk');self.assertEqual(finding['label'],'🟡 Potential Risk');self.assertTrue(finding['citations'])
+        finding=next(x for x in result['reading_checklist'] if x['kind']=='finding' and x['signal']=='potential_risk');self.assertNotIn('label',finding);self.assertTrue(finding['citations'])
+        self.assertTrue(all(c in {r['evidence_id'] for r in result['citations']} for c in finding['citations']));self.assertIn('potential_risk 🟡 Potential Risk',result['compaction'])
         self.assertEqual(result,read(root/'final',True));self.assertEqual(result['network_requests'],0)
 
     def test_reading_payload_collapses_field_restatements_and_unreferenced_citations(self):
         root,b,n=self.fixture(True);result=finalize(b.root,root/'final',allow_synthetic=True)
-        findings=[x for x in result['reading_checklist'] if x['kind']=='finding']
+        findings=[x for x in result['reading_checklist'] if x['kind']=='finding'];typed=[x for x in result['reading_checklist'] if x['kind']=='typed_fact']
         import json
         report=json.loads((root/'final/report.json').read_text());pipeline=[f for f in report['findings'] if f['owner']=='pipeline']
         parents={f['id'] for f in pipeline if f['id']=='pipeline-'+f['support'][0]['evidence_id']}
-        self.assertTrue(parents);self.assertTrue(all(x['id'] in parents or not x['id'].startswith('pipeline-') for x in findings))
+        # A typed fact's own pipeline finding travels inside the fact entry; only analyst findings stay separate entries.
+        self.assertTrue(parents);self.assertFalse(any(x['id'].startswith('pipeline-') for x in findings))
+        self.assertEqual({'pipeline-'+x['evidence_id'] for x in typed if 'finding' in x},parents)
         self.assertEqual(result['field_restatements_omitted'],len(pipeline)-len(parents))
-        self.assertTrue(any(x.get('field_restatements') for x in findings if x['id'] in parents))
+        self.assertTrue(any(x['finding'].get('field_restatements') for x in typed if 'finding' in x))
         self.assertEqual(result['citations_omitted']+len(result['citations']),len(json.loads((root/'final/manifest.json').read_text())['observations']))
-        cited={c['evidence_id'] for x in findings for c in x['citations']}
+        cited={c for x in findings for c in x['citations']}
         self.assertTrue(cited<={c['evidence_id'] for c in result['citations']})
+
+    def test_reading_keeps_every_typed_quantity_and_limit_and_aliases_round_trip(self):
+        from solana_render import PROVENANCE_KEYS,ADDRESS
+        root,b,n=self.fixture(True);result=finalize(b.root,root/'final',allow_synthetic=True)
+        manifest=json.loads((root/'final/manifest.json').read_text());typed={x['evidence_id']:x for x in result['reading_checklist'] if x['kind']=='typed_fact'}
+        table=result['addresses'];self.assertTrue(table)
+        def expand(text):return ADDRESS.sub(lambda m:m.group(0),text) if not table else __import__('re').sub(r'@[A-Za-z0-9_]+',lambda m:table.get(m.group(0),m.group(0)),text)
+        def leaves(value,path=()):
+            if isinstance(value,dict):
+                for k,v in value.items():
+                    if k in PROVENANCE_KEYS:continue
+                    yield from leaves(v,path+(k,))
+            elif isinstance(value,list):
+                for v in value:yield from leaves(v,path)
+            elif value is not None and value not in ([],{},''):yield path,value
+        for d in manifest['derivations']:
+            entry=typed[d['id']];text=expand(json.dumps([entry['details'],entry['limits'],entry['attention'],entry['summary']],ensure_ascii=False))
+            for path,value in leaves(d['output']):
+                if path and path[-1] in ('places','rounding'):continue  # share objects collapse to numerator/denominator = percent
+                self.assertIn(json.dumps(value,ensure_ascii=False).strip('"'),text,(d['id'],path,value))
+            for row in [str(r['path']) for r in __import__('solana_facts').scan(d['output'],__import__('solana_facts').LIMIT_KEYS)]:
+                self.assertTrue(any(expand(l).startswith(row.split('[')[0]) for l in entry['limits']),(d['id'],row))
+        for alias in __import__('re').findall(r'@[A-Za-z0-9_]+',json.dumps(list(typed.values()),ensure_ascii=False)):
+            if alias.startswith('@a') or alias in ('@target_mint','@wsol','@spl_token','@token_2022','@system','@genesis_hash'):self.assertIn(alias,table,alias)
+        for alias,address in table.items():self.assertRegex(address,ADDRESS)
+        self.assertLess(len(json.dumps(result,ensure_ascii=False).encode()),60_000)
 
     def test_checkpoint_records_unjudged_work_but_cannot_deliver(self):
         t=tempfile.TemporaryDirectory();self.addCleanup(t.cleanup);root=Path(t.name);b=Bundle(root/'draft');save(b,note(b))

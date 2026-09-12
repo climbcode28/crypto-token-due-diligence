@@ -103,7 +103,7 @@ script) with a stable `id` of at most 12 characters, `kind` and `parameters`:
 | `pool` | `adapter`, `pool` (must appear in this run's exact-mint discovery or captured accounts), optional `lp_accounts` (at most six) |
 | `positions` | `adapter`, `pool`, `positions` (at most six discovered supported leads) |
 | `transactions` | `signatures` (at most two) |
-| `pool_activity` | `pool` (captured), optional `limit` (1–25 signatures, default 10) and `receipts` (0–4, default 2) |
+| `pool_activity` | `pool` (captured), optional `limit` (1–25 signatures, default 10), `receipts` (0–4 sampled swap receipts, default 2) and `probes` (receipts–8 signatures classified, default 4) |
 | `holders` | none: holder discovery (largest accounts or the bounded scan) plus the same-batch balance sample |
 | `creator_history` | `keys` (at most two attributed keys), optional `before` cursors |
 | `programs` | `addresses` (known program/controller dependencies) |
@@ -138,8 +138,9 @@ python3 "$S/scripts/solana_bundle.py" finalize "$RUN/draft" --out "$RUN/final"
 Finalize composes both lane notes and the coordinator note, preflights, freezes the
 engine and evidence, validates, renders and reproduces bytes, and returns `report_path`,
 the compact reading checklist (verdict and axes, every finding with its citation, the
-eleven coverage rows, typed-fact limits) and citations in one response. Answer from that
-checklist; open `report_path` only for a disputed detail. It lists every error at once;
+eleven coverage rows, typed-fact quantities and limits with `@aliases` for recurring
+addresses) and citations in one response. Answer from that checklist, expanding aliases
+from its `addresses` table; open `report_path` only for a disputed detail. It lists every error at once;
 repair the note and rerun. `compose --check` only validates a note without writing:
 
 ```sh
@@ -168,7 +169,9 @@ explicitly undeliverable as completed broad research; describe its limits. `read
 [report-replay](report-replay.md). Old schema-1 bundles are validated with
 `validate --profile legacy-v1`; they keep their original rendering.
 
-Automatic activity sampling requests at most ten recent signatures per selected pool
-and at most two receipts overall; `pool_activity` can add up to four more. Only
+Automatic activity sampling requests at most ten recent signatures per selected pool,
+probes at most four of them and samples at most two receipts overall; `pool_activity`
+classifies its probes the same way (skipping signatures already sampled or probed) and
+can add up to four more receipts. Only
 supported historical swap effects with exact pool/mint/owner and balance reconciliation
 become sample sales. Empty/short history is not archive coverage or proof of no selling.

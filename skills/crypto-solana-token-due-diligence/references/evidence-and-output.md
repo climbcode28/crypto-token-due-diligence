@@ -36,9 +36,12 @@ owner versus beneficial owner, sample account/receipt counts, custody exclusions
 LP principal versus fees, named controllers and bypass paths, quote versus execution,
 net proceeds versus gross/refunds/profit, economics/rights, assurance levels and the
 original focus. A short answer must not erase a material limitation or adverse fact.
-The checklist keeps every material quantity and limit; only publication-derived details
-(indexer listings, repository metadata, quote routes) are capped with an explicit
-remainder note. Refer to the frozen report for supporting detail; do not assign standard
+The checklist keeps every material quantity and limit in a compact shape: typed-fact
+details are nested, omit provenance (timestamps, digests, evidence ids, context slots)
+and null or empty fields, list same-shaped rows as column tables, and carry the fact's
+own pipeline finding; addresses that recur are `@aliases` resolved once in `addresses`
+(expand them when naming an account); only publication-derived details (indexer
+listings, repository metadata, quote routes) are capped with an explicit remainder note. Refer to the frozen report for supporting detail; do not assign standard
 unfinished research to the user as homework.
 
 Use [replay guidance](report-replay.md) for verification and trust boundaries, and

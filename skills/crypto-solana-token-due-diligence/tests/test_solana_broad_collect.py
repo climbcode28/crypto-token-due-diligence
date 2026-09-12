@@ -233,6 +233,30 @@ class LaneAndPresetTests(unittest.TestCase):
         self.assertEqual(json.loads((root/'import-diagnostics.json').read_text())['errors'],[])
         self.assertIn('pipeline-auto-sales',json.loads((root/'draft/notes/coordinator.json').read_text())['signal_assignments'])
 
+    def test_pool_activity_preset_classifies_probes_like_start_and_resumes(self):
+        from transaction_fixture import fixture
+        from solana_common import b58encode
+        from solana_transactions import SYSTEM
+        root,target,opts=self.setup_run();_,a,packet,_=fixture();tx=packet['response']['result']
+        tx['transaction']['message']['accountKeys']=[RichRpc.pool['pool'] if k==a['pool'] else k for k in tx['transaction']['message']['accountKeys']]
+        tx['blockTime']=RichRpc.stamp;RichRpc.receipt=tx;start(root,target,**opts)
+        # Two newer signatures appear after start: one without a supported swap (probed, skipped) and one exact-pool swap (probed, selected, sampled).
+        other=copy.deepcopy(tx);plain=b58encode(bytes([78])*64);other['transaction']['signatures'][0]=plain
+        keys=other['transaction']['message']['accountKeys'];other['transaction']['message']['instructions'][a['swap_index']]['programIdIndex']=keys.index(SYSTEM)
+        swap=copy.deepcopy(tx);again=b58encode(bytes([79])*64);swap['transaction']['signatures'][0]=again
+        RichRpc.receipts={plain:other,again:swap};sent=len([c for c in RichRpc.calls if c['method']=='getTransaction'])
+        spec={'id':'act','kind':'pool_activity','parameters':{'pool':RichRpc.pool['pool'],'limit':10,'receipts':1,'probes':4}}
+        result=collect(root,spec,opts['config'],factory=RichRpc);self.assertIsNone(result['preset_error'])
+        self.assertEqual(len([c for c in RichRpc.calls if c['method']=='getTransaction']),sent+2)  # one send per probe; the sample resumed the swap probe
+        classification=json.loads((root/'receipt-classification.json').read_text());mine=[r for r in classification['rows'] if r['sample']=='act']
+        self.assertEqual([(r['signature'],r['swap']) for r in mine],[(plain,False),(again,True)]);self.assertEqual((classification['probed'],classification['selected']),(3,2))
+        receipts=json.loads((root/'automatic-receipts.json').read_text());self.assertEqual([(r['signature'],r.get('direction'),r.get('sample')) for r in receipts][-1],(again,'sell','act'))
+        facts=json.loads((root/'draft/facts.json').read_text());self.assertEqual(next(f['data']['verified_receipts'] for f in facts['facts'] if f['operation']=='sales'),2)
+        self.assertEqual(json.loads((root/'import-diagnostics.json').read_text())['errors'],[])
+        again_result=collect(root,spec,opts['config'],factory=RichRpc);self.assertIsNone(again_result['preset_error'])
+        self.assertEqual(len([c for c in RichRpc.calls if c['method']=='getTransaction']),sent+2)  # an identical preset resumes without a new send
+        with self.assertRaisesRegex(ValueError,'probes'):collect(root,{'id':'bad','kind':'pool_activity','parameters':{'pool':RichRpc.pool['pool'],'receipts':3,'probes':2}},opts['config'],factory=RichRpc)
+
 
 class ImporterBoundaryTests(unittest.TestCase):
     """A later sample outside the verified network interval stays partial; the run keeps importing."""

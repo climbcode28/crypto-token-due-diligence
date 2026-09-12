@@ -423,3 +423,88 @@ two wall-clock-dependent tests use the virtual clock; a tautological and a dead-
 repaired; the derivation version map lists only operations whose output changed.
 
 Final state: Solana 379 passed, router 30, EVM 429; `git diff --check` clean; nothing committed.
+
+### Follow-up session (2026-09-12, evening): probe classification, payload compaction, live completed delivery
+
+Three items in order, nothing committed.
+
+**1. `pool_activity` classifies probes like `start`.** `receipt_read`, `classify_probes` and
+`record_probes` are shared by the start stage and the preset: each unseen recent signature is
+probed one at a time and classified before any header is bought, only receipts with a supported
+swap at the exact pool are sampled, the probe read name is reused so the sample never re-sends
+it, and the classification rows carry their `sample` id. New optional parameter `probes`
+(receipts to 8, default 4); `receipts` stays 0 to 4. An identical named preset resumes its own
+classification without a new send. Regression test: a non-swap signature is probed and
+skipped, the swap is probed, selected and sampled with one send per probe, the resumed preset
+sends nothing, and `receipts > probes` is refused. Live (run b below): the preset probed two
+signatures, selected both (one buy, one sell) and the sell became the run's verified sale.
+
+**2. Reading payload compaction** (`solana_render` and `solana_replay` 1.2.0). Typed-fact
+details are nested and omit provenance keys, nulls and empties; leaves already listed under
+limits or attention are not repeated; share objects collapse to `num/den = pct%`; same-shaped
+rows become column tables with constant columns hoisted; transaction facts list instruction
+programs, merged pre/post token balances, changed/unchanged lamport tables and hoisted scope
+strings; publication tables are capped at six rows; recurring addresses are `@aliases` resolved
+once in `addresses` (well-known programs, WSOL, the target mint and the genesis hash get named
+aliases); each typed fact carries its own pipeline finding (text and limitations are the fact's
+summary and limits; pipeline defaults omitted); analyst findings cite evidence ids only, omit
+labels, null concerns and false summary flags; attention and limit rows are strings with index
+ranges collapsed; the coverage entry is a table; `read` keeps the absolute path only inside
+`answer_link`. A regression test asserts every non-provenance leaf of every derivation output
+survives (numbers, controllers, statuses), limits are listed, aliases round-trip, and the
+synthetic delivery fixture reads under 60 KB.
+
+| Bundle | Old renderer | New renderer |
+| --- | --- | --- |
+| WIF `wif-e2e/checkpoint5` (44 findings, 18 facts) | 177,650 B | 73,169 B |
+| RAY run a checkpoint (20 facts, no composed findings) | — | 62,486 B read payload |
+| RAY run b delivered (24 analyst findings, 19 facts) | 266,611 B | 84,745 B reading, 87,409 B read payload |
+
+The under-60 KB target is **not met** on live bundles. What remains is analyst prose (24
+findings, about 24 KB) and typed quantities (19 facts, about 43 KB; every state and execution
+number is kept, checked leaf by leaf on this bundle, while indexer candidate tables beyond six
+rows are capped with a remainder note as publication details were before), plus verdict,
+coverage, citations and the alias table. Further lossless levers not taken: aliasing
+addresses inside analyst prose (about 2 KB) and hoisting repeated limit sentences.
+
+**3. Live completed broad delivery on RAY** (`4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R`,
+about USD 410M market cap per Dexscreener, SPL Token program, two Raydium AMM v4 pools sampled).
+Both lanes were dispatched in the same message as `start` with a preamble that waits for the
+note scaffold, then follows the printed pointer verbatim.
+
+Run a (`research/…-2026-09-12-live-a`, received 17:25:37Z): start 40 s, 66 attempts, 16
+facts; `pool_activity` probed/selected two buys; USD 1,000 Jupiter quote captured. It ended as
+a checkpoint, not a delivery, for three reasons recorded here so they are not repeated: (i) a
+second preset (`programs` on the AMM upgrade authority) ran after the ordinary budget was
+exhausted, its main batch was budget-denied while the final-reserve recheck of the mint
+succeeded unpinned, so the newest mint snapshot became unusable, `auto-controls` turned into a
+coverage-gap pipeline finding and `token_controls` could no longer close (a resolved boundary
+forbids gaps; an external limit needs failed attempts at two sources); (ii) both lane notes
+failed self-check on support-subject declaration, an invalid participant kind (`account`) and
+claim classes (state observation on document evidence, historical execution without an
+execution effect); (iii) later coordinator captures were budget-denied.
+
+Run b (`research/…-2026-09-12-live-b`, received 17:43:28Z, deadline 17:53:28Z): start 45 s,
+68 attempts; one preset (`pool_activity` on the RAY/SOL pool) and one quote capture by
+17:44:48Z; lane pointers carried the note-contract pitfalls; both lane notes passed self-check
+on the first attempt (project 44 s before its cutoff, liquidity 4 s after); the coordinator note
+was written from the facts by a scratchpad composition script (one project gap finding restated
+as a bounded source analysis with an explicit limitation); `compose --check` valid,
+`finalize` delivered at 17:47:55Z, 4 min 27 s after receipt, inside the +420 s target.
+Verdict conditional; ratings: token_controls no_issue_detected, external_dependencies and
+current_concentration concern, the other eight unknown; all eleven coverage rows checked and
+resolved. Evidence: `research/…-live-b/final` (report.md, reading.json, evidence/); the
+run-a checkpoint is `research/…-live-a/checkpoint`.
+
+Open items found by the live runs: an evidenced external limit needs an `alternate` route that
+the importer assigns only to GeckoTerminal captures, so non-market surfaces can complete only as
+resolved; sales and rebuys derive from the first two candidate receipts, so preset receipts are
+excluded when start already sampled two; a partial follow-up sample of the mint makes the newest
+snapshot unusable and blocks completion (consider deriving controls from the latest usable
+snapshot without a gap finding for the unpinned newer one); the quoted Jupiter route did not
+touch the sampled pools; a verdict text beginning with "Conditional:" renders as
+"Conditional: Conditional:" (cosmetic); lane briefs exceed the Bash 30 KB output cap and must be
+opened with Read.
+
+Final state: Solana 381 passed, router 30, EVM 429; README suite count updated; `git diff
+--check` clean; nothing committed.

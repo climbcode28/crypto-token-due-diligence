@@ -8,7 +8,7 @@ from solana_compose import ComposeError, compose,draft_lock
 from solana_facts import encoded,atomic
 from solana_render import render,reading
 
-VERSION='1.1.0'
+VERSION='1.2.0'
 ENGINE_ROOT=Path(__file__).resolve().parents[1]
 MAX_FILES=2000
 MAX_BYTES=192*1024*1024
@@ -85,10 +85,11 @@ def read(root,allow_synthetic=False):
     check(content['target']==result['receipt']['target'] and content['delivery_status']==result['delivery_status'],'reading','Reading identity/status differs.')
     from solana_render import safe_text,PUBLICATION_OPS,PUBLICATION_DETAIL_LINES
     for row in content['citations']:
+        # A frozen-evidence row keeps its absolute path only inside answer_link; a source row keeps its URL and capture time.
         if row['kind']=='frozen_evidence':
-            name=unquote(row['url']);row['path']=str(regular(root,name));target='<'+quote(row['path'],safe='/._- ')+'>'
+            name=unquote(row.pop('url'));target='<'+quote(str(regular(root,name)),safe='/._- ')+'>';row.pop('captured_at',None)
         else:target=row['url']
-        row['answer_link']='['+safe_text(row['label'])+']('+target+')'
+        row['answer_link']='['+safe_text(row.get('label',row['evidence_id']))+']('+target+')'
     for entry in content['reading_checklist']:
         # Older frozen checklists carry every publication leaf; the presentation caps them the same way.
         if entry.get('kind')=='typed_fact' and entry.get('operation') in PUBLICATION_OPS and isinstance(entry.get('details'),list) and len(entry['details'])>PUBLICATION_DETAIL_LINES+1:

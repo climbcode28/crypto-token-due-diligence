@@ -207,6 +207,38 @@ def provider_diagnostics(root):
     return rows
 
 
+def receipt_read(sig):
+    """One named receipt read per signature, shared by the start probe and any later sample so a probe is never re-sent."""
+    from solana_common import signature
+    return read('receipt_'+sha(sig.encode())[:8],'getTransaction',[signature(sig),{'commitment':'finalized','encoding':'json','maxSupportedTransactionVersion':0}])
+
+
+def classify_probes(root,config,sample,pool,signatures,*,probes,receipts,factory):
+    """Probe recent signatures one at a time and classify each before any header is bought: only receipts
+    carrying a supported swap at the exact pool are selected (at most `receipts`, from at most `probes`).
+    A probe without a supported pool swap is not evidence of no trading."""
+    from solana_transactions import classify_receipt
+    s=Session(root);target=s.meta['target'];s.close()
+    rows=[];selected=[]
+    for sig in signatures:
+        if len(rows)==probes or len(selected)==receipts:break
+        probe=execute(root,config,sample,receipt_read(sig),factory=factory)
+        row={'pool':pool,'sample':sample,**classify_receipt(target,probe,pool)};rows.append(row)
+        if row['swap']:selected.append(row)
+    return rows,selected
+
+
+def record_probes(root,sample,rows,selected,*,probes,receipts):
+    receipts_path=Path(root)/'automatic-receipts.json';known=json.loads(receipts_path.read_text()) if receipts_path.exists() else []
+    probes_path=Path(root)/'receipt-classification.json'
+    record=json.loads(probes_path.read_text()) if probes_path.exists() else {'probed':0,'selected':0,'maximum_probes':0,'rows':[],
+        'scope':'recent-signature classification only; a probe without a supported pool swap is not evidence of no trading'}
+    record['rows']+=rows;record['probed']+=len(rows);record['selected']+=len(selected);record['maximum_probes']+=probes
+    record.setdefault('samples',[]).append({'sample':sample,'probed':len(rows),'selected':len(selected),'maximum_probes':probes,'maximum_receipts':receipts})
+    atomic(probes_path,encoded(record))
+    atomic(receipts_path,encoded(known+[{'pool':r['pool'],'signature':r['signature'],'direction':r['direction'],'route':r['route'],'sample':sample} for r in selected]))
+
+
 def automatic_dependencies(root,config,factory):
     from adapters import pool_adapter
     from solana_programs import observed_account,decode_program
@@ -235,28 +267,20 @@ def automatic_dependencies(root,config,factory):
     # Recent pool signatures are probed one at a time and classified before the receipt budget
     # is spent on headers: only receipts carrying a supported swap at the exact pool are sampled
     # (at most two, from at most four probes). Historical effects still verify the actual flow.
-    from solana_transactions import classify_receipt
     s=Session(root);target=s.meta['target'];s.close()
     receipts=[];classified=[];probed=set()
-    def transaction_read(sig):return read('receipt_'+sha(sig.encode())[:8],'getTransaction',[sig,{'commitment':'finalized','encoding':'json','maxSupportedTransactionVersion':0}])
     for n,lead in enumerate(automatic):
         if len(receipts)==2 or len(probed)==4:break
         packet=execute(root,config,'activity'+str(n),read('history','getSignaturesForAddress',
             [lead['pool'],{'commitment':'finalized','limit':10}]),factory=factory)
         if packet.get('status')!='ok':continue
-        for row in packet['response']['result']:
-            if len(receipts)==2 or len(probed)==4:break
-            if row['err'] is not None or row['signature'] in probed:continue
-            probed.add(row['signature'])
-            # The probe shares the receipts sample's read name, so the later sample resumes it without a second send.
-            probe=execute(root,config,'receipts',transaction_read(row['signature']),factory=factory)
-            kind=classify_receipt(target,probe,lead['pool']);classified.append({'pool':lead['pool'],**kind})
-            if kind['swap']:receipts.append({'pool':lead['pool'],'signature':row['signature'],'direction':kind['direction'],'route':kind['route']})
-    atomic(Path(root)/'automatic-receipts.json',encoded(receipts))
-    atomic(Path(root)/'receipt-classification.json',encoded({'probed':len(probed),'selected':len(receipts),'maximum_probes':4,'rows':classified,
-        'scope':'recent-signature classification only; a probe without a supported pool swap is not evidence of no trading'}))
+        signatures=[r['signature'] for r in packet['response']['result'] if r['err'] is None and r['signature'] not in probed]
+        # The probe shares the receipts sample's read name, so the later sample resumes it without a second send.
+        rows,selected=classify_probes(root,config,'receipts',lead['pool'],signatures,probes=4-len(probed),receipts=2-len(receipts),factory=factory)
+        probed.update(r['signature'] for r in rows);classified+=rows;receipts+=selected
+    record_probes(root,'receipts',classified,receipts,probes=4,receipts=2)
     if automatic:
-        collect_sample(root,root,config,'receipts',mint_baseline(target['mint'],largest=False)+[transaction_read(r['signature']) for r in receipts],factory=factory)
+        collect_sample(root,root,config,'receipts',mint_baseline(target['mint'],largest=False)+[receipt_read(r['signature']) for r in receipts],factory=factory)
     # Capture known ProgramData authority metadata without pretending the slice is a
     # complete executable or silently exceeding the public response-byte allowance.
     accounts,objects,_=importer_view(root);programdata=[]
@@ -425,8 +449,9 @@ def _collect(root,spec,config,*,factory=HttpTransport):
     elif kind=='holders':rows=mint_baseline(target['mint'],largest=True)
     elif kind=='pool_activity':
         pool=pubkey(args['pool']);need(pool in accounts,'Pool lead has not been captured.')
-        limit=args.get('limit',10);receipts=args.get('receipts',2)
+        limit=args.get('limit',10);receipts=args.get('receipts',2);probes=args.get('probes',4)
         need(type(limit) is int and 1<=limit<=25 and type(receipts) is int and 0<=receipts<=4,'Activity limit 1-25 signatures and at most four receipts.')
+        need(type(probes) is int and receipts<=probes<=8,'Activity probes must be at least the receipts and at most eight.')
         rows=[]
     else:raise ValueError('Supported presets: pool, positions, transactions, creator_history, programs, quote, holders, pool_activity.')
     if not any(r['critical'] and target['mint'] in (r['params'][0] if r['method']=='getMultipleAccounts' else [r['params'][0]]) for r in rows):rows=mint_baseline(target['mint'],largest=False)+rows
@@ -445,17 +470,23 @@ def _collect(root,spec,config,*,factory=HttpTransport):
             collect_sample(root,root,config,ident+'lead',lead_rows,factory=factory)
             planned=dependency_rows(root,pool,args['adapter'],lp_accounts=args.get('lp_accounts'),positions=args.get('positions'))
         if kind=='pool_activity':
-            # Recent signatures are candidates only; receipts must independently establish the exact flow.
+            # Recent signatures are candidates only. Like start, each unseen signature is probed and classified
+            # before any header is bought; only supported swaps at the exact pool are sampled, and receipts must
+            # still independently establish the exact flow.
             packet=execute(root,config,ident,read('activity','getSignaturesForAddress',[pool,{'commitment':'finalized','limit':limit}]),factory=factory)
             need(packet.get('status')=='ok','Pool activity read unresolved: '+str(packet.get('reason') or packet.get('status')))
-            path=root/'automatic-receipts.json';known=json.loads(path.read_text()) if path.exists() else []
-            probes=root/'receipt-classification.json';seen={k['signature'] for k in known}
-            if probes.exists():seen|={r['signature'] for r in json.loads(probes.read_text()).get('rows',[])}
-            # A signature already sampled or probed is never fetched twice: it would duplicate the receipt and waste the window.
-            signatures=[r['signature'] for r in packet['response']['result'] if r['err'] is None and r['signature'] not in seen][:receipts]
-            atomic(path,encoded(known+[{'pool':pool,'signature':x} for x in signatures if x not in {k['signature'] for k in known}]))
-            if not signatures:return None
-            planned=mint_baseline(target['mint'],largest=False)+historical_sample(signatures)
+            probes_path=root/'receipt-classification.json';record=json.loads(probes_path.read_text()) if probes_path.exists() else {'rows':[]}
+            mine=[r for r in record['rows'] if r.get('sample')==ident]
+            if mine:selected=[r for r in mine if r['swap']]  # An identical named preset resumes its own classification.
+            else:
+                path=root/'automatic-receipts.json';seen={k['signature'] for k in (json.loads(path.read_text()) if path.exists() else [])}
+                seen|={r['signature'] for r in record['rows']}
+                # A signature already sampled or probed is never fetched twice: it would duplicate the receipt and waste the window.
+                signatures=[r['signature'] for r in packet['response']['result'] if r['err'] is None and r['signature'] not in seen]
+                classified,selected=classify_probes(root,config,ident,pool,signatures,probes=probes,receipts=receipts,factory=factory)
+                record_probes(root,ident,classified,selected,probes=probes,receipts=receipts)
+            if not selected:return None
+            planned=mint_baseline(target['mint'],largest=False)+[receipt_read(r['signature']) for r in selected]
         return collect_sample(root,root,config,ident,planned,factory=factory,expand_largest=kind=='holders')
     _,error=stage(root,'preset_'+ident,run_preset)
     result=refresh(root);result['preset_error']=error
