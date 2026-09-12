@@ -42,7 +42,10 @@ fact's summary and its own pipeline finding; the typed-fact detail tables (every
 quantity, controller and status) are frozen beside it in `facts-compact.json`, keyed
 by evidence id as each entry's `details_ref` says, nested, without provenance
 (timestamps, digests, evidence ids, context slots) or null and empty fields, with
-same-shaped rows as column tables. Addresses that recur are `@aliases`; each document
+same-shaped rows as column tables. Recurring addresses, and well-known ones even when
+they occur once (the two token programs, System, ComputeBudget, the two BPF loaders,
+Squads v4, WSOL, the supported pool programs, the target mint and the genesis hash), are
+`@aliases`; each document
 resolves the aliases it uses in its own `addresses` table (expand them when naming an
 account). Only publication-derived details (indexer listings, repository metadata,
 quote routes) are capped with an explicit remainder note. Open `facts_path` in the same

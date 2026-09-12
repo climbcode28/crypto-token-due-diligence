@@ -437,7 +437,11 @@ it, and the classification rows carry their `sample` id. New optional parameter 
 classification without a new send. Regression test: a non-swap signature is probed and
 skipped, the swap is probed, selected and sampled with one send per probe, the resumed preset
 sends nothing, and `receipts > probes` is refused. Live (run b below): the preset probed two
-signatures, selected both (one buy, one sell) and the sell became the run's verified sale.
+signatures and selected both (one buy, one sell); the run's verified sale and verified rebuy
+are start's own two receipts, and the preset's two receipts did not enter the sale/rebuy
+derivations (the open item below). A preset id that matches an existing sample id (such as
+`receipts`) is refused at registration, since `pool_activity` would otherwise resume that
+sample's classification as its own and report success without probing.
 
 **2. Reading payload compaction** (`solana_render` and `solana_replay` 1.2.0). Typed-fact
 details are nested and omit provenance keys, nulls and empties; leaves already listed under
@@ -456,9 +460,17 @@ synthetic delivery fixture reads under 60 KB.
 
 | Bundle | Old renderer | New renderer |
 | --- | --- | --- |
-| WIF `wif-e2e/checkpoint5` (44 findings, 18 facts) | 177,650 B | 73,169 B |
-| RAY run a checkpoint (20 facts, no composed findings) | — | 62,486 B read payload |
+| WIF `wif-e2e/checkpoint5` (44 findings, 18 facts) | 177,650 B | 73,627 B |
+| RAY run a checkpoint (20 facts, no composed findings) | — | 62,092 B read payload |
 | RAY run b delivered (24 analyst findings, 19 facts) | 266,611 B | 84,745 B reading, 87,409 B read payload |
+
+Measurement basis (re-measured against the committed renderer, 6174859): "reading" is the
+compact JSON size of the reading checklist (the frozen `reading.json` is written indented,
+so its on-disk size is larger, and `read` on the unchanged checkpoint5 bundle returns
+180,092 B); "read payload" is the compact size of the `read` result, which adds the bundle
+paths and citation links. The WIF row is a re-render of a bundle frozen with the older
+renderer; the run-a and run-b bundles were frozen with the new one, so their bytes match
+exactly.
 
 The under-60 KB target is **not met** on live bundles. What remains is analyst prose (24
 findings, about 24 KB) and typed quantities (19 facts, about 43 KB; every state and execution
@@ -487,7 +499,8 @@ execution effect); (iii) later coordinator captures were budget-denied.
 Run b (`research/…-2026-09-12-live-b`, received 17:43:28Z, deadline 17:53:28Z): start 45 s,
 68 attempts; one preset (`pool_activity` on the RAY/SOL pool) and one quote capture by
 17:44:48Z; lane pointers carried the note-contract pitfalls; both lane notes passed self-check
-on the first attempt (project 44 s before its cutoff, liquidity 4 s after); the coordinator note
+on the first attempt (project 44 s before its cutoff, liquidity 4 s after, per the session
+transcript; finalize rewrites the composed notes, so the bundle does not record it); the coordinator note
 was written from the facts by a scratchpad composition script (one project gap finding restated
 as a bounded source analysis with an explicit limitation); `compose --check` valid,
 `finalize` delivered at 17:47:55Z, 4 min 27 s after receipt, inside the +420 s target.
@@ -524,8 +537,13 @@ verify. Docs (SKILL step 6, runbook, output reference) tell the coordinator to o
 
 | Bundle | Before split (read payload) | After split (read payload) | Facts document |
 | --- | --- | --- | --- |
-| WIF `wif-e2e/checkpoint5` | 73.2 KB reading | 53.7 KB reading | 25.1 KB |
-| RAY run b delivered (`final` → `final3`) | 87.4 KB | 57.5 KB | 69.8 KB on disk |
+| WIF `wif-e2e/checkpoint5` (re-rendered, not re-frozen) | 73.6 KB reading | 53.7 KB reading | 26.3 KB (41.7 KB indented; no frozen file) |
+| RAY run b delivered (`final` → `final3`) | 87.4 KB | 57.5 KB | 41.2 KB (69.8 KB on disk) |
+
+Facts-document sizes are compact JSON; "on disk" is the indented frozen file. The WIF row
+was re-rendered with the committed split renderer (010134e); `read` on the unchanged
+checkpoint5 bundle still returns 180,092 B because that bundle was frozen before either
+change.
 
 The independent review of the split found one real defect and it is fixed: the publication row
 cap recursed into table columns and into the contents of kept rows whenever a table carried
@@ -543,4 +561,27 @@ non-publication leaves, none missing; two cap notes, both whole row entries; eve
 resolving in its own table) and raised one low-severity point, now closed: a table nested
 inside a kept publication row is no longer capped either.
 
-Suites after the split: Solana 384, router 30, EVM 429. Nothing committed.
+Suites after the split: Solana 384, router 30, EVM 429. Committed as 6174859 and 010134e.
+
+Review of the docs, plan record and `pool_activity` (2026-09-12, late): the payload numbers
+above were re-measured against the committed code and corrected (three figures were taken
+from a development state of the renderer; the WIF facts figure predates the nested-table
+fix); the claim that the preset's sell became the verified sale was wrong and is corrected;
+`report-replay.md`, `evidence-and-tools.md` and the runbook sampling paragraph now name
+`facts_path`, the facts-document bytes that replay compares, and the four-probe limit as a
+limit across pools. One code change: a new preset id that matches an existing sample id is
+refused before any send (regression test added). From the same review's nits: a probe whose
+receipt was unavailable now records its transport status in `receipt-classification.json`
+and is not treated as classified, so a later, differently named preset may probe it again
+(an identical preset still resumes without a send; test added; Solana 386); the alias
+wording names the well-known addresses that are aliased even when they occur once; the
+USD 410M market cap is the run-b Dexscreener capture (marketCap 410,464,235). An
+independent review of these edits confirmed the code paths, the doc sentences and every
+number above, and its points are folded in: the collision guard also checks the
+classification record (rows can exist without a sample plan when a reserve is refused),
+"unavailable" is stated as any non-`ok` status, `facts_path` is documented as absent for
+pre-split bundles, the well-known alias list is complete, the run-a row is a frozen
+measurement rather than a re-render, and the unavailable-probe test asserts the single
+transient retry, the sample outcome, and that a classified non-swap row in the legacy shape
+without `receipt_status` (not a sampled receipt, so only the compatibility default can skip it)
+is not probed again.

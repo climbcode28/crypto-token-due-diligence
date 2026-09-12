@@ -52,8 +52,10 @@ preflight; do not manually rebuild a manifest or adjust evidence to obtain a ver
 `finalize` composes and validates, freezes all evidence and engine/registry/layout
 sources, renders the readable assessment, and compares copied-engine output before
 new-directory delivery. A partial/blocked checkpoint stays undeliverable as completed
-broad research. Successful finalize/read returns a complete reading checklist and
-safe source/local citations without another fetch. See [output](evidence-and-output.md),
+broad research. Successful finalize/read returns `report_path`, `facts_path` (bundles frozen since
+the split), the compact reading checklist (every judgment and limit; the typed-fact
+detail tables sit in `facts-compact.json`) and safe source/local citations without
+another fetch. See [output](evidence-and-output.md),
 [replay](report-replay.md) and [calibration scenarios](reporting-scenarios.md).
 
 ## Maintenance

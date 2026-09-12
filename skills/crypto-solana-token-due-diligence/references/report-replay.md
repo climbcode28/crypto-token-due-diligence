@@ -10,8 +10,10 @@ python3 "$S/scripts/solana_bundle.py" verify "$FINAL" --profile solana-evidence-
 python3 "$S/scripts/solana_bundle.py" replay "$FINAL" --profile solana-evidence-v2 --trust-frozen-code
 ```
 
-`read` checks the inventory/hashes, then returns `report_path`, the compact reading
-checklist and ready-to-use citations without recomputing against the installed
+`read` checks the inventory/hashes, then returns `report_path`, `facts_path` (the
+sibling `facts-compact.json` holding the typed-fact detail tables; absent for bundles
+frozen before the split, whose checklists carry the details inline), the compact
+reading checklist and ready-to-use citations without recomputing against the installed
 engine; the frozen Markdown stays in the report. This permits formatting after an installed version change. It distinguishes
 an incomplete checkpoint from a deliverable completed report.
 
@@ -25,7 +27,8 @@ they do not authenticate its author. Review provenance before trusting a bundle.
 verified code/data to a clean temporary tree, then runs the copied validator and
 renderer with isolated Python (`-I -B -S`), a minimal environment and no inherited
 Python paths, current-directory imports, site packages or bytecode. It compares
-both Markdown and reading-checklist bytes and leaves the source bundle unchanged.
+the Markdown, reading-checklist and facts-document bytes and leaves the source bundle
+unchanged.
 Only the frozen scripts directory is added to Python's standard-library path.
 This is reproducible import isolation, **not a hostile-code sandbox**. Trusted
 Python retains host capabilities; do not trust arbitrary bundles merely because

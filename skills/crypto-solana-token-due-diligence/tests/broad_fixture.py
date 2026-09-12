@@ -43,7 +43,10 @@ class RichRpc(Rpc):
                 # Optional extra receipts (signature -> transaction) precede the swap receipt in the recent page.
                 rows=[{'signature':sig,'slot':100,'err':None,'memo':None,'blockTime':cls.stamp} for sig in cls.receipts]
                 value=rows+([{'signature':cls.receipt['transaction']['signatures'][0],'slot':100,'err':None,'memo':None,'blockTime':cls.stamp}] if cls.receipt else [])
-            elif m=='getTransaction':value=copy.deepcopy(cls.receipts.get(p[0],cls.receipt))
+            elif m=='getTransaction':
+                value=cls.receipts.get(p[0],cls.receipt)
+                if isinstance(value,BaseException):raise value  # One signature's receipt fails at the transport.
+                value=copy.deepcopy(value)
             else:value=None
             result=response(req,value);self.local.response_bytes=len(json.dumps(result).encode());return result
         finally:

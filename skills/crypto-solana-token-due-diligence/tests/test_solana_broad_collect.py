@@ -257,6 +257,51 @@ class LaneAndPresetTests(unittest.TestCase):
         self.assertEqual(len([c for c in RichRpc.calls if c['method']=='getTransaction']),sent+2)  # an identical preset resumes without a new send
         with self.assertRaisesRegex(ValueError,'probes'):collect(root,{'id':'bad','kind':'pool_activity','parameters':{'pool':RichRpc.pool['pool'],'receipts':3,'probes':2}},opts['config'],factory=RichRpc)
 
+    def test_preset_id_matching_a_start_sample_is_refused_before_any_send(self):
+        from transaction_fixture import fixture
+        root,target,opts=self.setup_run();_,a,packet,_=fixture();tx=packet['response']['result']
+        tx['transaction']['message']['accountKeys']=[RichRpc.pool['pool'] if k==a['pool'] else k for k in tx['transaction']['message']['accountKeys']]
+        tx['blockTime']=RichRpc.stamp;RichRpc.receipt=tx;start(root,target,**opts);calls=len(RichRpc.calls)
+        # Named like the start receipts sample, a pool_activity preset would resume start's classification as its own and report success without probing.
+        with self.assertRaisesRegex(ValueError,'collides'):collect(root,{'id':'receipts','kind':'pool_activity','parameters':{'pool':RichRpc.pool['pool']}},opts['config'],factory=RichRpc)
+        self.assertEqual(len(RichRpc.calls),calls);self.assertFalse((root/'preset-requests'/'receipts.json').exists())
+
+    def test_unavailable_probe_keeps_its_status_and_a_later_preset_may_probe_it_again(self):
+        from transaction_fixture import fixture
+        from solana_common import b58encode
+        from solana_transactions import SYSTEM
+        import solana_collect_v2 as collect_v2
+        root,target,opts=self.setup_run();_,a,packet,_=fixture();tx=packet['response']['result']
+        tx['transaction']['message']['accountKeys']=[RichRpc.pool['pool'] if k==a['pool'] else k for k in tx['transaction']['message']['accountKeys']]
+        tx['blockTime']=RichRpc.stamp;RichRpc.receipt=tx;start(root,target,**opts)
+        # Three newer signatures: one whose receipt times out (probed, recorded with its status), one served without a
+        # supported swap (probed, classified, skipped) and one exact-pool swap (probed, selected, sampled).
+        swap=copy.deepcopy(tx);again=b58encode(bytes([79])*64);swap['transaction']['signatures'][0]=again
+        other=copy.deepcopy(tx);plain=b58encode(bytes([78])*64);other['transaction']['signatures'][0]=plain
+        keys=other['transaction']['message']['accountKeys'];other['transaction']['message']['instructions'][a['swap_index']]['programIdIndex']=keys.index(SYSTEM)
+        lost=b58encode(bytes([80])*64);RichRpc.receipts={lost:TimeoutError('fixture timeout'),plain:other,again:swap};first=len(RichRpc.calls)
+        with unittest.mock.patch.object(collect_v2,'SLEEP',lambda seconds:None):
+            result=collect(root,{'id':'act','kind':'pool_activity','parameters':{'pool':RichRpc.pool['pool'],'receipts':1,'probes':4}},opts['config'],factory=RichRpc)
+        self.assertIsNone(result['preset_error']);rows=[r for r in json.loads((root/'receipt-classification.json').read_text())['rows'] if r['sample']=='act']
+        self.assertEqual([(r['signature'],r['receipt_status'],r['swap']) for r in rows],[(lost,'timeout',False),(plain,'ok',False),(again,'ok',True)])
+        # The lost receipt got its single transient retry, each served probe was sent once and the sample resumed the swap.
+        self.assertEqual([c['params'][0] for c in RichRpc.calls[first:] if c['method']=='getTransaction'],[lost,lost,plain,again])
+        facts=json.loads((root/'draft/facts.json').read_text());self.assertEqual(next(f['data']['verified_receipts'] for f in facts['facts'] if f['operation']=='sales'),2)
+        self.assertEqual(json.loads((root/'import-diagnostics.json').read_text())['errors'],[])
+        # Once the lost receipt is served, a later preset probes only that signature. The classified non-swap row is given
+        # the pre-status shape (no receipt_status key): only the compatibility default keeps it skipped, since it is not a
+        # sampled receipt.
+        probes_path=root/'receipt-classification.json';record=json.loads(probes_path.read_text())
+        for r in record['rows']:
+            if r.get('receipt_status')=='ok':r.pop('receipt_status')
+        probes_path.write_text(json.dumps(record))
+        served=copy.deepcopy(other);served['transaction']['signatures'][0]=lost
+        RichRpc.receipts={lost:served,plain:other,again:swap};sent=len(RichRpc.calls)
+        later=collect(root,{'id':'act2','kind':'pool_activity','parameters':{'pool':RichRpc.pool['pool'],'receipts':1,'probes':4}},opts['config'],factory=RichRpc)
+        self.assertIsNone(later['preset_error']);self.assertEqual([c['params'][0] for c in RichRpc.calls[sent:] if c['method']=='getTransaction'],[lost])
+        rows=[r for r in json.loads((root/'receipt-classification.json').read_text())['rows'] if r['sample']=='act2']
+        self.assertEqual([(r['signature'],r['receipt_status'],r['swap']) for r in rows],[(lost,'ok',False)])
+
 
 class ImporterBoundaryTests(unittest.TestCase):
     """A later sample outside the verified network interval stays partial; the run keeps importing."""

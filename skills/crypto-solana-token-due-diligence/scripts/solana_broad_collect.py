@@ -223,7 +223,8 @@ def classify_probes(root,config,sample,pool,signatures,*,probes,receipts,factory
     for sig in signatures:
         if len(rows)==probes or len(selected)==receipts:break
         probe=execute(root,config,sample,receipt_read(sig),factory=factory)
-        row={'pool':pool,'sample':sample,**classify_receipt(target,probe,pool)};rows.append(row)
+        # receipt_status keeps the transport outcome: a probe whose receipt never arrived is not a classification.
+        row={'pool':pool,'sample':sample,'receipt_status':probe.get('status'),**classify_receipt(target,probe,pool)};rows.append(row)
         if row['swap']:selected.append(row)
     return rows,selected
 
@@ -462,7 +463,12 @@ def _collect(root,spec,config,*,factory=HttpTransport):
         with s.transaction():
             if path.exists():need(strict_json(path.read_bytes(),path.name)==spec,'Named preset changed.')
             else:
-                need(len(list(folder.glob('*.json')))<2,'Two coordinator preset calls already used.');atomic(path,encoded(spec))
+                need(len(list(folder.glob('*.json')))<2,'Two coordinator preset calls already used.')
+                # A new preset must not reuse a start sample id: pool_activity would resume that sample's classification as its
+                # own. Classification rows can exist without a sample plan (a refused reserve), so both records are checked.
+                probes_path=root/'receipt-classification.json';record=json.loads(probes_path.read_text()) if probes_path.exists() else {}
+                classified={r.get('sample') for r in record.get('rows',[])}|{r.get('sample') for r in record.get('samples',[])}
+                need(not (root/'sample-plans'/(ident+'.json')).exists() and ident not in classified,'Preset ID collides with an existing sample; choose another id.');atomic(path,encoded(spec))
     finally:s.close()
     def run_preset():
         planned=rows
@@ -480,8 +486,10 @@ def _collect(root,spec,config,*,factory=HttpTransport):
             if mine:selected=[r for r in mine if r['swap']]  # An identical named preset resumes its own classification.
             else:
                 path=root/'automatic-receipts.json';seen={k['signature'] for k in (json.loads(path.read_text()) if path.exists() else [])}
-                seen|={r['signature'] for r in record['rows']}
-                # A signature already sampled or probed is never fetched twice: it would duplicate the receipt and waste the window.
+                seen|={r['signature'] for r in record['rows'] if r.get('receipt_status','ok')=='ok'}
+                # A signature already sampled or classified is never fetched twice: it would duplicate the receipt and waste
+                # the window. A probe with any status other than ok (budget, timeout, provider error, empty result) keeps that
+                # status and may be probed again here under this preset's own read family.
                 signatures=[r['signature'] for r in packet['response']['result'] if r['err'] is None and r['signature'] not in seen]
                 classified,selected=classify_probes(root,config,ident,pool,signatures,probes=probes,receipts=receipts,factory=factory)
                 record_probes(root,ident,classified,selected,probes=probes,receipts=receipts)

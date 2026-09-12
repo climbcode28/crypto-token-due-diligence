@@ -139,7 +139,7 @@ Finalize composes both lane notes and the coordinator note, preflights, freezes 
 engine and evidence, validates, renders and reproduces bytes, and returns `report_path`,
 `facts_path`, the compact reading checklist (verdict and axes, every finding with its
 citation, the eleven coverage rows, typed-fact summaries, limits and attention rows with
-`@aliases` for recurring addresses) and citations in one response. The typed-fact
+`@aliases` for recurring and well-known addresses) and citations in one response. The typed-fact
 detail tables with every quantity are frozen in `facts-compact.json` (`facts_path`),
 keyed by evidence id as each entry's `details_ref` says. Answer from that checklist,
 expanding aliases from its `addresses` table; open `facts_path` in the same turn only
@@ -173,9 +173,13 @@ explicitly undeliverable as completed broad research; describe its limits. `read
 [report-replay](report-replay.md). Old schema-1 bundles are validated with
 `validate --profile legacy-v1`; they keep their original rendering.
 
-Automatic activity sampling requests at most ten recent signatures per selected pool,
-probes at most four of them and samples at most two receipts overall; `pool_activity`
-classifies its probes the same way (skipping signatures already sampled or probed) and
-can add up to four more receipts. Only
+Automatic activity sampling requests at most ten recent signatures per selected pool
+and, across the selected pools, probes at most four of them and samples at most two
+receipts; `pool_activity`
+classifies its probes the same way (skipping signatures already sampled or classified;
+a probe with any receipt status other than `ok`, such as a budget refusal, timeout,
+provider error or empty result, keeps that status in `receipt-classification.json` and a
+later, differently named preset may probe it again) and can add up to four more
+receipts. Only
 supported historical swap effects with exact pool/mint/owner and balance reconciliation
 become sample sales. Empty/short history is not archive coverage or proof of no selling.
