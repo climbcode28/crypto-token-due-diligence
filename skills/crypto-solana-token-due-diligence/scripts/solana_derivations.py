@@ -3,8 +3,8 @@ import re
 from solana_common import need,target_identity,pubkey
 from solana_programs import observed_account
 
-VERSION='1.3.0'  # Persisted derivation contract; bumped whenever any operation's output shape changes.
-RUNTIME_VERSION='1.5.0'
+VERSION='1.4.0'  # Persisted derivation contract; bumped whenever any operation's output shape changes.
+RUNTIME_VERSION='1.7.0'
 # The contract version in which each operation's output last changed. A derivation recorded
 # before its operation last changed cannot be recomputed by this engine: read or replay it
 # with its frozen engine instead. Operations absent here have not changed since 1.0.0.
@@ -18,6 +18,8 @@ RUNTIME_VERSION='1.5.0'
 # derivation recorded without it still recomputes, so its entry stays at 1.1.0.
 # 1.3.0 (2026-09-12, night): sales/rebuys rows carry spending_owner and custody (router custody legs verify with the
 # beneficial wallet as seller) and curve trades verify through native or token quote legs.
+# 1.4.0 (2026-09-13): pool facts may carry an optional position_census (counted positions, ranking basis, sampled share) bound to
+# the census read; a pool derivation recorded without it still recomputes, so its entry stays at 1.2.0.
 CHANGED_IN={**{op:'1.1.0' for op in ('controllers','discovery_pools','holders','mint','controls','history')},'pool':'1.2.0','transaction':'1.3.0','sales':'1.3.0','rebuys':'1.3.0'}
 
 
@@ -55,6 +57,11 @@ def compute(operation,parameters,target,resolve):
         from solana_accounts import decode_mint
         value,meta=observed_account(p.get('address',target['mint']),get('observation'))
         need(not meta['sliced'],'full mint required');return {**decode_mint(value),**meta}
+    if operation=='metadata':
+        from solana_metadata import decode_metadata
+        value,meta=observed_account(p['address'],get('observation'))
+        need(value is not None,'metadata account absent');need(not meta['sliced'],'full metadata account required')
+        return {**decode_metadata(p['address'],value,target['mint']),**meta}
     if operation=='controls':
         from solana_accounts import controls
         result=controls(get('mint'),target,epoch_packet=get('epoch') if p.get('epoch') else None)
@@ -108,7 +115,12 @@ def compute(operation,parameters,target,resolve):
         module=pool_adapter(p['adapter']);kwargs={}
         if p['adapter'] in ('raydium_clmm','orca_whirlpool','meteora_dlmm','meteora_damm_v2'):kwargs['positions']=p.get('positions',[])
         elif p['adapter']!='pump_curve':kwargs['lp_accounts']=p.get('lp_accounts',[])
-        return module.analyze(target,p['pool'],packets(),**kwargs)
+        result=module.analyze(target,p['pool'],packets(),**kwargs)
+        census=p.get('census')
+        if isinstance(census,dict):
+            if census.get('status') in ('sampled','empty','partial') and census.get('read'):resolve(census['read'])  # the census read is a declared input
+            result['position_census']=census
+        return result
     if operation=='transaction':
         from solana_transactions import decode_transaction
         return decode_transaction(target,get('transaction'),get('block'))

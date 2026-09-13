@@ -4,10 +4,10 @@ from pathlib import Path
 from solana_common import sha,need
 from solana_profile import Evidence,strict_json,regular,PROFILE
 
-VERSION='1.2.1'
+VERSION='1.3.0'
 CATEGORIES={'mint':'controls','controls':'controls','holders':'holders','program':'programs','controllers':'programs',
  'pool':'pools','local_quote':'quotes','public_quote':'quotes','quote_sizes':'quotes','transaction':'transactions',
- 'sales':'transactions','rebuys':'transactions','history':'launch','launch':'launch','creator_activity':'creator',
+ 'sales':'transactions','rebuys':'transactions','history':'launch','launch':'launch','metadata':'launch','creator_activity':'creator',
  'inventory':'creator','prior_launches':'creator','source_assurance':'source_assurance',
  'discovery_pools':'maturity','repository_metadata':'maturity','repository_revision':'maturity','repository_tree':'maturity'}
 LIMIT_KEYS={'gaps','missing','remaining','limitations','scope','coverage','enumeration','unsupported_lock_paths','selection_scope','newer_unpinned',
@@ -41,6 +41,14 @@ def scan(value,keys,path=''):
     return rows
 
 
+def census_text(c):
+    if not isinstance(c,dict):return ''
+    if c.get('status') in ('sampled','empty','partial'):
+        share=c.get('sampled_weight_share');basis='summed bin shares, a ranking weight, not principal' if str(c.get('ranking','')).startswith('summed_bin_shares') else 'liquidity ranking weight, not principal'
+        return ' of '+str(c.get('positions_counted'))+' counted ('+(share['percent_display']+'% of '+basis if share else 'no ranking weight')+')'
+    return ' (position census '+str(c.get('status'))+': '+str(c.get('reason'))+')'
+
+
 def describe(operation,data):
     """Exact calculations are supplied by typed operations, never redone by an analyst."""
     if operation=='controls':
@@ -54,7 +62,9 @@ def describe(operation,data):
         return ('Sampled '+str(len(data['accounts']))+' accounts: '+data['observed_base_amount_atomic']+'/'+data['supply_atomic']+' atomic units ('+ratio+'). Custody exclusions '+data['custody_excluded_amount_atomic']+'. Spending-owner aggregates: '+owners+'. '+data['scope']+'.')
     if operation=='pool':
         return (data['adapter']['id']+' pool '+data['pool']+'. Reserves atomic '+json.dumps(data.get('reserves_atomic'))+
-            '; observed vault count '+str(len(data['vaults']))+'; sampled positions '+str(len(data.get('positions',[])))+'. Principal, fees, custody, locks and execution are separately scoped below.')
+            '; observed vault count '+str(len(data['vaults']))+'; sampled positions '+str(len(data.get('positions',[])))+census_text(data.get('position_census'))+'. Principal, fees, custody, locks and execution are separately scoped below.')
+    if operation=='metadata':
+        verified=data['verified_creators'];return ('Metaplex metadata: name '+json.dumps(data['name'])+', symbol '+json.dumps(data['symbol'])+', update authority '+data['update_authority']+(' (mutable)' if data['is_mutable'] else ' (immutable)')+'; '+str(len(data['creators']))+' creator entries, verified: '+(', '.join(verified) if verified else 'none')+'. Keys are attribution leads, not identities; the URI is text only.')
     if operation in ('sales','rebuys'):
         return 'Reconciled '+operation+' candidates in the supplied receipt sample. Counts describe this verification sample; indexed market activity and total actor history remain separate.'
     if operation in ('local_quote','public_quote','quote_sizes'):

@@ -36,8 +36,9 @@ fees, creator fees, LP principal, distributions, discretionary buybacks and enfo
 rights. Do not invent equity-like user requirements or malicious intent from ordinary
 fees. State which dependencies and reward-accounting/liveness checks remain unknown.
 
-Creator/launch work uses specifically attributed keys, bounded pages/windows and
-exact receipts. Distinguish allocation, sale, liquidity withdrawal, fee collection,
+Creator/launch work uses specifically attributed keys (a receipt-named creator, a Pump
+curve's recorded creator, or a Metaplex update authority/verified creator; the fact's
+`basis` says which), bounded pages/windows and exact receipts. Distinguish allocation, sale, liquidity withdrawal, fee collection,
 rebuy, transfer and inventory reconciliation. Failed/short history is not no sales or
 no prior launches. Exchange deposits are not proof of personal cash-out. Prior links
 separate signer continuity, public affiliation, hypothesized control and human identity.
@@ -50,7 +51,7 @@ Use background public sources. The maintained batch command is
 serves one coverage surface (for example `utility_redemption_rights` for terms). It
 registers ownership and charges actual sends/retries/redirects under the shared session. Quote every URL
 (an unquoted `?` or `*` is a zsh glob) and do not wrap the helper in `timeout`, which macOS lacks; the helper
-enforces its own cutoff. Reuse existing capture IDs rather than fetching the same URL again. You cannot overwrite another owner's evidence.
+enforces its own cutoff. Reuse existing capture IDs rather than fetching the same URL again. The command needs outbound network: in a sandboxed host (Codex) request network permission for the exact command. If it reports `network_unavailable`, or every capture is `transport_failure` with a `failure` of `dns` or `not_permitted`, the host denied the network; rerun with permission instead of recording the source as unavailable. You cannot overwrite another owner's evidence.
 Return exact repository/audit/program/creator leads with the captured source IDs;
 request coordinator import/targeted presets where needed.
 

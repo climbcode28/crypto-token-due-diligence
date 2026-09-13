@@ -40,12 +40,16 @@ def account_batches(addresses, *, prefix="accounts", floor=None, depends=(), cri
                  depends=depends, critical=critical) for i in range(0, len(addresses), count)]
 
 
-def mint_baseline(mint, *, largest=True):
+def mint_baseline(mint, *, largest=True, metadata=False):
     pubkey(mint)
     rows = [read("mint", "getAccountInfo", [mint, settings()], critical=True),
             read("epoch", "getEpochInfo", [{"commitment": "finalized"}])]
     if largest:
         rows.append(read("largest", "getTokenLargestAccounts", [mint, {"commitment": "finalized"}]))
+    if metadata:
+        # The Metaplex metadata PDA: absent for many Token-2022 mints, so a null answer is an answer, not a gap.
+        from solana_metadata import metadata_address
+        rows.append(read("metadata", "getAccountInfo", [metadata_address(mint), settings()]))
     return rows
 
 
@@ -142,7 +146,7 @@ def position_sample(adapter_id, pool, pool_packet, position_leads, position_obse
     account, meta = observed_account(pool, pool_packet)
     need(not meta['sliced'], "full pool lead required")
     state = module.decode_pool(pool, account)
-    plans = []
+    plans = [];groups = []  # (addresses, floor) per atomic batch; leads share a batch while their dependency union fits
     for i, lead in enumerate(position_leads):
         address = pubkey(lead['position'])
         need(address in position_observations, "full position lead not captured")
@@ -166,8 +170,13 @@ def position_sample(adapter_id, pool, pool_packet, position_leads, position_obse
         if lead.get('holding'): addresses.append(pubkey(lead['holding']))
         if lead.get('bundle'): addresses.append(pubkey(lead['bundle']))
         need(len(set(addresses)) <= ACCOUNT_BATCH, 'position dependencies exceed one atomic batch')
-        plans += account_batches(list(dict.fromkeys(addresses)), prefix='position_'+str(i),
-            floor=max(meta['context_slot'], position_meta['context_slot']), critical=True, account_bytes=12000)
+        floor = max(meta['context_slot'], position_meta['context_slot'])
+        if groups and len(set(groups[-1][0]+addresses)) <= ACCOUNT_BATCH:
+            last = groups[-1];groups[-1] = (list(dict.fromkeys(last[0]+addresses)), max(last[1], floor))
+        else:
+            groups.append((list(dict.fromkeys(addresses)), floor))
+    for g, (addresses, floor) in enumerate(groups):
+        plans += account_batches(addresses, prefix='position_'+str(g), floor=floor, critical=True, account_bytes=12000)
     return plans
 
 

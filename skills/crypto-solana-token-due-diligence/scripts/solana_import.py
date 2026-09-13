@@ -239,6 +239,13 @@ class Importer:
                     # (with whether its authorities still match), never a coverage gap that blocks the surface.
                     params={'mint':usable_mint,**optional_epoch,'selection_scope':'earlier_pinned_snapshot_newer_unpinned','newer_unpinned':self.newer_unpinned(mint,usable_mint)}
             self.derive('auto-controls','controls',params)
+        # Metaplex metadata for the exact mint: a present, decodable account becomes a fact; an absent one stays a stated limit.
+        from solana_metadata import metadata_address
+        pda=metadata_address(target['mint']);self.metadata_observation=None
+        reads=[eid for eid,c in self.checked.items() if c['status']=='ok' and eid in raw_evidence.usable and self.objects[eid]['request']['method']=='getAccountInfo' and self.objects[eid]['request']['params'][0]==pda]
+        if reads:
+            latest=max(reads,key=lambda eid:self.objects[eid]['completed_at']);value,_=observed_account(pda,self.objects[latest])
+            if value and self.derive('auto-metadata','metadata',{'address':pda,'observation':latest}):self.metadata_observation=latest
         if usable_mint:
             # Aggregates take the latest usable snapshot, never a newer unusable one.
             params={'mint':usable_mint}
@@ -255,7 +262,7 @@ class Importer:
             return False
         largest=[i for i,c in self.checked.items() if c['status']=='ok' and i in raw_evidence.usable and discovers(i)]
         samples=[i for i,c in self.checked.items() if c['status']=='ok' and i in raw_evidence.usable and self.objects[i]['request']['method']=='getMultipleAccounts' and target['mint'] in c.get('addresses',[]) and len(c['addresses'])>1 and '_holdings_' in i]
-        if largest and samples:self.derive('auto-holders','holders',{'discovery':largest[-1],'sample':samples[-1]})
+        derived_pools=[]
         from adapters import pool_adapter
         by_program={pool_adapter(k).PROGRAM:k for k in ADAPTERS}
         for address,eid in accounts.items():
@@ -277,16 +284,28 @@ class Importer:
                 params={'adapter':kind,'pool':address,'observations':mapping}
                 for lead in leads:
                     if lead.get('pool')==address and lead.get('adapter')==kind:
-                        for k in ('lp_accounts','positions'):
+                        for k in ('lp_accounts','positions','census'):
                             if k in lead:params[k]=lead[k]
                 try:
                     state=module.decode_pool(address,value) if kind in ('raydium_clmm','orca_whirlpool','meteora_dlmm','meteora_damm_v2') else module.decode_pool(value)
                 except ValueError:continue
                 if kind!='pump_curve' and target['mint'] not in state.get('mints',[]):continue
                 fid='pool-'+sha(address.encode())[:16];pool=self.derive(fid,'pool',params,self.subject('pool',address))
+                if pool:derived_pools.append((address,kind,pool))
                 if pool and kind=='raydium_cpmm' and 'auto-sizes' in self.objects:
                     for j,size in enumerate(self.objects['auto-sizes'].get('sizes',[])):
                         self.derive('quote-'+sha(address.encode())[:12]+'-'+str(j),'local_quote',{'adapter':kind,'pool':address,'observations':mapping,'input_atomic':size['input_atomic']})
+        if largest and samples:
+            # A pool's vault token account ranked among the largest holders is protocol custody, not a holder: exclude it
+            # with the pool observation as evidence so concentration is custody-adjusted (a live DLMM vault ranked top 20).
+            sampled=set(self.checked[samples[-1]].get('addresses',[]));exclusions={}
+            for address,kind,pool in derived_pools:
+                for vault in pool.get('vaults',[]):
+                    if vault.get('address') in sampled and vault.get('evidence'):
+                        exclusions[vault['address']]={'reason':'pool_vault:'+kind+':'+address,'evidence':list(vault['evidence'])}
+            params={'discovery':largest[-1],'sample':samples[-1]}
+            if exclusions:params['custody_exclusions']=exclusions
+            self.derive('auto-holders','holders',params)
         for eid,o in list(self.obs.items()):
             if o['kind']!='document' or o['status']!='ok':continue
             host=urlsplit(o['source']['capture']['url']).hostname
@@ -319,6 +338,7 @@ class Importer:
             if c['status']=='ok' and req['method']=='getSignaturesForAddress' and 'creator_history' in eid:pages.setdefault(req['params'][0],[]).append(eid)
         for address,ids in pages.items():
             if latest_slot>0 and self.derive('history-'+sha(address.encode())[:12],'history',{'address':address,'pages':ids[:2],'start_slot':0,'end_slot':latest_slot}):histories[address]='history-'+sha(address.encode())[:12]
+        launch=None;sales=rebuys=None
         if txs:
             launch=self.derive('auto-launch','launch',{'executions':txs[:4]})
             known_pools={lead['pool'] for lead in leads if lead.get('pool')}
@@ -329,24 +349,36 @@ class Importer:
                 seen_signatures.add(sig)
                 swaps=[e for e in self.objects[name].get('effects',[]) if (e['kind']=='swap_instruction' and e['pool'] in known_pools) or (e['kind']=='protocol_trade_instruction' and e.get('curve') in known_pools)]
                 if len(swaps)==1:candidates.append({'pool':swaps[0].get('pool') or swaps[0]['curve'],'execution':name})
-            sales=rebuys=None
             if candidates:
                 # Both directions are derived from the same receipts; a buy is never a failed sale.
                 from solana_transactions import MAX_TRADE_RECEIPTS
                 # Every sampled receipt at a known pool counts, start's and the presets', up to the verifier's bound.
                 sales=self.derive('auto-sales','sales',{'candidates':candidates[:MAX_TRADE_RECEIPTS]});rebuys=self.derive('auto-rebuys','rebuys',{'candidates':candidates[:MAX_TRADE_RECEIPTS]})
-            attributed=[]
-            for init in (launch or {}).get('initializations',[]):
-                for address in (init['creator_argument'],):
-                    if address not in {a['address'] for a in attributed} and len(attributed)<2:attributed.append({'mint':target['mint'],'address':address,'role':'creator','evidence':init['evidence']})
-            signers={s for name in txs for s in self.objects[name].get('signers',[]) if any(e['kind']=='launch_initialize' for e in self.objects[name].get('effects',[]))}
-            for address in sorted({a['address'] for a in attributed}|signers)[:2]:
-                self.derive('prior-'+sha(address.encode())[:12],'prior_launches',{'address':address,'executions':txs[:8]})
-            if attributed:
-                params={'attributions':attributed,'executions':txs[:8],'histories':[histories[a['address']] for a in attributed if a['address'] in histories]}
-                if sales:params['sales']='auto-sales'
-                if rebuys:params['rebuys']='auto-rebuys'
-                self.derive('auto-creator','creator_activity',params)
+        attributed=[]
+        for init in (launch or {}).get('initializations',[]):
+            for address in (init['creator_argument'],):
+                if address not in {a['address'] for a in attributed} and len(attributed)<2:attributed.append({'mint':target['mint'],'address':address,'role':'creator','evidence':init['evidence']})
+        for address,kind,pool in derived_pools:
+            # A Pump curve records its creator on chain; that key outranks metadata, whose update authority is the platform's.
+            role=pool.get('creator_role') if kind=='pump_curve' else None
+            from solana_metadata import attributable
+            if role and attributable(role.get('address')) and role.get('evidence') and role['address'] not in {a['address'] for a in attributed} and len(attributed)<2:
+                attributed.append({'mint':target['mint'],'address':role['address'],'role':'creator','basis':'pump_curve_recorded_creator','evidence':list(role['evidence'])})
+        if self.metadata_observation and 'auto-metadata' in self.objects:
+            # Without a launch receipt, the metadata's update authority and verified creators are the attributable keys.
+            from solana_metadata import attribution_leads
+            for lead in attribution_leads(self.objects['auto-metadata']):
+                if lead['address'] not in {a['address'] for a in attributed} and len(attributed)<2:
+                    attributed.append({'mint':target['mint'],'address':lead['address'],'role':'creator','basis':lead['basis'],'evidence':[self.metadata_observation]})
+        signers={s for name in txs for s in self.objects[name].get('signers',[]) if any(e['kind']=='launch_initialize' for e in self.objects[name].get('effects',[]))}
+        for address in sorted({a['address'] for a in attributed}|signers)[:2]:
+            # A prior-launch scan needs sampled executions; the wallet is its subject, never the mint.
+            if txs:self.derive('prior-'+sha(address.encode())[:12],'prior_launches',{'address':address,'executions':txs[:8]},self.subject('wallet',address))
+        if attributed:
+            params={'attributions':attributed,'executions':txs[:8],'histories':[histories[a['address']] for a in attributed if a['address'] in histories]}
+            if sales:params['sales']='auto-sales'
+            if rebuys:params['rebuys']='auto-rebuys'
+            self.derive('auto-creator','creator_activity',params)
         roots=[d['id'] for d in self.m['derivations'] if d['operation'] in ('controls','pool','program')]
         if roots:
             # One unusable root or a newer unusable packet must not taint the whole authority graph:

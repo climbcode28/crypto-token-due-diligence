@@ -164,5 +164,14 @@ class SessionTests(unittest.TestCase):
                 self.assertFalse(root.exists())
 
 
+class CeilingManifestTests(unittest.TestCase):
+    def test_release_request_ceilings_match_the_session_constants(self):
+        import json
+        from pathlib import Path
+        from solana_session import PUBLIC_MAX_REQUESTS, KEYED_MAX_REQUESTS
+        release = json.loads((Path(__file__).resolve().parents[1]/'assets/release.json').read_text())
+        self.assertEqual((release['limits']['maximum_requests'], release['limits']['maximum_requests_keyed']), (PUBLIC_MAX_REQUESTS, KEYED_MAX_REQUESTS))
+
+
 if __name__ == "__main__":
     unittest.main()

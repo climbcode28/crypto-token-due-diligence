@@ -28,7 +28,7 @@ class GuidanceTests(unittest.TestCase):
             if name=='solana_bundle.py':
                 for action in ('finalize','checkpoint','verify','read','replay','--trust-frozen-code'):self.assertIn(action,result.stdout)
         skill=(S/'SKILL.md').read_text();runbook=(S/'references/runbook.md').read_text()
-        for phrase in ('120','64 MiB','receipt +420','deadline −120','at most two','public','checkpoint'):
+        for phrase in ('120','64 MiB','receipt +420','deadline −120','up to four','public','checkpoint'):
             self.assertIn(phrase,skill)
         self.assertIn('--cost-policy free',runbook);self.assertIn('solana-evidence-v2',runbook)
         self.assertNotIn('optional transport comes from the EVM sibling',skill)

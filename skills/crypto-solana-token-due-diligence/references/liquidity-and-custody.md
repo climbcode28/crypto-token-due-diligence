@@ -119,7 +119,11 @@ No constant-product approximation or total market-depth assertion is supplied.
 DLMM owner, operator and fee-owner fields are distinct controller leads. A captured
 lock-release point may be compared only to a Clock sysvar from the same account batch;
 operator permission and program controls remain separate from that time comparison.
-Expanded positions and unknown layout versions refuse principal calculation.
+Expanded positions and unknown layout versions refuse principal calculation. Bin array
+version bytes 0-3 are accepted: the two pinned IDL revisions (`ce0e6afe` and `576919e3`) keep
+the principal fields (amounts, price, liquidity supply) at the same offsets, and the pinned SDK
+tags version 3 as the limit-order release while reading those fields the same way for every
+version.
 
 DAMM v2 uses its actual 1,112-byte Pool and 408-byte Position. Current fee configuration
 is embedded in Pool; it does not contain the initialization configuration address.

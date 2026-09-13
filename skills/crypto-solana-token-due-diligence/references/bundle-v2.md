@@ -41,7 +41,7 @@ selects an existing frozen report and creates no research allowance.
 
 The durable session binds intake and provider namespace, `synthetic`, request and
 byte ceilings, actual started attempts, completed responses, outstanding grants,
-retry-family eligibility and phase timestamps. Default ceilings: 120 attempts,
+retry-family eligibility and phase timestamps. Default ceilings: 120 attempts (160 on a keyed dRPC run),
 64 MiB response bytes, 3 concurrent RPC, 2 per web origin. Reserve 15 attempts
 per lane and 12 final/retry attempts before discretionary reads; never grant the
 same remaining allowance twice. A retry/redirect is another attempt. Account

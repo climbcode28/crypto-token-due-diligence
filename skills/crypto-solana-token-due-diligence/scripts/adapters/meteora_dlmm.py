@@ -9,6 +9,7 @@ from adapters import meteora_common as common
 
 PROGRAM = 'LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo'
 REVISION = '576919e3e4368e542c402f000b4264724f7f23ec'
+BIN_ARRAY_MAX_VERSION = 3
 CAPABILITY = capability('meteora_dlmm', PROGRAM, REVISION, model='per_bin_position_shares',
     dependencies=['pair_with_embedded_fees', 'mints', 'vaults', 'PositionV2', 'covered_bin_arrays'])
 CAPABILITY.update(position_variants=['fixed_PositionV2_70_bins'],
@@ -87,7 +88,9 @@ def decode_bin(address, value, pool, bin_id):
     raw = layout(value, 'BinArray', 10136)
     need(number(raw,8,8,True) == bin_id//70 and b58encode(raw[24:56]) == pool and
          address == bin_array_address(pool,bin_id), 'DLMM bin array relationship mismatch')
-    need(raw[16] in (0,1) and not any(raw[17:24]), 'unsupported bin array version')
+    # Version tags upstream releases (3 = limit orders, SDK BIN_ARRAY_DEFAULT_VERSION); the 144-byte Bin keeps
+    # amount_x, amount_y, price and liquidity_supply at the same offsets in both pinned IDL revisions (ce0e6afe, 576919e3).
+    need(raw[16] <= BIN_ARRAY_MAX_VERSION and not any(raw[17:24]), 'unsupported bin array version')
     start = 56+(bin_id%70)*144
     return {'id': bin_id, 'amounts': [number(raw,start),number(raw,start+8)],
             'price_x64': number(raw,start+16,16), 'liquidity_supply': number(raw,start+32,16)}

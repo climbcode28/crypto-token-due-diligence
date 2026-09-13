@@ -139,6 +139,38 @@ class DeliveryTests(unittest.TestCase):
         b.r['decision']['verdict_kind']='insufficient_evidence';b.r['decision']['text']='insufficient_evidence: the same text'
         text=render(b.m,b.r);self.assertIn('\nInsufficient evidence: the same text',text);self.assertNotIn('evidence: insufficient',text)
 
+    def test_unverified_findings_carry_a_gap_basis_in_checklist_and_report(self):
+        from solana_render import render,reading,gap_basis
+        t=tempfile.TemporaryDirectory();self.addCleanup(t.cleanup);b=Bundle(Path(t.name),completed=True)
+        good=[f for f in b.r['findings'] if f['signal']=='good'];self.assertTrue(good)
+        f=next(x for x in b.r['findings'] if x['signal']=='unverified');row=next(c for c in b.r['coverage'] if c['dimension']==f['dimension'])
+        if f['id'] not in b.r['summary_ids']:b.r['summary_ids'].append(f['id'])
+        row['closure'].update(boundary='pending',next_route='positions');row['status']='partial'
+        payload=reading(b.m,b.r);entry=next(e for e in payload['reading_checklist'] if e.get('kind')=='finding' and e.get('id')==f['id'])
+        self.assertEqual(entry['gap_basis'],'partially attempted; targeted follow-up open (next route: positions)')
+        judged_good=[e for e in payload['reading_checklist'] if e.get('kind')=='finding' and e['signal']!='unverified'];self.assertTrue(judged_good);self.assertTrue(all('gap_basis' not in e for e in judged_good))
+        externals=[e for e in payload['reading_checklist'] if e.get('kind')=='finding' and e.get('id')!=f['id'] and e['signal']=='unverified'];self.assertTrue(externals)
+        self.assertTrue(all(e['gap_basis'].startswith('attempted; sources ') for e in externals),[e['gap_basis'] for e in externals][:3])
+        text=render(b.m,b.r);self.assertIn('| Surface | Coverage | Basis | Missing evidence |',text);self.assertIn('| partially attempted; targeted follow\\-up open \\(next route: positions\\) |',text)
+        # every mapping, with and without attempts
+        self.assertEqual(gap_basis({'status':'not_checked','attempt_ids':[],'closure':{'boundary':'pending','next_route':'standard'}}),'not attempted: standard work remains')
+        self.assertEqual(gap_basis({'status':'partial','attempt_ids':['a-1'],'closure':{'boundary':'pending','next_route':'standard'}}),'partially attempted: standard work remains')
+        self.assertEqual(gap_basis({'status':'not_checked','attempt_ids':[],'closure':{'boundary':'pending','next_route':'Additional scoped evidence required; no completion inferred.'}}),'not attempted; targeted follow-up open (a follow-up route is named)')
+        self.assertEqual(gap_basis({'status':'not_checked','attempt_ids':[],'closure':{'boundary':'budget','next_route':None}}),'not attempted: budget or time exhausted')
+        self.assertEqual(gap_basis({'status':'partial','attempt_ids':['a-1'],'closure':{'boundary':'implementation_gap','next_route':'quote'}}),'partially attempted: no maintained check for this (next route: quote)')
+        self.assertEqual(gap_basis({'status':'unavailable','attempt_ids':['a-1','a-2'],'closure':{'boundary':'evidenced_external_limit','next_route':None,'attempt_ids':['a-1','a-2']}},{'a-1':{'status':'timeout'},'a-2':{'status':'null'}}),'attempted; sources inaccessible (evidenced external limit)')
+        self.assertEqual(gap_basis({'status':'unavailable','attempt_ids':['a-1'],'closure':{'boundary':'evidenced_external_limit','next_route':None,'attempt_ids':['a-1']}},{'a-1':{'status':'null'}}),'attempted; sources returned nothing (evidenced external limit)')
+        self.assertEqual(gap_basis({'status':'checked','attempt_ids':['a-1'],'closure':{'boundary':'resolved','next_route':None}}),'informational; surface resolved, no further standard research owed')
+        self.assertEqual(gap_basis({'status':'partial','attempt_ids':['a-1'],'closure':{'boundary':'resolved','next_route':None}}),'partially attempted: standard work remains')  # a draft's premature resolved closure
+        self.assertEqual(gap_basis({'closure':{'boundary':'other'}}),'unclassified');self.assertEqual(gap_basis(None),'unclassified')
+
+    def test_typed_fact_judged_unverified_finding_carries_gap_basis(self):
+        root,b,n=self.fixture();payload=finalize(b.root,root/'final',allow_synthetic=True)  # judged pipeline findings exist only in the composed, frozen report
+        judged=[e for e in payload['reading_checklist'] if e.get('kind')=='typed_fact' and isinstance(e.get('finding'),dict) and e['finding'].get('signal')=='unverified']
+        self.assertTrue(judged,'the delivery fixture judges a typed fact unverified');self.assertTrue(all(e['finding'].get('gap_basis') for e in judged))
+        resolved=[e for e in judged if e['finding']['gap_basis'].startswith('informational')];self.assertTrue(resolved)
+        coverage=next(e for e in payload['reading_checklist'] if e.get('kind')=='coverage');self.assertIn('next_route',json.dumps(coverage['surfaces']))
+
     def test_old_bundle_without_facts_document_still_reads_and_verifies(self):
         """A bundle frozen before the facts document (details inline, no facts_document key) keeps reading and verifying."""
         from solana_replay import file_inventory

@@ -47,6 +47,17 @@ class DlmmTests(unittest.TestCase):
         target,a,v=fixture();v[a['pool']]['owner']=damm.PROGRAM
         with self.assertRaises(ValueError):dlmm.analyze(target,a['pool'],batch(v))
 
+    def test_known_bin_array_versions_decode_and_future_or_padded_arrays_refuse(self):
+        # Live arrays carried version 2 on 2026-09-13; the SDK default is 3 (limit orders). Principal offsets are unchanged.
+        for version in range(dlmm.BIN_ARRAY_MAX_VERSION+1):
+            target,a,v=fixture(bin_array_version=version)
+            p=dlmm.analyze(target,a['pool'],batch(v),positions=[a['lead']])['positions'][0]
+            self.assertEqual(p['principal']['amounts_atomic'],['750','1000'],version);self.assertEqual(p['status'],'observed')
+        for offset,data in [(16,bytes([dlmm.BIN_ARRAY_MAX_VERSION+1])),(17,b'\1')]:
+            _,a,v=self.analyze();v[a['arrays'][0]]=mutate(v[a['arrays'][0]],offset,data)
+            p=self.analyze(v)[0]['positions'][0]
+            self.assertIsNone(p['principal']);self.assertIn('unsupported bin array version',p['gaps'])
+
     def test_fee_configuration_boundary_and_future_modes(self):
         for offset,data in [(36,b'\2'),(35,b'\3'),(80,(401).to_bytes(2,'little')),(32,(10001).to_bytes(2,'little')),(40,(10001).to_bytes(4,'little')),(8,(65535).to_bytes(2,'little'))]:
             _,a,v=self.analyze();v[a['pool']]=mutate(v[a['pool']],offset,data)

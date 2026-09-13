@@ -14,6 +14,8 @@ from solana_common import need, target_identity
 SCHEMA = 1
 TRANSIENT = {"timeout", "transport_failure", "http_429", "http_502", "http_503", "http_504", "node_lag"}
 NODE_LAG_RETRIES = 3  # a load-balanced backend behind the pinned context slot is retried after waiting out the slot gap
+PUBLIC_MAX_REQUESTS = 120  # sends per run on the credential-free public tier, whose windows and refusals bind first
+KEYED_MAX_REQUESTS = 160  # sends per run on a keyed dRPC endpoint: the standard stages plus a two-pool position census
 COLLECTION_SECONDS = 480  # collection stops this long after receipt (or 120 s before the deadline, whichever is earlier)
 LANE_SECONDS = 300  # lanes stop this long after receipt (or 120 s before the deadline); assets/release.json repeats it
 OWNERS = {"ordinary", "liquidity", "project", "final", "contingency"}

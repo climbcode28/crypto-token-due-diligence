@@ -27,7 +27,7 @@ Assign each source and query one owner; share captures across lanes.
 | --- | --- |
 | 0:00–0:30 | Read the provider policy excerpt; start `broad_collect.py start` in the background. |
 | 0:30–1:30 | `discovery.json` exists: print both lane briefs and launch both lanes in one message. The pipeline continues to `facts.json`. |
-| 1:30–3:30 | Read `facts`; order at most two presets for conclusion-changing checks; compose them as they return. |
+| 1:30–3:30 | Read `facts`; order up to four presets while time allows, custody first; compose them as they return. |
 | 4:00–4:30 | Lane notes due; compose each. A lane that has not returned leaves its surfaces as recorded gaps. |
 | 4:30–6:00 | Write the coordinator note (findings, all eleven coverage rows, decision, texts); `finalize`. |
 | 6:00–7:00 | One repair round at most; write the chat answer from the frozen report. |

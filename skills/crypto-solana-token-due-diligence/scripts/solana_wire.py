@@ -90,7 +90,7 @@ def validate_request(request):
         filters = params[1].get("filters")
         need(isinstance(filters, list) and len(filters) == 2, "unbounded program scans prohibited")
         size, match = filters
-        need(isinstance(size, dict) and set(size) == {"dataSize"} and 1 <= natural(size["dataSize"]) <= 2048, "bounded dataSize filter required")
+        need(isinstance(size, dict) and set(size) == {"dataSize"} and 1 <= natural(size["dataSize"]) <= 8192, "bounded dataSize filter required")  # DLMM PositionV2 is 8120 bytes; the byte allowance still caps the scan
         need(isinstance(match, dict) and set(match) == {"memcmp"}, "exact relationship filter required")
         match = match["memcmp"]
         need(isinstance(match, dict) and set(match) == {"offset", "bytes"}, "invalid relationship filter")

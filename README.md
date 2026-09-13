@@ -105,7 +105,9 @@ See [provider setup](docs/provider-setup.md) and the
 Every collection command needs outbound network under the host's normal approval rules.
 A Solana start with no identity response retains a blocked result and its consumed
 budget; it must not restart in a new directory to obtain fresh allowances. Follow the
-runbook's recovery rules and keep missing identity explicit.
+runbook's recovery rules and keep missing identity explicit. On a keyed dRPC run the Solana session
+ceiling is 160 sends instead of 120, the room it uses to census LP positions on concentrated
+pools after the standard collection.
 
 ## Development
 

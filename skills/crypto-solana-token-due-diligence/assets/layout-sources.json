@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "retrieved_at": "2026-09-11",
+  "retrieved_at": "2026-09-13",
   "scope": "Pinned interface definitions and deterministic vectors; source correspondence is not deployment verification.",
   "sources": [
     {
@@ -823,6 +823,15 @@
       "license": "ts-client package declares ISC; root license not present in pinned tree"
     },
     {
+      "repository": "https://github.com/MeteoraAg/dlmm-sdk",
+      "revision": "ce0e6afea4c9f97412128d697ab325a2e39a42cc",
+      "path": "idls/dlmm.json",
+      "url": "https://raw.githubusercontent.com/MeteoraAg/dlmm-sdk/ce0e6afea4c9f97412128d697ab325a2e39a42cc/idls/dlmm.json",
+      "sha256": "b1f754715ce909724bcabb7efaa49fdee4d7306e0b72e3f2e38939297681176e",
+      "bytes": 195715,
+      "license": "ts-client package declares ISC; root license not present in pinned tree"
+    },
+    {
       "repository": "https://github.com/https://github.com/MeteoraAg/dlmm-sdk",
       "revision": "576919e3e4368e542c402f000b4264724f7f23ec",
       "path": "commons/src/pda.rs",
@@ -1054,6 +1063,15 @@
       "url": "https://raw.githubusercontent.com/MeteoraAg/dlmm-sdk/576919e3e4368e542c402f000b4264724f7f23ec/ts-client/src/dlmm/constants/index.ts",
       "sha256": "4e5c7077f0580acd9c998058f6a818d7409a99bdae3179fa3ad80371d991a027",
       "bytes": 4539,
+      "license": "ts-client package declares ISC; root license not present in pinned tree"
+    },
+    {
+      "repository": "https://github.com/MeteoraAg/dlmm-sdk",
+      "revision": "576919e3e4368e542c402f000b4264724f7f23ec",
+      "path": "ts-client/src/dlmm/types/index.ts",
+      "url": "https://raw.githubusercontent.com/MeteoraAg/dlmm-sdk/576919e3e4368e542c402f000b4264724f7f23ec/ts-client/src/dlmm/types/index.ts",
+      "sha256": "781be5f16a3be24d03f7a62edce503a38ee37797ac93e3e40d8c1f1a440f7530",
+      "bytes": 17165,
       "license": "ts-client package declares ISC; root license not present in pinned tree"
     },
     {

@@ -78,7 +78,7 @@ def main():
         'median_partial_handling_seconds':statistics.median(r['elapsed_seconds'] for r in rows),
         'all_handled_within_600_seconds':all(r['elapsed_seconds']<=600 for r in rows),
         'rich_case_live_parity':'unmet','reason':'All cases are substantive partial checkpoints; no completed broad live case, verified sale sample or principal-ownership sample.'}
-    assert result['round_attempts']<=360 and all(r['started_attempts']==r['completed_attempts'] and r['started_attempts']<=120 and r['response_bytes']<=67108864 for r in rows)
+    assert result['round_attempts']<=sum(r.get('max_requests',120) for r in rows) and all(r['started_attempts']==r['completed_attempts'] and r['started_attempts']<=r.get('max_requests',120) and r['response_bytes']<=67108864 for r in rows)
     atomic(a.out,encoded(result));print(json.dumps({k:v for k,v in result.items() if k!='cases'}))
 
 

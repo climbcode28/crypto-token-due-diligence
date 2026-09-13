@@ -8,6 +8,7 @@ from solana_common import need,sha,pubkey
 from solana_session import Session,utc,label
 from solana_transport import HttpTransport,provider_availability,transport_settings,is_drpc_host,validate_endpoint,credential_free_network_url
 from solana_collect_v2 import collect as collect_sample,execute,queue
+from solana_session import PUBLIC_MAX_REQUESTS,KEYED_MAX_REQUESTS
 from solana_presets import mint_baseline,account_batches,read,settings,validate_plan
 from solana_web_capture import register_urls,capture as capture_sources,clean_url
 from solana_discovery import MAINNET,source_plan,pools
@@ -16,9 +17,10 @@ from solana_facts import encoded,atomic,build,compact
 from solana_profile import regular,strict_json,PROFILE,DIMENSIONS,Evidence,validate_report
 from solana_compose import CHECKLISTS,empty_coverage,expand_finding,note_header,validate_imports,ComposeError,preflight
 
-VERSION='1.4.1'
+VERSION='1.6.0'
 ASSETS=Path(__file__).resolve().parents[1]/'assets'
 STAGES=('identity_discovery','related_accounts_controllers','pool_transaction_quote_dependencies','final_consistency_checks')
+PRESET_CAP=4  # named coordinator presets per run; the collection cutoff and request grants gate each one before this count does
 
 
 PUBLIC_ROOT='https://api.mainnet-beta.solana.com'
@@ -103,8 +105,12 @@ def capture(root,urls,owner='ordinary',*,dimension=None,opener_factory=None):
         ids=[r['source_id'] for r in rows if r['status']=='pending']+[r['id'] for r in shared if r['owner']==owner and r['status']=='pending']
     finally:s.close()
     results=capture_sources(root,ids,owner=owner,opener_factory=opener_factory) if ids else []
-    return {'captures':results,'existing_sources':[{'id':r['id'],'owner':r['owner'],'url':r['url']} for r in shared],
+    output={'captures':results,'existing_sources':[{'id':r['id'],'owner':r['owner'],'url':r['url']} for r in shared],
        'unattempted':[r for r in rows if r['status']!='pending']}
+    if results and all(r.get('status') in NO_RESPONSE for r in results):
+        kinds=sorted({r.get('failure') or r.get('status') for r in results})
+        output.update(network_unavailable=True,next='Every capture in this call failed before any response ('+', '.join(kinds)+'): the host denied outbound network to this command. Request network permission for this exact command (Codex: escalated permissions) and run it again; this is a host limit, not evidence about the source.')
+    return output
 
 
 def market_documents(root,target):
@@ -224,6 +230,74 @@ def lp_holder_leads(root,config,sample,lp_mint,kind,*,factory,limit=6):
     return [r['address'] for r in discovery_leads(lp_mint,scan['request'],checked,limit=limit)] if checked['status']=='ok' else []
 
 
+def clmm_census_rows(root,pool,leads):
+    """CLMM dependency batches planned from census leads: the census slice already carries each position's ticks and NFT mint,
+    so one atomic batch reads the full position with the pool, mints, vaults, config, boundary tick arrays, position mint and
+    the NFT holding, and the adapter decodes the position from that packet. No separate lead read is needed."""
+    from adapters import raydium_clmm as module
+    from solana_programs import observed_account
+    need(all(l.get('kind')=='census' and 'lower_tick' in l and 'position_mint' in l for l in leads),'CLMM census leads required')
+    accounts,objects,checked=importer_view(root);need(pool in accounts,'Pool lead has not been captured.')
+    packet=objects[accounts[pool]];value,meta=observed_account(pool,packet);state=module.decode_pool(pool,value)
+    groups=[]
+    for lead in leads:
+        addresses=[pool,*state['mints'],*state['vaults'],pubkey(lead['position']),state['config'],pubkey(lead['position_mint'])]
+        addresses+=[module.tick_array_address(pool,t,state['tick_spacing']) for t in (lead['lower_tick'],lead['upper_tick'])]
+        if lead.get('holding'):addresses.append(pubkey(lead['holding']))
+        need(len(set(addresses))<=25,'position dependencies exceed one atomic batch')
+        if groups and len(set(groups[-1]+addresses))<=25:groups[-1]=list(dict.fromkeys(groups[-1]+addresses))
+        else:groups.append(list(dict.fromkeys(addresses)))
+    plans=[]
+    for g,addresses in enumerate(groups):plans+=account_batches(addresses,prefix='position_'+str(g),floor=meta['context_slot'],critical=True,account_bytes=12000)
+    return plans
+
+
+def position_census(root,config,sample,pool,kind,*,factory):
+    """Count a concentrated pool's fixed-layout positions, sample the largest few in full, and say what was not counted.
+    The census weight only orders leads; principal and custody come from the full position sample. A refused or
+    oversized census (the public tier refuses program scans) is a stated gap, never an inference."""
+    from solana_positions import census_read,census_leads,sampled_share,LEAD_CAP
+    HEADERS=3  # ordinary getBlock headers per sample: one per distinct context slot, including recheck slots
+    def cost(n):
+        # Sends plus final-recheck reservations (collect_v2 reserves states + 2 per critical read + 1 per sample). CLMM: the
+        # census read, one holder lookup per lead and one dependency batch planned from the census slice (genesis, batch,
+        # headers). DLMM: the census read, a lead sample (its bin ids sit outside the slice) and the dependency batch.
+        if kind=='raydium_clmm':return (1+n+(1+1+HEADERS))+4
+        return (1+(1+1+HEADERS)+(1+1+HEADERS))+(4+4)
+    s=Session(root);remaining=s.status()['remaining_requests'];mint=s.meta['target']['mint'];s.close()
+    affordable=max([n for n in range(LEAD_CAP,0,-1) if cost(n)<=remaining-2],default=0)  # two sends stay free for contingency
+    if not affordable:return [],{'status':'skipped','reason':'ordinary request grant too small for a position census ('+str(remaining)+' left, '+str(cost(1)+2)+' needed for one lead including the two-send margin)'}
+    packet=execute(root,config,sample,census_read(kind,pool),factory=factory)
+    if packet.get('status')!='ok':return [],{'status':'unavailable','reason':str(packet.get('reason') or packet.get('status')),'read':(packet.get('request') or {}).get('id')}
+    try:leads,summary=census_leads(kind,pool,packet,cap=affordable)
+    except ValueError as exc:return [],{'status':'unavailable','reason':str(exc),'read':packet['request']['id']}
+    summary['budget']={'remaining_before':remaining,'leads_affordable':affordable,'lead_cap':LEAD_CAP}
+    if kind=='raydium_clmm':
+        for i,lead in enumerate(leads):
+            # The position NFT's single holder is the custodian; a tier that refuses this method leaves custody a stated gap.
+            holder=execute(root,config,sample,read('nft'+str(i),'getTokenLargestAccounts',[lead['position_mint'],{'commitment':'finalized'}]),factory=factory)
+            rows=((holder.get('response') or {}).get('result') or {}).get('value') or [] if holder.get('status')=='ok' else []
+            if len(rows)==1 and rows[0].get('amount')=='1':lead['holding']=rows[0]['address']
+            else:lead['holding_gap']=str(holder.get('reason') or holder.get('status') or 'no single NFT holder')
+    if leads:
+        try:
+            if kind!='raydium_clmm':
+                # Every sample needs a critical read of the target mint: it rides in the same batch as the full lead accounts.
+                collect_sample(root,root,config,sample+'l',account_batches([mint]+[l['position'] for l in leads],prefix='lead',critical=True,account_bytes=12000),factory=factory)
+            plan=(lambda ls:clmm_census_rows(root,pool,ls)) if kind=='raydium_clmm' else (lambda ls:dependency_rows(root,pool,kind,positions=ls))
+            # The importer resolves a pool's dependencies from one packet, so every sampled lead must share one atomic batch:
+            # leads are dropped from the tail until the dependency union fits.
+            rows=plan(leads);dropped=[]
+            while len(leads)>1 and sum(1 for r in rows if r['name'].startswith('position_'))>1:
+                dropped.append(leads.pop()['position']);rows=plan(leads)
+            summary.update(sampled=len(leads),dropped_for_one_batch=dropped,sampled_weight_share=sampled_share(leads,summary['weight_total']))
+            collect_sample(root,root,config,sample+'p',rows,factory=factory)
+        except ValueError as exc:
+            summary.update(status='partial',reason='lead sampling stopped: '+str(exc));return leads,summary
+    summary['status']='sampled' if leads else 'empty'
+    return leads,summary
+
+
 def provider_diagnostics(root):
     """What a coordinator must know without reading ledgers: refused methods, unsent reads, unresolved stages."""
     root=Path(root);rows=[];s=status(root)
@@ -248,6 +322,19 @@ def provider_diagnostics(root):
         try:degraded=[r for r in strict_json(facts_path.read_bytes(),'facts.json').get('missing_reads',[]) if r.get('reason')]
         except (ValueError,KeyError,TypeError):degraded=[]
         if degraded:rows.append({'stage':'evidence','category':'degraded_reads','count':len(degraded),'reads':[{'read':r['id'],'reason':r['reason']} for r in degraded[:12]],'reason':'These retained reads passed no check that a resolved fact needs; facts built on them are gaps until re-sampled.'})
+    auto=root/'automatic-leads.json'
+    if auto.exists():
+        blocked=[{'pool':l['pool'],'adapter':l['adapter'],'status':l['census']['status'],'reason':l['census'].get('reason')} for l in strict_json(auto.read_bytes(),auto.name) if isinstance(l.get('census'),dict) and l['census'].get('status') in ('unavailable','skipped','partial')]
+        facts_file=root/'draft/facts.json'
+        if facts_file.exists():
+            try:pool_facts=[f['data'] for f in strict_json(facts_file.read_bytes(),'facts.json').get('facts',[]) if f.get('operation')=='pool']
+            except (ValueError,KeyError,TypeError):pool_facts=[]
+            for d in pool_facts:
+                c=d.get('position_census') or {};positions=d.get('positions') or []
+                if c.get('status')=='sampled' and positions and not any(p.get('status')=='observed' for p in positions):
+                    gap=next((g for p in positions for g in (p.get('gaps') or [])),None)
+                    blocked.append({'pool':d.get('pool'),'adapter':d.get('adapter',{}).get('id'),'status':'sampled_unresolved','reason':'every sampled position stayed partial: '+str(gap)})
+        if blocked:rows.append({'stage':'collection','category':'position_census_unavailable','pools':blocked,'reason':'The position census for these concentrated pools was refused, not affordable after the standard samples, stopped early, or sampled without resolving a position (each entry says which), so their LP custody stays a stated gap; the public tier refuses program scans, a keyed endpoint answers them.'})
     if any(f.endswith('_holderscan') for f in unresolved):
         rows.append({'stage':'collection','category':'holder_scan_failed','reason':'The bounded holder census already ran and failed, so a holders preset would repeat it; holder concentration stays an explicit gap for this run.'})
     # A pool whose every listed recent signature failed on chain yields no receipt although its history read succeeded.
@@ -394,6 +481,14 @@ def automatic_dependencies(root,config,factory):
         # One sliced batch shares a context slot: program metadata costs one header pair, not one per program.
         rows=mint_baseline(mint,largest=False)+[read('programdata','getMultipleAccounts',[list(dict.fromkeys(programdata))[:4],{**settings(),'dataSlice':{'offset':0,'length':45}}])]
         collect_sample(root,root,config,'programs',rows,factory=factory)
+    # The position census runs last, on whatever ordinary grant the standard stages left, so it never starves the
+    # receipt, program and final rechecks every run needs; its lead count is fitted to that leftover and to one atomic batch.
+    from solana_positions import LAYOUTS as CENSUS_LAYOUTS
+    for n,lead in enumerate(automatic):
+        if lead['adapter'] in CENSUS_LAYOUTS:
+            try:lead['positions'],lead['census']=position_census(root,config,'census'+str(n),lead['pool'],lead['adapter'],factory=factory)
+            except (ValueError,KeyError,TypeError) as exc:lead['positions'],lead['census']=[],{'status':'partial','reason':str(exc) if isinstance(exc,ValueError) else type(exc).__name__}
+    atomic(Path(root)/'automatic-leads.json',encoded(automatic))
     return results
 
 
@@ -468,6 +563,7 @@ def start(root,target,*,question,received_at,deadline_at,focus=None,urls=None,sc
         try:need(s.meta['question']==question and s.meta['received_at']==utc(float(received_at)) and s.meta['deadline_at']==utc(float(deadline_at)) and s.meta['focus']==(focus or []) and s.meta['urls']==(urls or []) and s.meta['scope']==scope,'Resume must preserve original intake and absolute timing.')
         except BaseException:s.close();raise
     else:s=Session.create(root,target,question=question,received_at=received_at,deadline_at=deadline_at,focus=focus,urls=urls,scope=scope,synthetic=synthetic,
+        max_requests=KEYED_MAX_REQUESTS if provider=='drpc' else PUBLIC_MAX_REQUESTS,  # the provider lock keeps one ceiling per run
         method_limits={} if provider=='drpc' else None)  # a keyed endpoint drops the public tier's per-method windows; the default window and connection pacing still apply
     meta=s.meta;s.close();run_provider(root,config,factory,create=True);surfaces=surfaces or (list(DIMENSIONS) if scope=='broad' else ['token_controls'])
     need(set(surfaces)<=set(DIMENSIONS),'Unknown focused surface.')
@@ -481,6 +577,7 @@ def start(root,target,*,question,received_at,deadline_at,focus=None,urls=None,sc
     if config.get('fallback'):diagnostics.append({'stage':'provider','category':'provider_fallback','reason':'A dRPC configuration was present but not usable ('+config['fallback']+'); the credential-free public root was used. This is a workflow decision, not evidence.'})
     work=json.loads((ASSETS/'work-plan.template.json').read_text());work.update({k:meta[k] for k in ('scope','received_at','target_at','deadline_at','user_hard_deadline')})
     work['investigation_id']=meta['investigation_id'];work['target']=target;work['question']=question;work['focus']=focus or [];work['urls']=urls or []
+    work.setdefault('limits',{})['attempts']=meta['max_requests']  # the keyed ceiling, not the template's public figure
     work['surfaces']=[{**row,'required':row['dimension'] in surfaces} for row in work['surfaces']]
     if not (root/'work-plan.json').exists():atomic(root/'work-plan.json',encoded(work))
     def identity_discovery():
@@ -489,7 +586,7 @@ def start(root,target,*,question,received_at,deadline_at,focus=None,urls=None,sc
             if target['genesis_hash']==MAINNET:requested+=list(source_plan(target).values())+([source_plan(target,surface='token_info')['primary']] if scope=='broad' else [])
         with ThreadPoolExecutor(max_workers=2) as pool:
             web=pool.submit(capture,root,requested,opener_factory=opener_factory) if requested else None
-            collect_sample(root,root,config,'baseline',mint_baseline(target['mint'],largest=scope=='broad' or 'current_concentration' in surfaces),factory=factory,expand_largest=scope=='broad' or 'current_concentration' in surfaces)
+            collect_sample(root,root,config,'baseline',mint_baseline(target['mint'],largest=scope=='broad' or 'current_concentration' in surfaces,metadata=True),factory=factory,expand_largest=scope=='broad' or 'current_concentration' in surfaces)
             result=web.result() if web else None
         # Indexer project links are fetched only when a second indexer names the same identity;
         # single-indexer profiles stay recorded as unverified and are never crawled automatically.
@@ -594,7 +691,7 @@ def _collect(root,spec,config,*,factory=HttpTransport):
         with s.transaction():
             if path.exists():need(strict_json(path.read_bytes(),path.name)==spec,'Named preset changed.')
             else:
-                need(len(list(folder.glob('*.json')))<2,'Two coordinator preset calls already used.')
+                need(len(list(folder.glob('*.json')))<PRESET_CAP,'Four coordinator preset calls already used.')
                 # A new preset must not reuse a start sample id: pool_activity would resume that sample's classification as its
                 # own. Classification rows can exist without a sample plan (a refused reserve), so both records are checked.
                 probes_path=root/'receipt-classification.json';record=json.loads(probes_path.read_text()) if probes_path.exists() else {}
@@ -663,7 +760,10 @@ def lane_check(root,owner,*,allow_synthetic=False):
         placeholders(n,'note',errors)
         if not n.get('evidence_ids') or not all(i in e.rows for i in n['evidence_ids']):errors.append({'path':'evidence_ids','message':'Completed lane needs retained current-run evidence IDs.'})
     if errors:raise ComposeError(errors)
-    return {'valid':True,'owner':owner,'complete':complete,'lane_cutoff':meta['lane_cutoff'],'late':time.time()>meta['lane_cutoff'],'written':False}
+    own=[c for c in captures if c.get('owner')==owner];denied=bool(own) and all(c.get('status') in NO_RESPONSE for c in own)
+    result={'valid':True,'owner':owner,'complete':complete,'lane_cutoff':meta['lane_cutoff'],'late':time.time()>meta['lane_cutoff'],'written':False}
+    if denied:result.update(captures_unavailable=True,warning='Every capture this lane made failed before any response: the host denied the network to those commands. Rerun the captures with network permission before treating any source as unavailable.')
+    return result
 
 
 def main():

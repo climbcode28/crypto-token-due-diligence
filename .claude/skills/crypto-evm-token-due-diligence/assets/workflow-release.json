@@ -1,9 +1,10 @@
 {
-  "workflow_version": "3.3.0",
+  "workflow_version": "3.3.1",
   "backend_engine_version": "3.5.0",
   "reporting_engine_version": "2.6.2",
   "date": "2026-09-13",
   "changes": [
+    "Deeper targeted verification: the coordinator may order up to four presets (was two) while at least 150 s remain before the deadline, custody first: enumerate the canonical pool's other large positions with logs then positions, read locker withdrawal getters and Safe modules/guard, then receipts and side pools. Guidance only; no backend, reporting or budget changes.",
     "Chain-specific built-in public RPC defaults for seven registered mainnets, explicit credential-free public selection, unchanged configured-provider authorization gates, and target-derived selection for presets and low-level collections. Separate per-command paid flags from repeat consent; exercise clean link/copy installation and report delivery.",
     "Distinguish paid-use approval rejection from general network denial; preserve standing authorization and host boundaries, continue independently permitted public research under required review, isolate public endpoint selection, and complete useful permitted work before requesting missing authorization. Read provider policy in a dedicated output. No backend, reporting, schema or host permission changes.",
     "Publication hardening: anonymous EVM web captures reject private destinations and connected peers, validate redirects, and ignore environment proxies. Claude uses ordinary host tool permissions without shipped auto-allow wildcards.",
@@ -22,7 +23,7 @@
     "Chat delivery renders the four conclusions (technical exposure, credibility and maturity, token economics, research confidence) as four bullets, never one paragraph"
   ],
   "validation_scope": "Offline public-selection and clean-install tests plus specialist regression suites; live fresh-host acceptance outcomes and limitations are recorded separately in the review record.",
-  "previous_workflow_version": "3.2.9",
+  "previous_workflow_version": "3.3.0",
   "review_record": "../../../../docs/reviews/first-run-reliability.md",
   "completion_review_version": 2,
   "decision_review_version": 2,

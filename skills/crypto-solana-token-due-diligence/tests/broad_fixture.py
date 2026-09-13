@@ -13,6 +13,8 @@ class RichRpc(Rpc):
     def reset(cls):
         target,a,v=fixture();cls.target=target;cls.pool=a;cls.values=copy.deepcopy(v);cls.values[CLOCK]=clock(timestamp=int(time.time()))
         cls.values[key(7)]=holding(target['mint'],key(8),10000);cls.largest={target['mint']:[key(7)],a['lp']:[a['holder']]}
+        from metadata_fixture import metadata_account
+        cls.metadata=metadata_account(target['mint'],update_authority=key(90),creators=[(key(91),True,60),(key(92),False,40)]);cls.values[cls.metadata['address']]=cls.metadata['account']
         cls.calls=[];cls.active=cls.peak=0;cls.mode='normal';cls.stamp=int(time.time());cls.receipt=None;cls.receipts={};Web.token_info=True;Web.pairs=None;return target
     def __call__(self,req):
         cls=type(self)

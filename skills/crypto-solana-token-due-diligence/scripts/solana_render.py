@@ -5,7 +5,7 @@ from solana_profile import AXES,DIMENSIONS,check,regular
 from solana_web_capture import clean_url
 from solana_facts import describe,scan,LIMIT_KEYS,ATTENTION_KEYS
 
-VERSION='1.2.1'
+VERSION='1.3.0'
 LABELS={'good':'✅ Good','potential_risk':'🟡 Potential Risk','bad':'🔴 Bad','unverified':'⚪ Unverified'}
 PUBLICATION_OPS={'discovery_pools','repository_metadata','repository_revision','repository_tree','public_quote'}
 PUBLICATION_DETAIL_LINES=40
@@ -246,6 +246,30 @@ def rows_as_text(rows):
 FACTS_DOCUMENT='facts-compact.json'
 
 
+def gap_basis(row,attempts=None):
+    """Why a finding stays Unverified, from its coverage row: whether the surface was attempted (recorded attempts or partial
+    status), what closes it (standard work, a targeted route, budget, a missing check, an evidenced external limit) and, for an
+    external limit, whether the cited sources were unreachable or answered with nothing. An informational Unverified finding on a
+    resolved surface is named as such, not as a gap."""
+    if not isinstance(row,dict) or not isinstance(row.get('closure'),dict):return 'unclassified'
+    closure=row['closure']
+    boundary=closure.get('boundary');route=closure.get('next_route')
+    tried=bool(row.get('attempt_ids')) or row.get('status') in ('partial','checked','unavailable')
+    prefix='partially attempted' if tried else 'not attempted'
+    note=''
+    if route and route!='standard':
+        note=' (next route: '+route+')' if isinstance(route,str) and len(route)<=32 and ' ' not in route else ' (a follow-up route is named)'
+    if boundary=='resolved' and row.get('status') in ('checked','not_applicable'):return 'informational; surface resolved, no further standard research owed'
+    if boundary=='resolved':return prefix+': standard work remains'  # a draft may mark a partial surface resolved before its checks complete
+    if boundary=='evidenced_external_limit':
+        statuses={((attempts or {}).get(a) or {}).get('status') for a in closure.get('attempt_ids',[])}
+        return 'attempted; sources returned nothing (evidenced external limit)' if statuses and statuses<={'null'} else 'attempted; sources inaccessible (evidenced external limit)'
+    if boundary=='budget':return prefix+': budget or time exhausted'+note
+    if boundary=='implementation_gap':return prefix+': no maintained check for this'+note
+    if boundary=='pending':return prefix+('; targeted follow-up open'+note if note else ': standard work remains')
+    return 'unclassified'
+
+
 def reading_documents(manifest,report):
     """The compact reading checklist and its sibling facts document, built together so aliases agree.
 
@@ -266,6 +290,7 @@ def reading_documents(manifest,report):
     # counted rather than repeated; the pipeline finding of a typed fact (whose text and limitations
     # are that fact's summary and limits) travels inside the fact's entry; the frozen report lists all.
     selected=set(report['summary_ids']);ids={f['id'] for f in report['findings']};facts={d['id']:d for d in manifest['derivations']}
+    rows_by_dimension={c['dimension']:c for c in report['coverage']};attempts={a['id']:a for a in manifest.get('attempts',[]) if isinstance(a,dict) and 'id' in a}
     def parent_of(f):
         if f.get('owner')!='pipeline' or 'support' not in f or not f['support']:return None
         parent='pipeline-'+f['support'][0]['evidence_id']
@@ -279,6 +304,7 @@ def reading_documents(manifest,report):
             'citations':[c['evidence_id'] for c in finding_citations(f,citations)]}
         if f['id'] in selected:entry['summary']=True
         if f.get('concern') is not None:entry['concern']=f['concern']
+        if f['signal']=='unverified':entry['gap_basis']=gap_basis(rows_by_dimension.get(f['dimension']),attempts)
         cited.update(entry['citations'])
         fact=f['support'][0]['evidence_id'] if f.get('owner')=='pipeline' and f.get('support') else None
         if fact in facts and f['id']=='pipeline-'+fact:judgments[fact]=entry
@@ -296,7 +322,7 @@ def reading_documents(manifest,report):
         if judged:
             derived=[str(r['path'])+': '+str(r['value']) for r in limits]
             finding={k:judged[k] for k in ('dimension','signal','claim','strength','impact','confidence','time_basis') if PIPELINE_DEFAULTS.get(k)!=judged[k]}
-            for k in ('summary','concern'):
+            for k in ('summary','concern','gap_basis'):
                 if k in judged:finding[k]=judged[k]
             if judged['text']!=summary:finding['text']=judged['text']
             extra=[l for l in judged['limitations'] if l not in derived]
@@ -307,8 +333,8 @@ def reading_documents(manifest,report):
     # One alias table across both documents; each document lists only the aliases it uses.
     (typed,details),shared=alias_addresses([typed,details],report['target'])
     checklist+=typed
-    columns=['rating','status','boundary','reason','pending_work','decision_impact']
-    checklist.append({'kind':'coverage','surfaces':table(columns,{c['dimension']:[report['ratings'][c['dimension']],c['status'],c['closure']['boundary'],
+    columns=['rating','status','boundary','next_route','reason','pending_work','decision_impact']
+    checklist.append({'kind':'coverage','surfaces':table(columns,{c['dimension']:[report['ratings'][c['dimension']],c['status'],c['closure']['boundary'],c['closure'].get('next_route'),
         c['closure']['reason'],c['pending_work'],c['decision_impact']] for c in report['coverage']}),'limitations':report['limitations']})
     for c in report['coverage']:cited.update(a for a in c['closure'].get('attempt_ids',[]))
     for eid in facts:cited.add(eid)
@@ -350,13 +376,13 @@ def facts_compact(manifest,report):
     return reading_documents(manifest,report)[1]
 
 
-def summary(report,citations):
+def summary(report,citations,attempts=None):
     """Labeled findings with adjacent citations and exactly four conclusion bullets, mirroring the EVM chat shape."""
     decision=report['decision'];lines=['## Summary','']
     if decision:lines+=[verdict_line(decision),'']
     else:lines+=['Unjudged '+('checkpoint' if report['delivery_status']=='checkpoint' else 'draft')+'. Standard research and analyst decisions are incomplete.','']
     lines+=['✅ Good = supported positive finding · 🟡 Potential Risk = observed concern or adverse inference · 🔴 Bad = supported material problem.',
-        '⚪ Unverified = a research gap, not an observed defect or a passing check. Labels apply to the stated findings and time basis; Good is not a safety verdict.']
+        '⚪ Unverified = a research gap or an informational note, not an observed defect or a passing check. Labels apply to the stated findings and time basis; Good is not a safety verdict.']
     selected=[f for f in report['findings'] if f['id'] in set(report['summary_ids'])]
     assessed=[f for f in selected if f['signal'] in ('good','potential_risk','bad')];gaps=[f for f in selected if f['signal']=='unverified']
     if assessed:
@@ -367,8 +393,9 @@ def summary(report,citations):
     if not selected:lines+=['','No summary assessment has been composed; the evidence below is retained as research material.']
     elif not assessed:lines+=['','No assessed findings were selected; the research gaps below do not establish a favorable or adverse verdict.']
     if gaps:
-        lines+=['','### Research gaps','','These checks limit research confidence and may prevent a decision; they do not add observed-risk counts.','','| Surface | Coverage | Missing evidence |','| --- | --- | --- |']
-        for f in gaps:lines+=['| '+safe_text(f['dimension'])+' | ⚪ **Unverified** | '+safe_text(f['text'])+' '+links([r['evidence_id'] for r in f['support']],citations)+' |']
+        rows_by_dimension={c['dimension']:c for c in report['coverage']}
+        lines+=['','### Research gaps','','These checks limit research confidence and may prevent a decision; they do not add observed-risk counts. Basis says why each row stands: not or partially attempted, attempted with its sources inaccessible or empty, or informational on a resolved surface.','','| Surface | Coverage | Basis | Missing evidence |','| --- | --- | --- | --- |']
+        for f in gaps:lines+=['| '+safe_text(f['dimension'])+' | ⚪ **Unverified** | '+safe_text(gap_basis(rows_by_dimension.get(f['dimension']),attempts))+' | '+safe_text(f['text'])+' '+links([r['evidence_id'] for r in f['support']],citations)+' |']
     lines+=['','**Conclusions**','']
     for axis in AXES:
         name=axis.replace('_',' ').capitalize().replace('Credibility maturity','Credibility and maturity')
@@ -383,7 +410,7 @@ def render(manifest,report):
       'Synthetic fixture; not a live token assessment.' if report['synthetic'] else 'Evidence-bounded assessment; observations retain their original capture times.','']
     if report['focus']:lines+=['Focus: '+safe_text('; '.join(report['focus'])),'']
     decision=report['decision']
-    lines+=summary(report,citations)
+    lines+=summary(report,citations,{a['id']:a for a in manifest.get('attempts',[]) if isinstance(a,dict) and 'id' in a})
     lines+=['## Assessment','']
     if decision:
         lines += [verdict_line(decision,label=decision['verdict_kind']),'']

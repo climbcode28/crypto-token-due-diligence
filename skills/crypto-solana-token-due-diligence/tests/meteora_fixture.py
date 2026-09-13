@@ -22,7 +22,7 @@ def clock(slot=100,timestamp=1000):
     return owned(struct.pack('<QqQQq',slot,0,1,1,timestamp),common.SYSVAR)
 
 
-def fixture(kind='dlmm',collect=0):
+def fixture(kind='dlmm',collect=0,bin_array_version=dlmm.BIN_ARRAY_MAX_VERSION):
     module=dlmm if kind=='dlmm' else damm
     program=module.PROGRAM
     pool,mints,owner=key(60),[key(2),key(3)],key(61)
@@ -46,7 +46,7 @@ def fixture(kind='dlmm',collect=0):
         arrays=[]
         for index in (-1,0):
             array=dlmm.bin_array_address(pool,index*70);arrays.append(array)
-            b=bytearray(10136);b[:8]=discriminator('BinArray');write(b,8,index,8,True);b[24:56]=base58_bytes(pool,32)
+            b=bytearray(10136);b[:8]=discriminator('BinArray');write(b,8,index,8,True);b[16]=bin_array_version;b[24:56]=base58_bytes(pool,32)
             for bin_id,amounts in [(-1,(1000,0)),(0,(1000,2000)),(1,(0,2000))]:
                 if bin_id//70 != index:continue
                 start=56+(bin_id%70)*144;write(b,start,amounts[0]);write(b,start+8,amounts[1]);write(b,start+16,Q,16);write(b,start+32,100*Q,16)

@@ -13,7 +13,7 @@ def begin(module, target, pool, observations, positions):
     need(all(isinstance(p, dict) and isinstance(p.get('evidence'), list) and 1 <= len(p['evidence']) <= 8 for p in positions), 'captured position leads required')
     need(len({pubkey(p.get('position')) for p in positions}) == len(positions), 'duplicate position lead')
     for p in positions:
-        need(p.get('kind') in ('explicit', 'account', 'indexer', 'transaction'), 'position lead kind required')
+        need(p.get('kind') in ('explicit', 'account', 'indexer', 'transaction', 'census'), 'position lead kind required')
         for e in p['evidence']: label(e)
     sample = Sample(target, pool, observations, module.CAPABILITY)
     state = module.decode_pool(pool, sample.account(pool))

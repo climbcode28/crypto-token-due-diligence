@@ -247,7 +247,7 @@ def capture_one(session_root, source_id, *, owner="ordinary", opener=None, max_b
         capture_id = packet["request_id"]
         result = {"id": capture_id, "source_id": source_id, "url": source["url"], "final_url": packet["url"], "owner": owner,
                   "dimension": source_dimension(session, source_id),
-                  "status": packet["status"], "attempts": [p["request_id"] for p in history],
+                  "status": packet["status"], "attempts": [p["request_id"] for p in history], "failure": packet.get("failure"),
                   "http_status": packet.get("http_status"), "content_type": packet.get("content_type"),
                   "captured_at": packet.get("captured_at"), "sha256": packet.get("sha256"),
                   "bytes": packet.get("bytes", 0), "raw": None}

@@ -132,6 +132,7 @@ def creator_activity(target,attributions,executions,*,histories=None,sales=None,
                 row['movements'].append({'kind':classification,'amount_atomic':e['amount_atomic'],'signature':execution['signature'],
                     'effect_id':e['id'],'account_owners':roles,'accounts':e['participants'],'evidence':[execution['transaction_evidence_id'],execution['block_evidence_id']]})
         row['observed_sale_receipts']=len(row['verified_sales']);row['sampled_receipts']=len(executions)
+        if not executions:row['gaps'].append('no receipts sampled for this key; zero observed sales is not evidence of no sales')
         row['gaps'].append('complete key history, cost basis, beneficiary and inventory conservation not established by receipt subset')
         rows.append(row)
     return {'target':target,'keys':rows,'scope':'bounded attributed-key observations; transfers/exchange labels/shared funding do not establish personal cash-out or identity'}

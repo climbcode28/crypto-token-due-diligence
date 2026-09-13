@@ -22,7 +22,8 @@ may be the EVM skill's, records nothing); `--provider drpc` requires it and `--p
 never uses it. `SOLANA_RPC_URL` only overrides the public root. The key goes only in
 `DRPC_API_KEY` (sent as a `Drpc-Key` header); a URL that carries it (a `dkey` parameter or a
 key path segment) is refused with `rpc_url_carries_credential`. A keyed endpoint drops the
-public tier's per-method windows but keeps the default 40-sends-per-10-seconds pacing; it
+public tier's per-method windows, raises the session ceiling from 120 to 160 sends (the room a
+two-pool position census needs after the standard samples) but keeps the default 40-sends-per-10-seconds pacing; it
 answers the account census methods slowly (`getTokenLargestAccounts` and
 `getProgramAccounts` get a 20-second request timeout, other reads 5 seconds), and its load
 balancer may answer a read behind the pinned context slot. Such node lag is retried up to
@@ -159,7 +160,7 @@ scripts, spawn agents, compose or finalize. If subagents are unavailable or late
 execute the feasible owned checklist locally with the same grants, or retain pending
 items. A missing lane or expired budget is never completed broad work.
 
-## 3. Judge from facts, at most two presets
+## 3. Judge from facts, up to four presets
 
 Presets spend the ordinary request grant that `start` left (`session.remaining_requests`
 in its output and in `status`); a preset that needs more is refused, so read that number
@@ -175,13 +176,15 @@ Categories: `controls`, `pools`, `holders`, `quotes`, `transactions`, `programs`
 `creator`, `launch`, `maturity`, `source_assurance`. Do not open raw manifests, do
 arithmetic by hand or fetch again to produce citations.
 
-The coordinator may run at most two presets, each a small JSON file (data, not a
+The coordinator may run up to four presets while the collection cutoff and the ordinary
+grant allow, in order of what would change a conclusion (custody and positions first,
+then exits, then history), each a small JSON file (data, not a
 script) with a stable `id` of at most 12 characters, `kind` and `parameters`:
 
 | Kind | Parameters |
 | --- | --- |
 | `pool` | `adapter`, `pool` (must appear in this run's exact-mint discovery or captured accounts), optional `lp_accounts` (at most six) |
-| `positions` | `adapter`, `pool`, `positions` (at most six discovered supported leads) |
+| `positions` | `adapter`, `pool`, `positions` (at most six discovered supported leads; after the standard samples, `start` censuses a Raydium CLMM or Meteora DLMM pool's fixed-layout positions and samples up to four of the largest, fitted to the leftover grant and to one atomic batch, recorded as `position_census` on the pool fact; it is skipped with a reason when fewer than 13 (CLMM) or 21 (DLMM) requests remain, the two-send margin included, and when it runs it leaves only a two-send margin, so no coordinator preset can follow it) |
 | `transactions` | `signatures` (at most two) |
 | `pool_activity` | `pool` (captured), optional `limit` (1–25 signatures, default 10), `receipts` (0–4 sampled swap receipts, default 2) and `probes` (receipts–8 signatures classified, default 4) |
 | `holders` | none: holder discovery (largest accounts or the bounded scan) plus the same-batch balance sample; it repeats what `start` already attempted, so use it only when `diagnostics` shows neither the largest-accounts read nor the bounded scan ran |
@@ -199,7 +202,7 @@ python3 "$S/scripts/solana_broad_collect.py" collect "$RUN" --request "$RUN/pres
 Presets run sequentially under the same deadline, attempt/byte ceiling and reserved
 final capacity, and each refreshes facts (the draft becomes unjudged; analyst notes and
 corrections are preserved). An identical named request resumes; a changed one is
-refused; a third distinct preset is refused. Captures made outside a lane check need:
+refused; a fifth distinct preset is refused. Captures made outside a lane check need:
 
 ```sh
 python3 "$S/scripts/solana_broad_collect.py" refresh "$RUN"

@@ -12,7 +12,7 @@ def analyze(module, target, pool, observations, positions):
     need(len({pubkey(p['position']) for p in positions}) == len(positions), "duplicate position lead")
     for lead in positions:
         for evidence in lead['evidence']: label(evidence)
-        need(lead.get('kind') in ('explicit', 'indexer', 'transaction', 'account'), "position discovery kind required")
+        need(lead.get('kind') in ('explicit', 'indexer', 'transaction', 'account', 'census'), "position discovery kind required")
     sample = Sample(target, pool, observations, module.CAPABILITY)
     state = module.decode_pool(pool, sample.account(pool))
     need(target["mint"] in state["mints"], "target mint not in concentrated pool")
@@ -77,6 +77,7 @@ def analyze(module, target, pool, observations, positions):
                     need(mint_account['owner'] == TOKEN_PROGRAM, "Token-2022 bundle representation unsupported")
                 mint = sample.mint(nft, mint_account['owner'], 0)
                 need(mint['supply_atomic'] == '1' and mint['mint_authority'] is None, "position NFT supply/issuance authority unresolved")
+                need(lead.get('holding'), lead.get('holding_gap') or 'position NFT holder unresolved')
                 holding_address = pubkey(lead.get('holding'))
                 holding = decode_holding(sample.account(holding_address), mint=nft, token_program=mint_account['owner'])
                 need(holding['amount_atomic'] == '1' and holding['state'] != 'uninitialized', "position holding does not own one NFT")

@@ -95,13 +95,13 @@ class BroadTests(unittest.TestCase):
         self.assertTrue(any(f['id']=='pipeline-auto-controls' for f in report['findings']));self.assertEqual(report['research_status'],'partial');self.assertTrue(any(o['status']=='permission_denied' for o in m['observations']))
         self.assertTrue(all(not c['closure']['standard_scope_complete'] for c in report['coverage']))
 
-    def test_two_followup_presets_share_grants_and_third_is_refused(self):
+    def test_four_followup_presets_share_grants_and_fifth_is_refused(self):
         root,target,opts=self.setup_run('focused');start(root,target,**opts);before=status(root)
-        for ident in ('followup1','followup2'):
+        for ident in ('followup1','followup2','followup3','followup4'):
             spec={'id':ident,'kind':'programs','parameters':{'addresses':[target['mint']]}}
             result=collect(root,spec,opts['config'],factory=RichRpc);self.assertEqual(result['research_status'],'partial')
         after=status(root);self.assertEqual(before['deadline_at'],after['deadline_at']);self.assertGreater(after['started_attempts'],before['started_attempts'])
-        with self.assertRaisesRegex(ValueError,'Two coordinator'):collect(root,{'id':'followup3','kind':'programs','parameters':{'addresses':[]}},opts['config'],factory=RichRpc)
+        with self.assertRaisesRegex(ValueError,'Four coordinator'):collect(root,{'id':'followup5','kind':'programs','parameters':{'addresses':[]}},opts['config'],factory=RichRpc)
 
     def test_wrong_network_keeps_diagnostics_and_never_completes(self):
         root,target,opts=self.setup_run();RichRpc.mode='wrong_network';r=start(root,target,**opts);self.assertEqual(r['research_status'],'partial');self.assertTrue(r['diagnostics'])
@@ -233,6 +233,66 @@ class BroadTests(unittest.TestCase):
     def test_start_whose_identity_read_answered_is_not_blocked(self):
         root,target,opts=self.setup_run();RichRpc.mode='wrong_network';r=start(root,target,**opts)
         self.assertEqual(r['research_status'],'partial');self.assertNotIn('blocked',r)  # an answered read that mismatches is a finding, not a block
+
+    def test_pool_vault_among_largest_holders_is_excluded_as_custody(self):
+        root,target,opts=self.setup_run();vault=RichRpc.pool['vaults'][0];RichRpc.largest[target['mint']].append(vault)
+        start(root,target,**opts);facts=json.loads((root/'draft/facts.json').read_text())['facts']
+        holders=next(f['data'] for f in facts if f['operation']=='holders')
+        row=next(a for a in holders['accounts'] if a['address']==vault)
+        self.assertTrue(row['custody_exclusion'] and row['custody_exclusion']['reason'].startswith('pool_vault:'),row)
+        self.assertTrue(all(e in {o['id'] for o in json.loads((root/'draft/manifest.json').read_text())['observations']} for e in row['custody_exclusion']['evidence']))
+        self.assertGreater(int(holders['custody_excluded_amount_atomic']),0)
+        plain=next(a for a in holders['accounts'] if a['address']!=vault);self.assertIsNone(plain['custody_exclusion'])
+
+    def test_capture_names_a_host_network_denial(self):
+        from solana_broad_collect import capture
+        root,target,opts=self.setup_run();start(root,target,**opts)
+        class Denied(Web):
+            def open(self,request,timeout):type(self).calls.append(request.full_url);raise PermissionError(1,'Operation not permitted')
+        r=capture(root,['https://project.example/denied-page'],'project',opener_factory=Denied)
+        self.assertTrue(r['network_unavailable']);self.assertIn('escalated permissions',r['next']);self.assertEqual([c['failure'] for c in r['captures']],['not_permitted'])
+        ok=capture(root,['https://project.example/another-page'],'project',opener_factory=Web)
+        self.assertNotIn('network_unavailable',ok)
+
+    def test_start_reads_metaplex_metadata_and_attributes_its_keys(self):
+        root,target,opts=self.setup_run();r=start(root,target,**opts);self.assertFalse(r['diagnostics'],r['diagnostics'])
+        facts=json.loads((root/'draft/facts.json').read_text())['facts']
+        meta=next(f['data'] for f in facts if f['operation']=='metadata');self.assertEqual((meta['name'],meta['update_authority'],meta['update_authority_platform']),('Fixture Token',__import__('solana_common').b58encode(bytes([90])*32),None))
+        creator=next((f['data'] for f in facts if f['operation']=='creator_activity'),None);self.assertIsNotNone(creator,'metadata keys should be attributed when no launch receipt names a creator')
+        self.assertEqual([(row['attribution']['role'],row['attribution']['basis']) for row in creator['keys']][:2],[('creator','metaplex_update_authority'),('creator','metaplex_verified_creator')])
+        self.assertTrue(all(e in {o['id'] for o in json.loads((root/'draft/manifest.json').read_text())['observations']} for row in creator['keys'] for e in row['attribution']['evidence']))
+        self.assertIn('Metaplex metadata',json.dumps(r['facts_summary']))
+
+    def test_absent_metadata_account_is_not_a_diagnostic(self):
+        root,target,opts=self.setup_run();del RichRpc.values[RichRpc.metadata['address']]
+        r=start(root,target,**opts);self.assertFalse([d for d in r['diagnostics'] if d.get('category')=='unresolved_reads'],r['diagnostics'])
+        facts=json.loads((root/'draft/facts.json').read_text())['facts'];self.assertFalse([f for f in facts if f['operation'] in ('metadata','creator_activity')])  # neither receipt nor metadata: nothing is attributed
+
+    def test_pump_curve_recorded_creator_outranks_metadata_and_an_unset_creator_is_never_attributed(self):
+        import base64
+        from pump_fixture import fixture as pump_fixture,put
+        from adapters.pump_common import ZERO
+        from solana_common import b58encode
+        key=lambda n:b58encode(bytes([n])*32)
+        root,target,opts=self.setup_run();_,pa,pv=pump_fixture();RichRpc.values.update(pv)
+        r=start(root,target,**opts);self.assertFalse(r['diagnostics'],r['diagnostics']);validate(root/'draft',True)
+        facts=json.loads((root/'draft/facts.json').read_text())['facts'];creator=next(f['data'] for f in facts if f['operation']=='creator_activity')
+        self.assertEqual([(k['attribution']['address'],k['attribution']['basis']) for k in creator['keys']],[(pa['creator'],'pump_curve_recorded_creator'),(key(90),'metaplex_update_authority')])
+        known={o['id'] for o in json.loads((root/'draft/manifest.json').read_text())['observations']}
+        self.assertTrue(all(e in known for k in creator['keys'] for e in k['attribution']['evidence']))
+        # An unset curve creator decodes as the system program key and must not become an attribution.
+        root2,target,opts=self.setup_run();_,pa,pv=pump_fixture();raw=bytearray(base64.b64decode(pv[pa['curve']]['data'][0]));put(raw,49,ZERO)
+        pv[pa['curve']]={**pv[pa['curve']],'data':[base64.b64encode(bytes(raw)).decode(),'base64']};RichRpc.values.update(pv)
+        start(root2,target,**opts);facts=json.loads((root2/'draft/facts.json').read_text())['facts'];creator=next(f['data'] for f in facts if f['operation']=='creator_activity')
+        self.assertEqual([k['attribution']['basis'] for k in creator['keys']],['metaplex_update_authority','metaplex_verified_creator'])
+        self.assertNotIn(ZERO,[k['address'] for k in creator['keys']])
+
+    def test_keyed_runs_get_the_160_send_ceiling_and_public_runs_keep_120(self):
+        from solana_session import KEYED_MAX_REQUESTS,PUBLIC_MAX_REQUESTS
+        root,target,opts=self.setup_run();start(root,target,**opts);self.assertEqual(status(root)['max_requests'],PUBLIC_MAX_REQUESTS)
+        root2,target,opts=self.setup_run();keyed={'url':'https://lb.drpc.org/solana','headers':{'Drpc-Key':'synthetic'},'provider':'drpc'}
+        start(root2,target,**{**opts,'config':keyed});s=status(root2);self.assertEqual(s['max_requests'],KEYED_MAX_REQUESTS);self.assertEqual((PUBLIC_MAX_REQUESTS,KEYED_MAX_REQUESTS),(120,160))
+        self.assertEqual(json.loads((root2/'provider.json').read_text())['provider'],'drpc')
 
 if __name__=='__main__':unittest.main()
 

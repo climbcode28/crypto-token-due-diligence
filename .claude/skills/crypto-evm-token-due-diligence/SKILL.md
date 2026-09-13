@@ -124,11 +124,13 @@ Follow [runbook.md](references/runbook.md); the commands are exact. In order:
    credentials, write scripts or spawn agents. Without a subagent tool, run both
    checklists yourself, write both notes with `lane` set, and compose each with `--lane`.
 4. **Judge from facts.** Read the pipeline's summary (or `bundle_assemble.py facts
-   "$RUN/draft"`). Never `cat` collections, drafts or manifests. Order at most two presets
-   (`broad_collect.py collect --preset …`) for conclusion-changing checks, chained in one
-   shell call with `;` (they share the run's draft and session files, so never as parallel
-   tool calls): a locker's withdrawal getters, a sale receipt a lane
-   found, a second position, a side pool. A reverted probe is an observed revert; it does not prove the getter absent or safe.
+   "$RUN/draft"`). Never `cat` collections, drafts or manifests. Order up to four presets
+   (`broad_collect.py collect --preset …`) while at least 150 s remain before the deadline,
+   custody first, chained in one shell call with `;` (they share the run's draft and session
+   files, so never as parallel tool calls): the canonical pool's other large positions
+   (`logs` to enumerate them, then `positions`), a locker's withdrawal getters, a Safe's
+   modules and guard (`architecture`), a sale receipt a lane found, a side pool. A reverted
+   probe is an observed revert; it does not prove the getter absent or safe.
 5. **Compose.** Compose both lane notes in one shell call, sequentially, then `bundle_assemble.py scaffold
    "$RUN/draft"` and edit the skeleton it writes ([compose.md](references/compose.md)):
    a topic and signal for each pipeline finding in `signals`, your own findings for
