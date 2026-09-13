@@ -1269,6 +1269,7 @@ def preset_collect(args):
     run = Path(args.run)
     facts = read_json(run / "facts.json")
     target = facts["target"]
+    args.chain_id = target["chain_id"]
     session = Investigation(run / "session.sqlite")
     cache = Cache(run / "cache.sqlite")
     try:

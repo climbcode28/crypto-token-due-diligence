@@ -8,6 +8,30 @@ from solana_session import Session
 
 
 class HandoffTests(unittest.TestCase):
+    def test_public_recovery_ignores_unused_paid_configuration_without_sends(self):
+        for endpoint in ('not a URL', 'https://example.com/solana',
+                         'https://lb.drpc.org/solana/test-only',
+                         'https://lb.drpc.org/?network=solana&dkey=test-only'):
+            for provider in ('auto', 'public'):
+                with self.subTest(endpoint=endpoint, provider=provider), patch.dict(os.environ,
+                     {'DRPC_API_KEY':'test-only', 'SOLANA_DRPC_URL':endpoint}, clear=True), \
+                     patch('socket.socket', side_effect=AssertionError('network')):
+                    before=dict(os.environ)
+                    config=public_config(allow_network=True, cost_policy='free', provider=provider)
+                    self.assertEqual((config['provider'], config['url'], config['headers']),
+                                     ('public', 'https://api.mainnet-beta.solana.com', {}))
+                    self.assertEqual(config['preflight']['network_requests'], 0)
+                    self.assertNotIn('test-only', json.dumps(config))
+                    self.assertEqual(dict(os.environ), before)
+                    with self.assertRaises(ValueError):
+                        public_config(allow_network=True, cost_policy='paid', allow_paid=True, provider='drpc')
+
+    def test_explicit_public_recovery_does_not_reuse_drpc_under_public_export(self):
+        with patch.dict(os.environ, {'SOLANA_RPC_URL':'https://lb.drpc.org/solana',
+             'DRPC_API_KEY':'test-only'}, clear=True), patch('socket.socket', side_effect=AssertionError('network')):
+            config=public_config(allow_network=True, cost_policy='free', provider='public')
+            self.assertEqual((config['url'], config['headers']), ('https://api.mainnet-beta.solana.com', {}))
+
     def test_routed_delay_and_preset_do_not_restart_deadlines(self):
         target=RichRpc.reset();Web.blocked=False
         with tempfile.TemporaryDirectory() as d:

@@ -30,15 +30,48 @@ three times after waiting out the slot gap the error names (about 0.4 s per slot
 s per wait). A run records its provider in `provider.json` and every later `collect` must
 use the same provider flags; a mismatch is refused rather than mixing tiers. The helper's
 zero-request local preflight runs inside `start`; host network permission is still enforced
-by the host, and a flag does not bypass a denial. Request that permission for the `start`
-command itself before running it. When the identity reads get no response at all, `start`
+by the host, and a flag does not bypass a denial. Read the host's declared network rules
+before `start`; when network access is restricted and per-command escalation exists,
+request it on the first authorized network command, including later collections/captures.
+Use normal execution when the host already permits access. When the identity reads get no response at all, `start`
 stops with `research_status: blocked` and a `blocked` cause: `network_unavailable` (every
 request, RPC and web, failed before any response: the command had no network) or
 `identity_unavailable` (the web answered but the RPC endpoint did not). It writes no lane
-briefs. Follow its `next` action: fix the cause, then run `start` again in a new run
-directory with the same `--received-at` and `--deadline-at`; never dispatch lanes or compose
-from a blocked run. Failed sends record a URL-free `failure` category (for example
+briefs. Follow its `next` action: retain the blocked run, consumed ledger and provider
+lock. Repeating `start` there returns the saved result; a fresh directory would reset
+accounting. Use useful permitted public-document `capture` through this same session
+within the remaining budget, or report the identity gap and required host/provider
+action. Never dispatch lanes or compose from a blocked run. Failed sends record a URL-free `failure` category (for example
 `not_permitted`, `dns`, `connection_refused`) in the diagnostics.
+
+## Provider authorization and denial recovery
+
+Choose paid dRPC only after establishing current-user authorization. Reuse applicable
+standing consent within its bounds unless the user restricts it; a saved policy is
+context, not a host approval token. A configured key and paid flags cannot compel the
+host to accept paid execution. Without established consent, start public research
+directly; optional paid access must not become a prerequisite for diligence.
+
+An omitted paid flag is an invocation issue: apply established authorization without
+asking again. If the host rejects paid authorization and the relevant consent is in
+the current user instructions, cite it and the finite request ceiling/original deadline
+in one review retry. Do not repeatedly rephrase a saved-file assertion as new consent.
+If only paid use is denied and the host permits safer alternatives, leave paid access
+blocked and continue independently authorized public RPC/documents through the host's
+required network review. Use `--provider public --allow-network --cost-policy free`,
+omit `--allow-paid`, and do not source the private env. Public selection ignores unused
+dRPC configuration and never forwards its key. Briefly state the provider change and
+the host's reason. A general network/research denial or unclear scope does not authorize
+switching providers/tools; complete only unaffected work and explain the boundary.
+
+A host rejection before process creation consumes no RPC attempts: retry an allowed
+public command with the same run path, original intake and deadline. Once a collector
+has executed, preserve its session ledger, consumed grants and provider lock; do not
+delete artifacts, change `provider.json` or create a fresh budget to switch tiers.
+Use only supported recovery; if the active run cannot continue, retain its truthful
+checkpoint and coverage gaps. Request user action only when required work still needs
+the rejected access, after completing useful permitted work. Never promise that a
+repository change can eliminate host approval prompts or public provider failures.
 
 ## 1. Start once with original timing
 
@@ -55,11 +88,13 @@ python3 "$S/scripts/solana_broad_collect.py" start "$RUN" \
   --mint EXACT_MINT --question 'The complete original request' \
   --received-at ORIGINAL_ISO_UTC --deadline-at ABSOLUTE_ISO_UTC \
   --focus 'Explicit requested emphasis' --url 'https://public.example/requested-source' \
-  --allow-network --cost-policy free
+  --provider public --allow-network --cost-policy free
 ```
 
-With dRPC configured, source the user env file in the same invocation and add
-`--cost-policy paid --allow-paid` (the key is read from the environment, never from an
+With dRPC configured **and paid use already authorized**, source the user env file
+with tracing disabled in the same invocation, replace `--provider public` with
+`--provider drpc`, and replace the free policy with `--cost-policy paid --allow-paid`
+(the key is read from the environment, never from an
 argument); the same flags apply to every `collect` in that run. `capture` is web-only and
 keeps `--cost-policy free` (the lane briefs print it that way); the run's paid flags are
 accepted there too.

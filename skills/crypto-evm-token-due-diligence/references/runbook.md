@@ -1,4 +1,4 @@
-# Broad diligence runbook (workflow 3.2.9)
+# Broad diligence runbook (workflow 3.3.0)
 
 The ordered command sequence for an ordinary broad review. Target **5–7 minutes**, cap
 **10 minutes**, and **at most about 40 coordinator turns**: every turn costs 6–8 seconds of
@@ -69,11 +69,13 @@ If a host rejects the call, retain its actual reason and distinguish these cases
 - **General network/research denial, or unclear scope:** do not infer that a public
   provider is permitted. Complete unaffected offline work and report the exact boundary.
 
-For a permitted public alternative, select a credential-free endpoint for the same
-chain from official network documentation. Set a dedicated `PUBLIC_RPC_URL` export and
-replace the provider arguments with `--rpc-url-env PUBLIC_RPC_URL --provider generic
---allow-network --cost-policy free`, without `--allow-paid` or `--auth-env`. Apply the
-same selection to subsequent presets. Merely changing `--provider` to `generic` while
+For a permitted public alternative, replace the provider arguments with
+`--provider public --allow-network --cost-policy free`, without `--allow-paid` or
+`--auth-env`. This selects the [built-in endpoint](public-rpc.md) for the exact target
+chain, ignoring saved endpoint/key exports. Other chains require a credential-free
+endpoint from official network documentation, selected via a dedicated `PUBLIC_RPC_URL`
+export and `--rpc-url-env PUBLIC_RPC_URL --provider generic --allow-network --cost-policy free`.
+Apply the same selection to subsequent presets. Merely changing `--provider` to `generic` while
 leaving the configured dRPC URL selected is still dRPC and still requires paid approval.
 Do not forward the dRPC key to the public endpoint or modify the saved private env.
 
@@ -91,22 +93,35 @@ host's instructions. A repository edit cannot guarantee acceptance of saved cons
 
 ## Step 1 in full
 
+For a first-time user without configured, authorized dRPC, use public RPC directly;
+no private env file, API key or paid-use question is needed. For an already configured,
+authorized provider, use the variant below instead so its preference is preserved.
+
 ```sh
 set +x
 SKILL_DIR=…            # this skill's directory
 RUN=research/<token>-$(date -u +%Y%m%dT%H%M%SZ)
-if [ -r "$HOME/.config/crypto-research/env" ]; then
-  source "$HOME/.config/crypto-research/env" >/dev/null 2>&1 || exit 2
-fi
 python3 "$SKILL_DIR/scripts/broad_collect.py" start \
   --chain-id 4663 --address 0x… --run "$RUN" \
   --question 'General diligence on the exact token; no special acceptance requirements' \
-  --provider drpc --allow-network --cost-policy paid --allow-paid \
+  --provider public --allow-network --cost-policy free \
   --max-requests 300 --timeout 600 --request-ceiling 400 --timeout-ceiling 1500
 ```
 
+**Configured provider variant:** with already-established paid dRPC authorization,
+source `"$HOME/.config/crypto-research/env"` with tracing disabled and suppressed output
+in the **same shell invocation** before `start` (stop that invocation if sourcing fails).
+Replace the public arguments with `--provider drpc --allow-network --cost-policy paid
+--allow-paid`. Use these flags on every later collection, reusing existing consent
+within its bounds rather than asking again. For a configured free endpoint, use
+`--provider generic --allow-network --cost-policy free` and its URL export.
+
+The generic adapter also selects the built-in public default when no endpoint is
+configured. It preserves configuration errors and paid-use gates when an endpoint is
+configured; `public` deliberately selects the credential-free built-in endpoint.
+
 For a routed request, retain its absolute `deadline_at` (Unix seconds). In the same
-private-env-sourcing shell call, compute the remaining duration immediately before
+launch shell call, compute the remaining duration immediately before
 `start` and replace **both** timeout values above; do not change provider flags or
 request caps. This adds no network call or separate timing tool turn:
 

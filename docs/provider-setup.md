@@ -30,6 +30,16 @@ EVM dRPC use requires the configured endpoint and the authorized invocation flag
 Solana dRPC use requires `--cost-policy paid --allow-paid`; public use needs no private
 configuration. Never print the private env file or place keys in captured URLs.
 
+Paid flags belong on every authorized command; they do not require repeated consent.
+Reuse the current user's applicable standing authorization within its bounds. Host
+approval rules still apply; if paid access alone is denied, complete permitted public
+research under the specialist's recovery rules before requesting missing authorization.
+
+EVM has [built-in public endpoints](../skills/crypto-evm-token-due-diligence/references/public-rpc.md)
+for its seven registered mainnets. `--provider public --cost-policy free` ignores paid
+configuration; `generic` uses the configured URL or the chain's public default when
+unset. All live commands still require `--allow-network` and host network permission.
+
 ## Research and maintenance
 
 Start each investigation in a new ignored `research/` directory. Preserve the original

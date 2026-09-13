@@ -56,16 +56,16 @@ the hope of a different answer.
 - Verified EVM targets use [EVM diligence](../crypto-evm-token-due-diligence/SKILL.md).
   The router only classifies candidate format; this specialist verifies identity.
 
-Solana standard start defaults to credential-free public HTTPS RPC: mainnet or the
-public root in `SOLANA_RPC_URL`; no private env or key is required. Optional dRPC uses
-the shared `DRPC_API_KEY` and credential-free `SOLANA_DRPC_URL` (default
-`https://lb.drpc.org/solana`); source `"$HOME/.config/crypto-research/env"` with tracing
-disabled in the same shell invocation as every keyed collection and never print it.
-`--provider auto` selects dRPC only with a key plus authorized `--cost-policy paid
---allow-paid`, else public RPC; `drpc` requires both; `public` never uses dRPC. A key
-alone grants no paid permission and travels only in the `Drpc-Key` header; keyed URLs
-are refused. `provider.json` locks the provider for later collections (same flags). Read
-start's `diagnostics` (node lag, refused/unsent/degraded reads) per the runbook.
+Solana defaults to credential-free public mainnet RPC or `SOLANA_RPC_URL`; no key is needed.
+Optional dRPC uses shared `DRPC_API_KEY` and credential-free `SOLANA_DRPC_URL` (default
+`https://lb.drpc.org/solana`); source `"$HOME/.config/crypto-research/env"` with tracing disabled
+in the same keyed collection invocation, never print it, and send the key only in `Drpc-Key`.
+`--provider auto` uses dRPC only with a key and authorized `--cost-policy paid --allow-paid`;
+`drpc` requires both. `public` ignores unused dRPC settings and sends no key. `provider.json`
+locks later collections to the same provider/flags; read start's `diagnostics` per the runbook.
+Paid use needs current-user authorization; reuse applicable standing consent within bounds.
+Without it use public RPC directly, without a paid-use question. Per-command flags do not mean
+repeat consent. Host rejection uses [denial recovery](references/runbook.md#provider-authorization-and-denial-recovery).
 
 Respect public rate limits, preserve refusals and follow remaining authorized public
 routes. A configuration failure is not a token finding. A successful preflight is not
@@ -88,8 +88,8 @@ analyst arithmetic. Use compact facts and named presets; raw evidence is for dis
    two pointer prompts. Typical wall clock is one to two minutes. Collection commands
    need outbound network; in a sandboxed host request it for the exact command first
    (Codex: escalated permissions). A `blocked` start (`network_unavailable` or
-   `identity_unavailable`) writes no lane pointers: follow its `next` action, rerun
-   `start` in a NEW run directory with the same timing flags, never dispatch lanes from it.
+   `identity_unavailable`) writes no lane pointers: follow its `next` action, retain its
+   ledger/provider lock, and create no new run or budget. Never dispatch lanes from it.
 2. **Lanes:** dispatch two general-purpose subagents (the default subagent type) with the two printed pointer prompts,
    verbatim, in the same turn that `start` returns and before reading facts yourself;
    the lane cutoff is receipt + 300 s whenever they are dispatched, so every minute

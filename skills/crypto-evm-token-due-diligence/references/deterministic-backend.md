@@ -23,11 +23,13 @@ identity or pin. Do not repurpose an endpoint for another chain, guess a network
 or carry paid approval to an unrelated provider. No dRPC key/account is required for
 shared skills: absent configuration or actual authorization means authorized alternatives.
 
-Provider order belongs to the research coordinator. The CLI contacts only the endpoint
-in its selected environment variable; it has no public-endpoint registry and never
-silently switches providers. Its `generic` adapter default does not mean public-first:
-recognized dRPC hosts still use dRPC authentication and paid-use gates. Prefer explicit
-`--provider drpc` for configured dRPC and select a public endpoint only for fallback.
+Provider preference belongs to the research coordinator. With no endpoint configured,
+the CLI selects a [built-in public endpoint](public-rpc.md) for the target chain ID.
+`--provider public` explicitly selects that endpoint without saved credentials, including
+for permitted recovery. `generic` preserves configured endpoints and their paid/auth
+gates; recognized dRPC hosts still require dRPC authorization. Prefer explicit
+`--provider drpc` for configured authorized dRPC. Unknown chains and missing custom
+exports remain configuration gaps; failures never trigger automatic provider rotation.
 
 The collector reads process exports and does not automatically load private files.
 For an existing user-created `~/.config/crypto-research/env`, the following is the

@@ -39,7 +39,7 @@ only when you invoke them by name.
 
 Requires **Python 3.10+**, **Git**, and **Claude Code, Codex or Cursor**. No Python packages required. If you don't have these tools installed, or aren't sure whether you do, ask your agent - they can help you 🙂 
 ```sh
-git clone <repository URL> ~/crypto-research
+git clone https://github.com/climbcode28/crypto-token-due-diligence.git ~/crypto-research
 cd ~/crypto-research
 ./install.sh
 ```
@@ -72,7 +72,8 @@ not a guarantee that a token is safe.
 ## Set an RPC endpoint
 
 **Both EVM and Solana work without dRPC or an API key.** The EVM skill selects a
-suitable public RPC endpoint when no configured, authorized dRPC endpoint is available.
+public RPC from built-in defaults for its seven registered mainnets when no configured,
+authorized dRPC endpoint is available; other chains need an explicit endpoint.
 Solana uses public mainnet RPC by default.
 
 To configure a custom dRPC endpoint yourself, copy the template example file outside the repository and edit it:
@@ -96,13 +97,15 @@ export DRPC_API_KEY='your-key'
 ```
 
 Keep keys out of URLs and the repository. Paid access requires your authorization;
-a configured key alone does not permit spending. Public RPC requires no API key.
+a configured key alone does not permit spending. Existing consent can be reused within
+its bounds, subject to host approval. Public RPC requires no API key or private env file.
 See [provider setup](docs/provider-setup.md) and the
 [Solana runbook](skills/crypto-solana-token-due-diligence/references/runbook.md) for details.
 
-Every collection command needs outbound network. In Codex, approve network access for the
-`start` command itself. A `start` that gets no response at all stops as `blocked` and says
-how to rerun; nothing is researched from a blocked run.
+Every collection command needs outbound network under the host's normal approval rules.
+A Solana start with no identity response retains a blocked result and its consumed
+budget; it must not restart in a new directory to obtain fresh allowances. Follow the
+runbook's recovery rules and keep missing identity explicit.
 
 ## Development
 
@@ -110,12 +113,15 @@ Editable skills live under `skills/`. Follow [project guidance](AGENTS.md) and t
 [EVM port notes](.claude/skills/crypto-evm-token-due-diligence/CLAUDE-CODE-PORT.md)
 when changing them.
 
-You can run the offline regression test suites from the repository root:
+The [first-run acceptance record](docs/reviews/first-run-reliability.md) separates
+installation tests, live host results and incomplete cases. Run the offline suites
+from the repository root:
 
 ```sh
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s skills/crypto-token-due-diligence/tests -q
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s skills/crypto-evm-token-due-diligence/tests -q
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s skills/crypto-solana-token-due-diligence/tests -q
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -q
 ```
 
 ## License

@@ -60,10 +60,13 @@ Follow [runbook.md](references/runbook.md); the commands are exact. In order:
 1. **Provider policy.** Run `python3 "$SKILL_DIR/scripts/provider_context.py" --policy` and
    read the excerpt in its own tool output (the Claude Code copy injects it at load).
    Prefer the configured, authorized dRPC
-   for its matching network; source the private env in the same shell call as every
-   collector; pass the flags the policy authorizes. `invocation_required` means omitted flags,
+   for its matching network; for configured use, source the private env in the same shell
+   call as every collector and pass the flags the policy authorizes. `invocation_required` means omitted flags,
    not provider failure; `ready` is offline and proves nothing about the token. Public RPC
-   is the fallback when configuration or authorization is genuinely absent.
+   is the fallback when configuration or authorization is genuinely absent: use
+   `--provider public --allow-network --cost-policy free`. The backend selects a
+   [built-in endpoint](references/public-rpc.md) for the exact chain; no private file,
+   API key or paid-use question is needed for a first public run.
    Before the first live shell call, apply the runbook's **Network execution context**
    rule: collector flags do not grant host network permission. If the host rejects paid
    use, apply **Provider authorization and denial recovery** there: preserve the denial,

@@ -192,7 +192,8 @@ class BroadTests(unittest.TestCase):
         self.assertEqual(list(r)[:2],['next','research_status'])  # the action leads the output
         block=next(d for d in r['diagnostics'] if d.get('category')=='network_unavailable')
         self.assertEqual(set(block['failures']),{'not_permitted'});self.assertGreaterEqual(block['failures']['not_permitted'],2)
-        self.assertIn('NEW run directory',block['next_action']);self.assertIn('escalated permissions',block['next_action'])
+        self.assertIn('Retain this blocked run',block['next_action']);self.assertIn('escalated permissions',block['next_action'])
+        self.assertNotIn('NEW run directory',block['next_action'])
         self.assertFalse((root/'lanes').exists());self.assertFalse(any((root/'draft/notes'/(o+'.json')).exists() for o in ('liquidity','project')))
         self.assertEqual(json.loads((root/'start-result.json').read_text())['research_status'],'blocked')
         again=start(root,target,**{**opts,'opener_factory':Denied});self.assertTrue(again['resumed']);self.assertEqual(again['research_status'],'blocked')
@@ -203,10 +204,31 @@ class BroadTests(unittest.TestCase):
         with unittest.mock.patch.object(RichRpc,'__call__',refused):r=start(root,target,**opts)
         self.assertEqual((r['research_status'],r['blocked'],r['lane_pointers']),('blocked','identity_unavailable',[]))
         block=next(d for d in r['diagnostics'] if d.get('category')=='identity_unavailable')
-        self.assertEqual(block['failures'],{'connection_refused':2});self.assertIn('--provider public',block['next_action'])
+        self.assertEqual(block['failures'],{'connection_refused':2});self.assertIn('same session',block['next_action'])
+        self.assertNotIn('--provider public',block['next_action'])
         self.assertTrue(Web.calls)  # the web answered, so the host network was fine and only the endpoint was dead
         packets=[json.loads(a['response']) for a in __import__('solana_session').Session(root).observations() if a['request_id'].startswith('baseline_network')]
         self.assertEqual([(p['status'],p['failure']) for p in packets],[('transport_failure','connection_refused')]*2)
+
+    def test_blocked_paid_start_preserves_accounting_and_lock_during_permitted_document_work(self):
+        from solana_broad_collect import capture
+        root,target,opts=self.setup_run()
+        opts['config']={**opts['config'],'provider':'drpc','headers':{'Drpc-Key':'synthetic-only'}}
+        def refused(rpc,request):raise ConnectionRefusedError(61,'Connection refused')
+        with unittest.mock.patch.object(RichRpc,'__call__',refused):r=start(root,target,**opts)
+        self.assertEqual(r['research_status'],'blocked');before=status(root)
+        self.assertGreater(before['started_attempts'],0)
+        again=start(root,target,**opts)
+        self.assertEqual(again['session']['started_attempts'],before['started_attempts'])
+        public={**opts['config'],'provider':'public','headers':{}}
+        with self.assertRaisesRegex(ValueError,'same provider flags'):
+            start(root,target,**{**opts,'config':public})
+        capture(root,['https://project.example/permitted-document'],opener_factory=Web)
+        after=status(root);self.assertGreater(after['started_attempts'],before['started_attempts'])
+        for key in ('investigation_id','received_at','deadline_at','target_at'):
+            self.assertEqual(after[key],before[key])
+        self.assertEqual(json.loads((root/'provider.json').read_text())['provider'],'drpc')
+        self.assertFalse((root/'lanes').exists())
 
     def test_start_whose_identity_read_answered_is_not_blocked(self):
         root,target,opts=self.setup_run();RichRpc.mode='wrong_network';r=start(root,target,**opts)

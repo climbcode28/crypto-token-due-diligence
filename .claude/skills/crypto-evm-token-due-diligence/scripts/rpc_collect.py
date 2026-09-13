@@ -199,9 +199,39 @@ def is_drpc_host(hostname):
     return any(hostname == h or hostname.endswith("." + h) for h in ("drpc.org", "drpc.live"))
 
 
+# Candidates checked against primary documentation on 2026-09-13; live chain and pin
+# checks remain mandatory. Provenance: references/public-rpc.md. Kept in the snapshotted
+# module so replay does not depend on a mutable external endpoint registry.
+PUBLIC_RPC_ENDPOINTS = {
+    1: "https://ethereum-rpc.publicnode.com",
+    10: "https://mainnet.optimism.io",
+    56: "https://bsc-dataseed-public.bnbchain.org",
+    137: "https://polygon.publicnode.com",
+    4663: "https://rpc.mainnet.chain.robinhood.com",
+    8453: "https://mainnet.base.org",
+    42161: "https://arb1.arbitrum.io/rpc",
+}
+DEFAULT_RPC_URL_ENV = "ROBINHOOD_DRPC_URL"
+
+
+def selected_endpoint(args):
+    """Resolve one endpoint offline without changing exports or granting paid use."""
+    if args.provider == "public":
+        return PUBLIC_RPC_ENDPOINTS.get(getattr(args, "chain_id", None), ""), "builtin_public"
+    configured = os.environ.get(args.rpc_url_env, "")
+    # Never mask an invalid configured value, missing explicit custom export, or an
+    # explicit dRPC request. Generic's existing paid/auth gates still apply to dRPC URLs.
+    if configured or args.provider == "drpc" or args.rpc_url_env != DEFAULT_RPC_URL_ENV:
+        return configured, "configured"
+    default = PUBLIC_RPC_ENDPOINTS.get(getattr(args, "chain_id", None), "")
+    return default, "builtin_public" if default else "configured"
+
+
 def configuration_settings(args):
     """Validate local URL/auth formats only; this does not grant execution permission."""
-    url = os.environ.get(args.rpc_url_env, "")
+    url, source = selected_endpoint(args)
+    need(source != "builtin_public" or not args.auth_env,
+         "built-in public RPC does not accept authentication headers")
     parts = urllib.parse.urlsplit(url)
     need(parts.scheme == "https" and bool(parts.hostname) and not parts.username and not parts.password
          and not parts.fragment, "RPC URL must be HTTPS without userinfo or fragment")
@@ -237,6 +267,8 @@ def invocation_blockers(args, drpc):
         reasons.append("network_disabled")
     if args.cost_policy not in ("free", "paid"):
         reasons.append("cost_policy_undeclared")
+    if args.provider == "public" and args.cost_policy == "paid":
+        reasons.append("public_requires_free_policy")
     if (drpc or args.cost_policy == "paid") and (args.cost_policy != "paid" or not args.allow_paid):
         reasons.append("paid_usage_not_authorized")
     return reasons
@@ -244,7 +276,7 @@ def invocation_blockers(args, drpc):
 
 def transport_settings(args):
     """Enforce invocation gates even when called without the availability helper."""
-    url = os.environ.get(args.rpc_url_env, "")
+    url, _ = selected_endpoint(args)
     drpc = args.provider == "drpc" or is_drpc_host(urllib.parse.urlsplit(url).hostname)
     blockers = invocation_blockers(args, drpc)
     need(not blockers, "RPC invocation requires authorized flags: " + ", ".join(blockers))
@@ -264,14 +296,15 @@ def provider_availability(args):
     reason = None
     blockers = []
     try:
-        url = os.environ.get(args.rpc_url_env, "")
+        url, source = selected_endpoint(args)
         drpc = args.provider == "drpc" or is_drpc_host(urllib.parse.urlsplit(url).hostname)
         if drpc and not os.environ.get("DRPC_API_KEY", "").strip():
             reason = "drpc_key_missing"
         elif not url.strip():
             # A private env still exporting the pre-rename name yields no endpoint under the current variable; name that
             # so the fix (rename to the current variable) is clear instead of a bare "unconfigured".
-            reason = "rpc_url_env_renamed" if os.environ.get("CRYPTO_RPC_URL", "").strip() else "rpc_endpoint_unconfigured"
+            reason = "public_endpoint_unavailable" if args.provider == "public" else \
+                "rpc_url_env_renamed" if os.environ.get("CRYPTO_RPC_URL", "").strip() else "rpc_endpoint_unconfigured"
         elif not drpc and args.auth_env and not os.environ.get(args.auth_env, "").strip():
             reason = "rpc_authentication_missing"
         else:
@@ -772,9 +805,10 @@ class Collector:
 
 
 def add_provider_arguments(p):
-    p.add_argument("--rpc-url-env", default="ROBINHOOD_DRPC_URL")
+    p.add_argument("--rpc-url-env", default=DEFAULT_RPC_URL_ENV)
     p.add_argument("--endpoint-label", default="research-rpc")
-    p.add_argument("--provider", choices=("generic", "drpc"), default="generic")
+    p.add_argument("--provider", choices=("generic", "drpc", "public"), default="generic",
+                   help="generic: configured URL or chain public default; public: built-in endpoint without credentials; drpc: configured paid provider")
     p.add_argument("--auth-env")
     p.add_argument("--auth-header", default="Authorization")
     p.add_argument("--allow-network", action="store_true")
@@ -790,6 +824,7 @@ def main():
     p.add_argument("--cache", type=Path, help="required for collection")
     p.add_argument("--session", type=Path, help="existing investigation budget; required for live collection")
     p.add_argument("--check-availability", action="store_true", help="offline provider selection; no plan, output or cache required")
+    p.add_argument("--chain-id", type=int, help="target chain for offline public availability; collection uses the plan's chain")
     add_provider_arguments(p)
     p.add_argument("--max-requests", type=int, default=200)
     p.add_argument("--max-logs-per-block", type=int, default=10000)
@@ -805,6 +840,7 @@ def main():
     try:
         plan = read_json(args.plan)
         prepare(plan)
+        args.chain_id = plan["target"]["chain_id"]
         integer(args.max_requests, "max requests", 1)
         integer(args.max_logs_per_block, "max logs", 1)
         need(1 <= integer(args.workers, "workers", 1) <= 4, "workers must be between 1 and 4")

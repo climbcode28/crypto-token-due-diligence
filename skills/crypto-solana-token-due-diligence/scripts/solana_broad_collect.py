@@ -16,7 +16,7 @@ from solana_facts import encoded,atomic,build,compact
 from solana_profile import regular,strict_json,PROFILE,DIMENSIONS,Evidence,validate_report
 from solana_compose import CHECKLISTS,empty_coverage,expand_finding,note_header,validate_imports,ComposeError,preflight
 
-VERSION='1.3.2'
+VERSION='1.4.1'
 ASSETS=Path(__file__).resolve().parents[1]/'assets'
 STAGES=('identity_discovery','related_accounts_controllers','pool_transaction_quote_dependencies','final_consistency_checks')
 
@@ -37,11 +37,11 @@ def public_config(*,allow_network,cost_policy,rpc_url_env='SOLANA_RPC_URL',provi
     public_root=os.environ.get(rpc_url_env,'');keyed_url=os.environ.get(DRPC_URL_ENV,'')
     if public_root and is_drpc_host(validate_endpoint(public_root).hostname):keyed_url,public_root=keyed_url or public_root,''  # a dRPC URL under the public name still means dRPC
     key=bool(os.environ.get('DRPC_API_KEY','').strip());paid=cost_policy=='paid' and allow_paid;fallback=None
-    if keyed_url:
-        parts=validate_endpoint(keyed_url);need(is_drpc_host(parts.hostname),DRPC_URL_ENV+' is not a dRPC URL.')
-        need(credential_free_network_url(parts),DRPC_URL_ENV+' carries the key (rpc_url_carries_credential): use the credential-free network URL (for example https://lb.drpc.org/solana); the key belongs only in DRPC_API_KEY.')
     if provider=='drpc':need(key,'DRPC_API_KEY is not configured.');need(paid,'dRPC use needs --cost-policy paid --allow-paid.')
     use_drpc=provider=='drpc' or (provider=='auto' and key and paid)
+    if use_drpc and keyed_url:
+        parts=validate_endpoint(keyed_url);need(is_drpc_host(parts.hostname),DRPC_URL_ENV+' is not a dRPC URL.')
+        need(credential_free_network_url(parts),DRPC_URL_ENV+' carries the key (rpc_url_carries_credential): use the credential-free network URL (for example https://lb.drpc.org/solana); the key belongs only in DRPC_API_KEY.')
     if provider=='auto' and keyed_url and not use_drpc:fallback='drpc_key_missing' if not key else 'paid_usage_not_authorized'
     if use_drpc:url=keyed_url or DRPC_ROOT
     else:
@@ -270,7 +270,7 @@ NO_RESPONSE=('transport_failure','timeout','not_sent_deadline')
 def identity_block(root):
     """Why identity could not be verified at all: a host that denied the network (every request in the identity stage, RPC
     and web alike, failed before any response) or an RPC endpoint that answered nothing while the web did. Identity is never
-    inferred, so continuing would only restate that gap in every surface; the run stops and says how to start again."""
+    inferred, so the run retains its blocked state and existing accounting."""
     s=Session(root)
     try:rows=s.observations()
     finally:s.close()
@@ -287,11 +287,11 @@ def identity_block(root):
     if answered:
         category='identity_unavailable'
         reason='The RPC endpoint answered nothing for the network identity reads while web captures did answer: the endpoint, not the host network, is unreachable from this command.'
-        action='Run start again in a NEW run directory with the same --received-at and --deadline-at, using --provider public (or fix SOLANA_DRPC_URL and keep the dRPC flags). Do not dispatch lanes or compose from this run.'
+        action='Retain this blocked run, its provider lock and consumed ledger. Repeating start here only returns the saved blocked result; do not create a new run or switch tiers for this request. Continue useful permitted public-document capture through this same session within its remaining budget, otherwise report the unresolved identity and endpoint access needed. Do not dispatch lanes or compose from this run.'
     else:
         category='network_unavailable'
         reason='Every request in the identity stage, RPC and web alike, failed before any response: this command had no outbound network access (a sandbox or host denial), so nothing about the token was observed.'
-        action='Grant this exact command outbound network access (in Codex, run it with escalated permissions), then run start again in a NEW run directory with the same --received-at and --deadline-at. Do not dispatch lanes or compose from this run; the deadline does not move.'
+        action='Retain this blocked run, its provider lock and consumed ledger. Repeating start here only returns the saved blocked result; do not create a new run for this request. Report the network failure and required host/provider action. Use escalated permissions only when the host requires and permits them for useful remaining work in this same session; the deadline does not move. Do not dispatch lanes or compose from this run.'
     return {'stage':STAGES[0],'category':category,'failures':failures,'reason':reason,'next_action':action}
 
 
