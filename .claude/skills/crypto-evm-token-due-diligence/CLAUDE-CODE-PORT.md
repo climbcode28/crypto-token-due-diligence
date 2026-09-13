@@ -3,8 +3,8 @@
 This directory is the Claude Code project-skill copy of the canonical
 `skills/crypto-evm-token-due-diligence` at the project root. Claude Code loads it from
 `.claude/skills/`; Codex uses the canonical folder through the project-local
-`.agents/skills/crypto-evm-token-due-diligence` symlink. EVM has no Personal registration.
-Both carry EVM workflow 3.2.7, backend engine 3.4.2 and reporting engine 2.6.2
+`.agents/skills/crypto-evm-token-due-diligence` symlink. The maintainer keeps EVM project-only; recipients can opt into Personal installation with `install.sh`.
+Both carry EVM workflow 3.2.8, backend engine 3.4.3 and reporting engine 2.6.2
 (pipeline 1.0.2, note schema 1, investigation schema 3, source comparison 1.1.0). Both copies
 use the same checks, procedures, thresholds, rules, schemas, strict profile, reviewed
 memories and regression fixtures. Live operations share one session across targets.
@@ -12,8 +12,8 @@ memories and regression fixtures. Live operations share one session across targe
 ## What differs from the canonical copy
 
 - `SKILL.md`: sibling skill links point to `../../../skills/<sibling>/SKILL.md`; the
-  frontmatter adds `allowed-tools` (Bash prefixes, Read, Write, Agent, WebSearch and the
-  research WebFetch domains) so the invocation turn runs without permission prompts; a
+  skill uses the host's normal tool permissions, with no shipped `allowed-tools`
+  auto-approval list; a
   "Claude Code execution conventions" section maps `SKILL_DIR` to `${CLAUDE_SKILL_DIR}`,
   requires the env `source` and helper command in one Bash call, runs the pipeline with
   `run_in_background` plus `Monitor`, and names the lanes as `Agent` subagents
@@ -28,9 +28,9 @@ memories and regression fixtures. Live operations share one session across targe
   directory. Versions and change lists are unchanged.
 - Canonical-only: `agents/openai.yaml` (Codex UI metadata). Claude-only, at the project
   level rather than inside this folder: `.claude/agents/evm-liquidity-lane.md`,
-  `.claude/agents/evm-project-lane.md` (lane subagent definitions with tool allowlists) and
-  `.claude/settings.json` (shared permission allowlist for the helper commands and research
-  domains).
+  `.claude/agents/evm-project-lane.md` (lane subagent definitions with tool lists).
+  No shared `.claude/settings.json` is shipped; recipients retain control of their
+  own command approvals and sandbox settings.
 - `scripts/`, `tests/`, `assets/*.template.json`, `assets/lane-brief-*.md`,
   `assets/chain-registry.json`, `memories.md` and every other reference are byte-identical.
 

@@ -1,6 +1,6 @@
 ---
 name: implement-review-improve
-description: Implement one specified phase from a saved Markdown plan, review the resulting changes, apply in-scope fixes, and verify acceptance criteria using the current project's conventions and commands. Use when the user explicitly invokes implement-review-improve for a phased execution and review cycle, including deep-plan outputs.
+description: Implement a specified phase or all remaining phases of a saved Markdown plan, reviewing, improving, and verifying each phase using the current project's conventions and commands. Use when the user explicitly invokes implement-review-improve for a phased execution and review cycle, including deep-plan outputs.
 disable-model-invocation: true
 ---
 
@@ -8,22 +8,22 @@ disable-model-invocation: true
 
 ## Purpose
 
-Run one complete cycle in the target project:
+Run this cycle for the requested phase, or for each remaining phase when the user requests all phases:
 
 1. Implement the requested plan phase.
 2. Review the actual changes for defects and worthwhile improvements.
-3. Apply in-scope fixes and re-verify, then stop before the next phase.
+3. Apply in-scope fixes and re-verify. In all-phase mode, continue to the next phase only after the current phase passes its acceptance checks.
 
 Discover the project's stack, rules, patterns, and commands each run. Prefer the simplest implementation that meets the phase's requirements and the project's quality standards. Avoid speculative abstractions and unrelated cleanup. No findings is a valid review result; do not invent refactors to fill a stage.
 
 ## Required Inputs And Scope
 
 - `plan_file`: path to a saved Markdown plan.
-- `phase`: the phase identifier or unambiguous step to execute.
+- `phase`: a phase identifier, an unambiguous step, or `all` for all remaining phases. An explicit request to implement the whole plan selects `all`.
 
 Resolve these from the user's request and current conversation first. If the plan is missing, look in the target project's established plan locations (for example `plans/`, `docs/plans/`, `.plans/`, or root-level plan files). Do not search unrelated personal directories. If the intended plan or phase remains ambiguous, ask one concise question with the candidate paths or identifiers. Use available question tools only where appropriate to the current mode.
 
-Read the complete plan for context, decisions, execution notes, and dependencies, but implement only the requested phase. For deep-plan output, include its shared design, assumptions, phase acceptance criteria, validation, and handoff requirements. Do not reinterpret a request to update this skill as permission to execute a project plan.
+Read the complete plan for context, decisions, execution notes, and dependencies, but implement only the requested phase or, in all-phase mode, the remaining phases in dependency order. For deep-plan output, include its shared design, assumptions, phase acceptance criteria, validation, and handoff requirements. Do not reinterpret a request to update this skill as permission to execute a project plan.
 
 ## Stage 0 — Prepare
 
@@ -109,11 +109,11 @@ Record concrete findings by severity with file/line references where useful, the
 
 ## Completion And Final Report
 
-Stop after this phase's implementation, review, and improvement cycle. Do not begin another phase or add extra enhancements automatically.
+In single-phase mode, stop after that phase's implementation, review, and improvement cycle. In all-phase mode, repeat the cycle for each remaining phase without routine confirmation between phases; verify completed prerequisites before relying on them. A blocked phase does not count as complete: continue only work independent of that blocker, and report what remains. Stop when all requested phases pass their checks or further progress needs user input or an external change. Do not add unrequested enhancements.
 
 Report concisely:
 
-- Phase completed, or partial/blocked status with exactly what remains
+- Phase(s) completed, or partial/blocked status with exactly what remains
 - What changed and why, with links to changed files
 - Review findings fixed, remaining actionable findings, and relevant deferrals; “no actionable findings” is acceptable
 - Checks actually run and their results, including failures, unavailable checks, and residual uncertainty

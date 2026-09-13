@@ -1,9 +1,10 @@
 {
-  "workflow_version": "3.2.7",
-  "backend_engine_version": "3.4.2",
+  "workflow_version": "3.2.8",
+  "backend_engine_version": "3.4.3",
   "reporting_engine_version": "2.6.2",
-  "date": "2026-09-11",
+  "date": "2026-09-12",
   "changes": [
+    "Publication hardening: anonymous EVM web captures reject private destinations and connected peers, validate redirects, and ignore environment proxies. Claude uses ordinary host tool permissions without shipped auto-allow wildcards.",
     "Accept lossless crypto-token-due-diligence handoffs and preserve the original absolute deadline in collector scheduling; retire native-asset routing to crypto-research.",
     "Distinguish market activity from the receipt-verification sample; lead with evidenced trading activity, acknowledge user-reported execution, and describe untested size-dependent costs as research limits rather than implied selling difficulty.",
     "User asks beyond the address (--focus) and user links (--url, at most six, credential-free) are stored in intake.json and rendered into both lane briefs as 'What the user asked'; the project lane captures the links first, each ask ends as an inference finding or a coverage attempt, and the scaffold echoes user_focus so the verdict answers it",
@@ -18,9 +19,9 @@
     "Retained from 3.1.0: structured start diagnostics with in-place restart, brief files with pointer prompts, lane compose --check, scaffold, presets and composes chained in one call",
     "Chat delivery renders the four conclusions (technical exposure, credibility and maturity, token economics, research confidence) as four bullets, never one paragraph"
   ],
-  "validation_scope": "Offline router and canonical/mirrored EVM regression suites; instruction-level deadline handoff. Collector engines, evidence schemas and provider gates unchanged; no live latency claim.",
-  "previous_workflow_version": "3.2.6",
-  "review_record": "../../../plans/token-diligence-router-2026-09-11.md",
+  "validation_scope": "Offline canonical and Claude EVM regression suites, including mocked private-destination, redirect, connected-peer and proxy isolation cases; no live network or hostile-code sandbox claim.",
+  "previous_workflow_version": "3.2.7",
+  "review_record": "../../../docs/reviews/publication-review.md",
   "completion_review_version": 2,
   "decision_review_version": 2,
   "source_comparison_version": "1.1.0",

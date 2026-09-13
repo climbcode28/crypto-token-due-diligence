@@ -75,4 +75,4 @@ echo "  /crypto-token-due-diligence, /crypto-evm-token-due-diligence, /crypto-so
 echo "  /deep-plan, /implement-review-improve                       (Claude Code and Cursor)"
 echo "  \$crypto-token-due-diligence, \$crypto-evm-token-due-diligence, \$crypto-solana-token-due-diligence,"
 echo "  \$deep-plan, \$implement-review-improve                     (Codex)"
-echo "The EVM skill needs an RPC endpoint; see README.md, section 'Set an RPC endpoint'."
+echo "Both specialists use public RPC by default; optional dRPC setup: README.md, section 'Set an RPC endpoint'."

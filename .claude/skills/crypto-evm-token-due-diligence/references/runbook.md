@@ -1,4 +1,4 @@
-# Broad diligence runbook (workflow 3.2.7)
+# Broad diligence runbook (workflow 3.2.8)
 
 The ordered command sequence for an ordinary broad review. Target **5–7 minutes**, cap
 **10 minutes**, and **at most about 40 coordinator turns**: every turn costs 6–8 seconds of

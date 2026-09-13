@@ -9,7 +9,7 @@ Individual diagrams: [EVM](docs/diagrams/evm-diligence-architecture-dark.png) ·
 [Solana](docs/diagrams/solana-diligence-architecture-dark.png).
 
 **Input**
-```t
+```text
 token_address:      Exact EVM or Solana token address (required)
 token_name:         Token name (optional)
 additional_context: Questions, links, or specific requirements (optional)
@@ -31,12 +31,13 @@ Research is read-only: no wallet connection, signing or trading.
 | [deep-plan](skills/deep-plan/SKILL.md) | General workflow skill: interviews you about an idea and saves a phased plan. |
 | [implement-review-improve](skills/implement-review-improve/SKILL.md) | General workflow skill: implements one phase or all phases of a plan, reviewing, fixing and verifying each phase. |
 
-All five skills work in Claude Code, Codex and Cursor from one shared copy. The two
-workflow skills run only when you invoke them by name.
+All five skills support Claude Code, Codex and Cursor. Most use the shared copies
+under `skills/`; Claude Code uses an adapted EVM copy. The two workflow skills run
+only when you invoke them by name.
 
 ## Quick start
 
-Requires **Python 3.10+**, **Git**, and **Claude Code, Codex or Cursor**. No Python packages required. Ask your agent how to set these up if you don't already have them set up 🙂
+Requires **Python 3.10+**, **Git**, and **Claude Code, Codex or Cursor**. No Python packages required.
 ```sh
 git clone <repository URL> ~/crypto-research
 cd ~/crypto-research
@@ -47,9 +48,9 @@ The installer links the skills into your user account and leaves existing files 
 Start a new session after installation. Use `./install.sh --copy` if symlinks are
 unavailable, or `./install.sh --uninstall` to remove installed links.
 Linked installs pick up updates when you run `git pull` in the clone.
-Opening the cloned folder itself also works without installing: Codex and Cursor read the
-registrations in `.agents/skills/` and `.cursor/skills/`, and Claude Code reads `.claude/skills/`.
-All of them point at the shared copies under `skills/`.
+Run the installer for access to all five skills. The clone also includes project
+registrations for development, but those do not register every skill in every host.
+Tool execution uses your host's normal permission settings.
 
 ## Example Usage
 
@@ -81,7 +82,8 @@ chmod 600 ~/.config/crypto-research/env
 
 The example uses Robinhood Chain's public endpoint. Despite its name,
 `ROBINHOOD_DRPC_URL` accepts a public or dRPC HTTPS endpoint for your EVM chain.
-`SOLANA_RPC_URL` optionally overrides Solana's public endpoint.
+`SOLANA_DRPC_URL` selects Solana's dRPC endpoint. The separate `SOLANA_RPC_URL`
+variable is only for overriding public RPC; leave it unset when configuring dRPC.
 
 **Optional dRPC:** add the following to that private env file, using your own key:
 
@@ -100,7 +102,8 @@ See [provider setup](HANDOFF.md) and the
 
 Editable skills live under `skills/`. Follow [project guidance](AGENTS.md) and the
 [EVM port notes](.claude/skills/crypto-evm-token-due-diligence/CLAUDE-CODE-PORT.md)
-when changing them. Implementation and review records are in [plans/](plans/).
+when changing them. Maintained review records are in [plans/](plans/); archived setup
+records are described in the [provenance index](docs/development-history.md).
 
 Run the offline regression suites from the repository root:
 

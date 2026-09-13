@@ -5,8 +5,10 @@
   `skills/deep-plan` and `skills/implement-review-improve`.
   Codex discovers EVM diligence through the project-local symlink
   `.agents/skills/crypto-evm-token-due-diligence` to its canonical folder. Keep EVM
-  registration project-only; do not create a Personal registration or a second Codex copy.
-  The router and Solana skill have Personal symlinks to their canonical folders.
+  registration project-only on the maintainer's machine; do not add or modify Personal
+  registrations during repository maintenance. Recipients who explicitly run `install.sh`
+  opt into Personal links for all five skills; that packaging path does not require
+  changing the maintainer's existing registrations.
   The router only classifies candidate format; specialists verify identity and share the
   original request deadline. Retired crypto-research is not an active skill.
 - `.claude/skills/crypto-evm-token-due-diligence` is the Claude Code copy of the EVM skill.
@@ -21,13 +23,14 @@
 - Use the implement-review-improve workflow for changes. Run the relevant standard-library
   unittest suites documented in README.md. Version behavioral improvements and retain
   regression coverage; relocation alone does not change the engine version.
-- `history/` (frozen development provenance) is not part of the published tree; it lives on the
-  maintainer's local `archive/pre-publish` branch and is ignored here. When present on disk, do not
+- `history/` (frozen development provenance) is ignored and is not part of the published tree.
+  Older records live on the maintainer's local `archive/pre-publish` branch; the publication
+  cleanup also preserves selected setup records there on disk, indexed in `docs/development-history.md`. When present on disk, do not
   rerun its historical installers as an installation or upgrade procedure; preserve evidence bytes.
 - Keep credentials outside the project. A configured dRPC key is not permission for paid
   usage. Before the first EVM provider check or RPC attempt, read the current policy that
-  the EVM skill's `provider_context.py --policy` prints (the Solana skill uses credential-free
-  public RPC and reads no policy file): the untracked personal `HANDOFF.local.md` when it
+  the EVM skill's `provider_context.py --policy` prints (Solana defaults to public RPC; configured
+  dRPC use requires explicit paid-use flags and current-user authorization): the untracked personal `HANDOFF.local.md` when it
   exists on this machine, otherwise the generic section at the top of `HANDOFF.md`. Honor a
   standing bounded paid read-only authorization recorded in the personal file unless the
   current user restricts it; it does not authorize purchases, top-ups, plan changes or

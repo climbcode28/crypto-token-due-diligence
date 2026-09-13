@@ -6,8 +6,8 @@ This is a personal, project-agnostic skill. Keep project-specific stacks, paths,
 
 ## Preserve These Behaviors
 
-- Implement, review, and improve exactly one requested phase, then stop.
-- Read the whole plan for shared context and dependencies; execute only the selected phase.
+- Implement, review, and improve the requested phase; when all phases are requested, repeat that cycle in dependency order until all remaining phases pass or progress is blocked.
+- Read the whole plan for shared context and dependencies; execute only the selected phase or explicitly requested all-phase scope.
 - Discover applicable instructions, current toolchain, maintained patterns, and proportionate verification each run.
 - Protect pre-existing work and respect the user's commit/push preference.
 - Apply routine in-scope fixes without unnecessary approval pauses; ask only about material ambiguity or missing authorization.

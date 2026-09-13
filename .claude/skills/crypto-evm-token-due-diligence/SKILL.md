@@ -1,27 +1,6 @@
 ---
 name: crypto-evm-token-due-diligence
 description: Evidence-bounded EVM token diligence covering controls, liquidity, adoption, project delivery, creator history and token economics, separating observed risks from unverified checks. Use for focused questions, broad diligence or formal reports on an exact EVM (chain ID, token address), including Robinhood Chain; not for price prediction, trading, Solana mints or a full protocol exploit audit.
-allowed-tools:
-  - Bash(python3 *)
-  - Bash(set +x*)
-  - Bash(mkdir *)
-  - Bash(ls *)
-  - Bash(sed *)
-  - Bash(date *)
-  - Read
-  - Write
-  - Agent
-  - WebSearch
-  - WebFetch(domain:api.dexscreener.com)
-  - WebFetch(domain:sourcify.dev)
-  - WebFetch(domain:github.com)
-  - WebFetch(domain:api.github.com)
-  - WebFetch(domain:raw.githubusercontent.com)
-  - WebFetch(domain:rh-scan.com)
-  - WebFetch(domain:robinscan.io)
-  - WebFetch(domain:robinhoodchain.blockscout.com)
-  - WebFetch(domain:docs.robinhood.com)
-  - WebFetch(domain:dexscreener.com)
 ---
 
 # Crypto EVM token due diligence

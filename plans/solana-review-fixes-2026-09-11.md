@@ -896,5 +896,6 @@ Final suites: router 30, EVM 429, Solana 417.
 Suites after this round: router 30, EVM 429, Solana 417. User env: keep
 `ROBINHOOD_DRPC_URL='https://lb.drpc.live/robinhood'` and `SOLANA_DRPC_URL='https://lb.drpc.org/solana'`
 (or `lb.drpc.live/solana`) credential-free, the key only in `DRPC_API_KEY`; the skills send it as a
-`Drpc-Key` header. `plans/drpc-local-setup-and-live-test.md` still shows the old EVM variable
+`Drpc-Key` header. The historical setup record (now archived; see
+[development provenance](../docs/development-history.md)) showed the old EVM variable
 name as a historical record.

@@ -7,7 +7,7 @@ __pycache__/
 !.env.example
 /cache/
 /runs/
-# Local investigation output and caches; frozen history remains tracked.
+# Local investigation output and caches stay private.
 /research/
 /share-export/
 # Personal, machine-local policy and tool settings never leave this checkout.

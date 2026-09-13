@@ -35,13 +35,18 @@ class GuidanceTests(unittest.TestCase):
         self.assertEqual(active(S/'assets/operational-lessons.json'),[])
 
     def test_provider_policy_and_registrations_unchanged(self):
-        # The Solana path is public-only: it reads no policy file, so only the repository's
-        # Solana statements are checked, and an installed copy without the repo skips them.
+        # Solana defaults to public RPC and permits explicitly authorized dRPC;
+        # installed copies without the repository handoff skip these doc checks.
         handoff=REPO/'HANDOFF.md'
         if not handoff.exists():self.skipTest('installed copy without repository handoff')
         text=handoff.read_text()
-        for sentence in ('`SOLANA_RPC_URL` only overrides the public root.','needs no\n  private env for the public tier','can use a personal dRPC','A key\n  alone is not authorization to spend.'):
-            self.assertIn(sentence,text)
+        normalized=' '.join(text.split())
+        for sentence in ("`SOLANA_RPC_URL` | Optional override for Solana's public endpoint.",
+                         '`SOLANA_DRPC_URL` | Optional dRPC endpoint for Solana;',
+                         'Solana dRPC use requires `--cost-policy paid --allow-paid`',
+                         'public use needs no private configuration.',
+                         'A configured key alone is not authorization for paid use.'):
+            self.assertIn(sentence,normalized)
         self.assertNotIn('four folders under',text)
         self.assertNotIn('custom Solana dRPC is deferred',text)  # the policy now permits it
         link=REPO/'.agents/skills/crypto-evm-token-due-diligence'

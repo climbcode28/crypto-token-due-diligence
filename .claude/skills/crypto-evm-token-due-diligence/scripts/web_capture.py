@@ -2,11 +2,12 @@
 """Bounded parallel HTTP capture with provenance. Raw bytes are evidence; summaries are not.
 
 No credentials are sent, no cookies are kept, redirects are followed at most three times
-within https/http and recorded. A 403, JavaScript shell or timeout is a recorded access
+within public https/http destinations and recorded. A 403, JavaScript shell or timeout is a recorded access
 gap with the URL and time, never an inference about the token.
 """
 import argparse
 import http.client
+import ipaddress
 import json
 import re
 import sqlite3
@@ -43,14 +44,71 @@ PRESETS = {
 SECRET_QUERY = re.compile(r"key|token|secret|sig|auth|password|passwd|apikey|api_key", re.I)
 
 
+class PrivateDestination(ValueError):
+    """A web source or connected peer is outside the public Internet."""
+
+
+def require_public_address(value):
+    address = ipaddress.ip_address(value)
+    if not address.is_global or address.is_multicast:
+        raise PrivateDestination("public destination required")
+
+
 def clean_url(url):
-    """Refuse credential-bearing URLs so keys never reach captures or evidence."""
+    """Check every initial/redirect URL; the connection also checks its actual peer."""
+    need(isinstance(url, str) and not any(ord(c) <= 32 or ord(c) == 127 for c in url), "invalid URL")
     parts = urllib.parse.urlsplit(url)
     need(parts.scheme in ("https", "http") and bool(parts.hostname), "unsupported URL")
+    need(parts.port is None or 1 <= parts.port <= 65535, "invalid URL port")
     need(not parts.username and not parts.password, "URL carries credentials")
     need(not any(SECRET_QUERY.search(k) for k, _ in urllib.parse.parse_qsl(parts.query, keep_blank_values=True)),
          "URL carries a credential-like query parameter; captures must not embed keys")
+    host = parts.hostname.lower().rstrip(".")
+    if host == "localhost" or host.endswith((".localhost", ".local", ".internal")):
+        raise PrivateDestination("public destination required")
+    try:
+        ipaddress.ip_address(host)
+    except ValueError:
+        pass  # DNS names are checked against the connected peer, not a separate lookup.
+    else:
+        require_public_address(host)
     return url
+
+
+class PublicHTTPConnection(http.client.HTTPConnection):
+    def connect(self):
+        super().connect()
+        try:
+            require_public_address(self.sock.getpeername()[0])
+        except ValueError:
+            self.close()
+            raise
+
+
+class PublicHTTPSConnection(http.client.HTTPSConnection):
+    def connect(self):
+        super().connect()
+        try:
+            require_public_address(self.sock.getpeername()[0])
+        except ValueError:
+            self.close()
+            raise
+
+
+class PublicHTTPHandler(urllib.request.HTTPHandler):
+    def http_open(self, req):
+        return self.do_open(PublicHTTPConnection, req)
+
+
+class PublicHTTPSHandler(urllib.request.HTTPSHandler):
+    def https_open(self, req):
+        return self.do_open(PublicHTTPSConnection, req, context=self._context)
+
+
+def public_opener():
+    # Anonymous captures must not inherit proxies, credentials or cookie state.
+    return urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect(),
+                                      PublicHTTPHandler(), PublicHTTPSHandler())
 
 
 def public_url(url):
@@ -129,7 +187,7 @@ def capture_attempt(item, out, timeout=20, max_bytes=16_000_000, opener=None, wr
               "host": None, "requests_used": 0}
     started = time.monotonic()
     deadline = min(deadline, started + timeout) if deadline is not None else started + timeout
-    client = opener or urllib.request.build_opener(NoRedirect())
+    client = opener or public_opener()
     body = b""
     try:
         clean_url(url)
@@ -197,7 +255,9 @@ def capture_attempt(item, out, timeout=20, max_bytes=16_000_000, opener=None, wr
         else:
             record["failure_category"] = "too_many_redirects"
     except (OSError, ValueError, urllib.error.URLError, http.client.HTTPException) as exc:
-        if isinstance(exc, ValueError) and "credential" in str(exc):
+        if isinstance(exc, PrivateDestination):
+            record["failure_category"] = "refused_private_url"
+        elif isinstance(exc, ValueError) and "credential" in str(exc):
             record["failure_category"] = "refused_credential_url"
         elif isinstance(exc, ValueError):
             record["failure_category"] = "invalid_response_or_url"
