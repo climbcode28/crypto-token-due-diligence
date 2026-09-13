@@ -2,7 +2,7 @@
 
 Current release manifests link to the implementation and acceptance records retained
 under `docs/reviews/`. Those records describe their original releases, not current setup or
-provider authorization. Use README and HANDOFF for current operation.
+provider authorization. Use README and [provider setup](provider-setup.md) for current operation.
 
 The publication cleanup removed the following completed setup and retired-workflow
 records from the public working tree:

@@ -32,7 +32,7 @@
   usage. Before the first EVM provider check or RPC attempt, read the current policy that
   the EVM skill's `provider_context.py --policy` prints (Solana defaults to public RPC; configured
   dRPC use requires explicit paid-use flags and current-user authorization): the untracked personal `HANDOFF.local.md` when it
-  exists on this machine, otherwise the generic section at the top of `HANDOFF.md`. Honor a
+  exists on this machine, otherwise the generic section at the top of `docs/provider-setup.md`. Honor a
   standing bounded paid read-only authorization recorded in the personal file unless the
   current user restricts it; it does not authorize purchases, top-ups, plan changes or
   unlimited usage. Never commit `HANDOFF.local.md`. Source the

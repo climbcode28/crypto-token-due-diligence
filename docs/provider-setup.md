@@ -10,7 +10,7 @@ and grants no standing permission to spend money on a paid provider.
   disabled in the same shell invocation as a configured provider check or collection.
 - A configured key alone is not authorization for paid use. The current user must
   authorize it; nothing here permits purchases, top-ups, or plan changes.
-- An optional, ignored `HANDOFF.local.md` next to this file can record the current
+- An optional, ignored `HANDOFF.local.md` at the repository root can record the current
   user's machine-local provider policy and bounded standing authorization. Its first
   second-level section takes precedence for EVM; `provider_context.py --policy`
   identifies the source. Never publish that file or reuse someone else's authorization.
@@ -37,7 +37,7 @@ request deadline when routing between skills. Verify chain or mint identity and 
 pins; never substitute testnet for mainnet. Completed reports must pass their specialist's
 validation and delivery checks. Preserve evidence bytes and frozen replay engines.
 
-See the [EVM runbook](skills/crypto-evm-token-due-diligence/references/runbook.md),
-[Solana runbook](skills/crypto-solana-token-due-diligence/references/runbook.md), and
-[project guidance](AGENTS.md). Maintained review records are in [docs/reviews/](docs/reviews/);
-older setup records are described in the [provenance index](docs/development-history.md).
+See the [EVM runbook](../skills/crypto-evm-token-due-diligence/references/runbook.md),
+[Solana runbook](../skills/crypto-solana-token-due-diligence/references/runbook.md), and
+[project guidance](../AGENTS.md). Maintained review records are in [docs/reviews/](reviews/);
+older setup records are described in the [provenance index](development-history.md).

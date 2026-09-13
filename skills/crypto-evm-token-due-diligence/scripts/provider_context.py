@@ -23,9 +23,9 @@ def context_files():
             roots.append(root)
     paths = []
     for root in roots:
-        # HANDOFF.local.md is the untracked, personal companion of HANDOFF.md (standing
+        # HANDOFF.local.md is the untracked, personal companion of docs/provider-setup.md (standing
         # authorizations for one machine); it never leaves the checkout through git.
-        for name in ("AGENTS.md", "README.md", "HANDOFF.md", "HANDOFF.local.md"):
+        for name in ("AGENTS.md", "README.md", "docs/provider-setup.md", "HANDOFF.local.md"):
             path = root / name
             if path.is_file() and str(path) not in paths:
                 paths.append(str(path))
@@ -42,8 +42,8 @@ def _first_section(path, limit):
 
 
 def policy_source(paths):
-    """The file whose first second-level section is the current policy: a personal HANDOFF.local.md wins over the tracked HANDOFF.md."""
-    for suffix in ("HANDOFF.local.md", "HANDOFF.md"):
+    """The file whose first second-level section is the current policy: a personal HANDOFF.local.md wins over the tracked docs/provider-setup.md."""
+    for suffix in ("HANDOFF.local.md", "docs/provider-setup.md"):
         for path in paths:
             if path.endswith(suffix):
                 return path
@@ -68,8 +68,8 @@ if __name__ == "__main__":
         excerpt = policy_excerpt(paths)
         result["policy_source"] = source
         print(json.dumps(result, sort_keys=True))
-        label = "personal HANDOFF.local.md (untracked)" if source and source.endswith("HANDOFF.local.md") else "trusted HANDOFF.md"
+        label = "personal HANDOFF.local.md (untracked)" if source and source.endswith("HANDOFF.local.md") else "trusted docs/provider-setup.md"
         print("\n--- current provider policy (from " + label + "; read before any RPC attempt) ---\n")
-        print(excerpt or "No HANDOFF.md found; standalone copy: use only this user's available configuration and permission.")
+        print(excerpt or "No docs/provider-setup.md found; standalone copy: use only this user's available configuration and permission.")
     else:
         print(json.dumps(result, sort_keys=True))

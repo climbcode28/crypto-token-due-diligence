@@ -16,8 +16,9 @@ class ProviderContextTests(unittest.TestCase):
             checkout = root / "checkout"
             scripts = checkout / "skills/crypto-evm-token-due-diligence/scripts"
             scripts.mkdir(parents=True)
-            (checkout / "AGENTS.md").write_text("read HANDOFF.md before provider selection")
-            (checkout / "HANDOFF.md").write_text("PERSONAL_AUTHORIZATION_NOT_FOR_OUTPUT")
+            (checkout / "AGENTS.md").write_text("read docs/provider-setup.md before provider selection")
+            (checkout / "docs").mkdir()
+            (checkout / "docs/provider-setup.md").write_text("PERSONAL_AUTHORIZATION_NOT_FOR_OUTPUT")
             (scripts / "provider_context.py").write_bytes((SCRIPTS / "provider_context.py").read_bytes())
             installed = root / "installed-skill"
             installed.symlink_to(scripts.parent, target_is_directory=True)
@@ -30,7 +31,7 @@ class ProviderContextTests(unittest.TestCase):
                                     cwd=nested, capture_output=True, text=True, check=True)
             data = json.loads(result.stdout)
             self.assertEqual(data["context_files"], [str(workspace / "AGENTS.md"), str(workspace / "README.md"),
-                                                    str(checkout / "AGENTS.md"), str(checkout / "HANDOFF.md")])
+                                                    str(checkout / "AGENTS.md"), str(checkout / "docs/provider-setup.md")])
             self.assertEqual(data["network_requests"], 0)
             self.assertNotIn("PERSONAL_AUTHORIZATION", result.stdout)
 
@@ -40,34 +41,37 @@ class ProviderContextTests(unittest.TestCase):
             checkout = root / "checkout"
             scripts = checkout / ".claude/skills/crypto-evm-token-due-diligence/scripts"
             scripts.mkdir(parents=True)
-            (checkout / "AGENTS.md").write_text("read HANDOFF.md before provider selection")
-            (checkout / "HANDOFF.md").write_text("PERSONAL_AUTHORIZATION_NOT_FOR_OUTPUT")
+            (checkout / "AGENTS.md").write_text("read docs/provider-setup.md before provider selection")
+            (checkout / "docs").mkdir()
+            (checkout / "docs/provider-setup.md").write_text("PERSONAL_AUTHORIZATION_NOT_FOR_OUTPUT")
             (scripts / "provider_context.py").write_bytes((SCRIPTS / "provider_context.py").read_bytes())
             elsewhere = root / "elsewhere"
             elsewhere.mkdir()
             result = subprocess.run([sys.executable, str(scripts / "provider_context.py")],
                                     cwd=elsewhere, capture_output=True, text=True, check=True)
             data = json.loads(result.stdout)
-            self.assertEqual(data["context_files"], [str(checkout / "AGENTS.md"), str(checkout / "HANDOFF.md")])
+            self.assertEqual(data["context_files"], [str(checkout / "AGENTS.md"), str(checkout / "docs/provider-setup.md")])
             self.assertEqual(data["network_requests"], 0)
             self.assertNotIn("PERSONAL_AUTHORIZATION", result.stdout)
             # Running from inside the checkout lists each file once.
             result = subprocess.run([sys.executable, str(scripts / "provider_context.py")],
                                     cwd=checkout, capture_output=True, text=True, check=True)
             self.assertEqual(json.loads(result.stdout)["context_files"],
-                             [str(checkout / "AGENTS.md"), str(checkout / "HANDOFF.md")])
+                             [str(checkout / "AGENTS.md"), str(checkout / "docs/provider-setup.md")])
 
     def test_personal_local_handoff_overrides_the_tracked_policy(self):
         with tempfile.TemporaryDirectory() as td:
             checkout = Path(td).resolve() / "checkout"
             scripts = checkout / "skills/crypto-evm-token-due-diligence/scripts"
             scripts.mkdir(parents=True)
-            (checkout / "AGENTS.md").write_text("read HANDOFF.md before provider selection")
-            (checkout / "HANDOFF.md").write_text("# Handoff\n\n## Current provider policy\n\nGENERIC_PUBLIC_POLICY\n\n## Later\n\nother\n")
+            (checkout / "AGENTS.md").write_text("read docs/provider-setup.md before provider selection")
+            (checkout / "docs").mkdir()
+            (checkout / "docs/provider-setup.md").write_text("# Handoff\n\n## Current provider policy\n\nGENERIC_PUBLIC_POLICY\n\n## Later\n\nother\n")
             (scripts / "provider_context.py").write_bytes((SCRIPTS / "provider_context.py").read_bytes())
             result = subprocess.run([sys.executable, str(scripts / "provider_context.py"), "--policy"], cwd=checkout, capture_output=True, text=True, check=True)
+            self.assertEqual(json.loads(result.stdout.splitlines()[0])["policy_source"], str(checkout / "docs/provider-setup.md"))
             self.assertIn("GENERIC_PUBLIC_POLICY", result.stdout)
-            self.assertIn("trusted HANDOFF.md", result.stdout)
+            self.assertIn("trusted docs/provider-setup.md", result.stdout)
             self.assertNotIn("HANDOFF.local.md", json.loads(result.stdout.splitlines()[0])["context_files"].__str__())
             (checkout / "HANDOFF.local.md").write_text("# Personal\n\n## Standing authorization\n\nPERSONAL_STANDING_AUTHORIZATION\n")
             result = subprocess.run([sys.executable, str(scripts / "provider_context.py"), "--policy"], cwd=checkout, capture_output=True, text=True, check=True)

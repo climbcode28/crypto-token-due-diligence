@@ -36,9 +36,9 @@ class GuidanceTests(unittest.TestCase):
 
     def test_provider_policy_and_registrations_unchanged(self):
         # Solana defaults to public RPC and permits explicitly authorized dRPC;
-        # installed copies without the repository handoff skip these doc checks.
-        handoff=REPO/'HANDOFF.md'
-        if not handoff.exists():self.skipTest('installed copy without repository handoff')
+        # installed copies without the repository provider setup skip these doc checks.
+        handoff=REPO/'docs/provider-setup.md'
+        if not handoff.exists():self.skipTest('installed copy without repository provider setup')
         text=handoff.read_text()
         normalized=' '.join(text.split())
         for sentence in ("`SOLANA_RPC_URL` | Optional override for Solana's public endpoint.",

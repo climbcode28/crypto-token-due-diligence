@@ -97,7 +97,7 @@ export DRPC_API_KEY='your-key'
 
 Keep keys out of URLs and the repository. Paid access requires your authorization;
 a configured key alone does not permit spending. Public RPC requires no API key.
-See [provider setup](HANDOFF.md) and the
+See [provider setup](docs/provider-setup.md) and the
 [Solana runbook](skills/crypto-solana-token-due-diligence/references/runbook.md) for details.
 
 ## Development
