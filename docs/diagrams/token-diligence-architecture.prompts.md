@@ -1,5 +1,102 @@
 # Token diligence architecture diagrams
 
+## Matching EVM and Solana footers
+
+Both specialist PNGs now use the same user-requested footer as the combined PNG:
+**Read-only access · 7 - 8 minute deadline · Missing evidence clearly labeled**.
+Built-in image_gen was used separately on each original image. The edit prompt
+replaced only the footer body line, preserving its heading, border and all other
+diagram content, styling and dimensions. Runtime timing configuration is unchanged.
+
+## Combined research-limits footer
+
+User-requested diagram wording: **Read-only access · 7 - 8 minute deadline · Missing evidence clearly labeled**.
+This is a presentation edit; collector/session timing configuration is unchanged.
+Built-in image_gen prompt:
+
+```text
+undefined
+```
+
+## Combined intake label
+
+User-requested wording: **Token address + token name (optional) + additional context (optional)**.
+Built-in image_gen edit, preserving the rest of the approved diagram.
+
+```text
+undefined
+```
+
+## Chain-specific evidence sources
+
+The source panels now retain named EVM and Solana sources while preserving the
+approved simplified workflow. EVM names follow the original reference panel.
+Solana discovery/source routes were checked against `solana_discovery.py`:
+Dexscreener, GeckoTerminal, Solana Explorer, program IDLs and verified-build claims.
+Raydium, Orca, Meteora, pump.fun and PumpSwap are protocol/launch context, not a claim
+that every run automatically queries each website. Website/docs/GitHub/X are shared
+context. The image paths remain unchanged, so README and HTML pick up the edits.
+
+### Solana source-panel edit (built-in image_gen)
+
+```text
+Edit this approved SIMPLE Solana architecture diagram. Change ONLY the contents of the upper-left dashed "Evidence sources" panel. Preserve every other panel, main flow, connectors, legend, title, footer, dimensions and style exactly. Maintain the clean 1536x1024 EVM-style diagram, dark navy, thin muted cyan and white handwritten lettering. Do not add technical architecture details elsewhere.
+
+Replace that panel text with these EXACT lines, with the two section headings slightly larger and generous vertical spacing like the original:
+"Evidence sources"
+"RPC + discovery"
+"Authorized dRPC or public RPC"
+"Dexscreener · GeckoTerminal"
+"Solana Explorer · IDLs · verified builds"
+
+"Context + leads"
+"Raydium · Orca · Meteora"
+"pump.fun · PumpSwap · launchpads"
+"Website · docs · GitHub · X"
+
+These fit inside the existing upper-left dashed panel using the same body font size as the current evidence-source text. Keep the panel size unchanged, and the existing RPC outgoing connector unchanged. No added paragraphs or extra diagrams. No changes outside this panel.
+```
+
+### Combined source-panel edit (built-in image_gen)
+
+```text
+Edit the approved SIMPLE combined crypto token due diligence diagram. Keep the central router and workflow, right assessment and two lanes, findings box and footer EXACTLY as they are. Change ONLY the left column so Evidence sources explicitly lists the differing EVM and Solana sources. Preserve the professional simple navy/white-handwritten/muted-cyan style, 1536x1024 landscape, readable labels. This is additional source inventory only, NOT extra workflow or implementation detail.
+
+Enlarge the left upper dashed Evidence sources panel downward: keep its top near y106 and left/right near x40/x415, and extend bottom to about y680. Use compact but readable body lettering approximately 17–19px, orderly left alignment. Within it use EXACT following text. "EVM" and "Solana" are modest underlined subheadings, with whitespace clearly separating their source lists. The source category headings can be same size body, but underlined or accented:
+"Evidence sources"
+
+"EVM"
+"RPC + discovery"
+"Authorized dRPC first · public fallback"
+"Dexscreener · Sourcify · explorer"
+"Context + leads"
+"RH Scan · Robinscan · Blockscout"
+"Defined · Fomo · RH Trenches"
+"Pons · Long · relevant launchpads"
+
+"Solana"
+"RPC + discovery"
+"Authorized dRPC or public RPC"
+"Dexscreener · GeckoTerminal"
+"Solana Explorer · IDLs · verified builds"
+"Context + leads"
+"Raydium · Orca · Meteora"
+"pump.fun · PumpSwap · launchpads"
+
+"Shared context"
+"Website · docs · GitHub · X"
+
+Fit all this with whitespace within the enlarged panel; do not shrink the whole diagram. The long lines must remain legible and inside the border. The original evidence-sources arrow to Coordinate research remains, and it must not cross any text.
+
+Move the existing left lower "Deterministic backends" panel below the expanded sources to about y700–852. Preserve its exact existing content with slightly tighter vertical spacing:
+"Deterministic backends"
+"EVM: contracts · pools · block pins"
+"Solana: mints · positions · context slots"
+"Verified reads · trade receipts"
+
+Do NOT change title, center column, router, the text "Within the selected specialist", right column, legend, main arrows or footer. No new panels elsewhere, no repeated workflows, no implementation details, no paragraphs. Only reorganize the left column to restore chain-specific source detail.
+```
+
 Replaced the overly detailed drafts at the user's request. Built-in image_gen used
 the original EVM diagram as the style and complexity reference for both images.
 The Solana diagram keeps the same five-stage flow; the combined diagram adds an

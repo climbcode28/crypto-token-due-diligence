@@ -64,6 +64,6 @@ class GuidanceTests(unittest.TestCase):
         release=json.loads((S/'assets/release.json').read_text());self.assertEqual(release['operations_version'],'1.0.0')
         from solana_common import ENGINE_VERSION
         self.assertEqual(release['engine_version'],ENGINE_VERSION);self.assertEqual(release['engine_version'],'1.0.0')
-        self.assertIn(release['v2_workflow_version'],(REPO/'README.md').read_text())
+        self.assertIn('skills/crypto-solana-token-due-diligence/SKILL.md',(REPO/'README.md').read_text())
 
 if __name__=='__main__':unittest.main()
