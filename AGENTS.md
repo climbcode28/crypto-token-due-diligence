@@ -1,7 +1,8 @@
 # Project guidance
 
 - Canonical editable skills live in `skills/crypto-token-due-diligence`,
-  `skills/crypto-evm-token-due-diligence` and `skills/crypto-solana-token-due-diligence`.
+  `skills/crypto-evm-token-due-diligence`, `skills/crypto-solana-token-due-diligence`,
+  `skills/deep-plan` and `skills/implement-review-improve`.
   Codex discovers EVM diligence through the project-local symlink
   `.agents/skills/crypto-evm-token-due-diligence` to its canonical folder. Keep EVM
   registration project-only; do not create a Personal registration or a second Codex copy.
@@ -11,9 +12,10 @@
 - `.claude/skills/crypto-evm-token-due-diligence` is the Claude Code copy of the EVM skill.
   Edit the canonical folder first, then mirror the change there per its `CLAUDE-CODE-PORT.md`.
 - `skills/deep-plan` and `skills/implement-review-improve` are the shared workflow skills, explicit
-  invocation only, used unchanged by Claude Code, Codex and Cursor. `.cursor/skills/` holds Cursor
-  pointer skills that only name the canonical folder under `skills/` to read; change behavior in
-  the canonical folder, never in a pointer.
+  invocation only, used unchanged by Claude Code, Codex and Cursor. They are registered in this
+  project through relative symlinks in `.agents/skills/` and `.claude/skills/`; `.cursor/skills/`
+  holds Cursor pointer skills that only name the canonical folder under `skills/` to read. Change
+  behavior in the canonical folder, never in a symlink target copy or a pointer.
 - Preserve archived research-rubric provenance, verified EVM/Solana diligence routing, optional dRPC
   fallback, and evidence/identity/pin standards.
 - Use the implement-review-improve workflow for changes. Run the relevant standard-library

@@ -1,7 +1,7 @@
 # Crypto research
 
-Token due-diligence skills for [Claude Code](https://claude.com/claude-code) and
-[Codex](https://openai.com/codex). Provide an exact EVM token address or Solana mint,
+Token due-diligence skills for [Claude Code](https://claude.com/claude-code),
+[Codex](https://openai.com/codex) and [Cursor](https://cursor.com). Provide an exact EVM token address or Solana mint,
 an optional token name, and any questions or context. Get a source-linked assessment
 of token controls, liquidity, project credibility, creator history and token economics.
 
@@ -16,10 +16,15 @@ Research is read-only: no wallet connection, signing or trading.
 | [crypto-token-due-diligence](skills/crypto-token-due-diligence/SKILL.md) | Start here. Routes your request to the appropriate specialist. |
 | [crypto-evm-token-due-diligence](skills/crypto-evm-token-due-diligence/SKILL.md) | EVM token research, including Robinhood Chain. |
 | [crypto-solana-token-due-diligence](skills/crypto-solana-token-due-diligence/SKILL.md) | Solana mint research for SPL and Token-2022 tokens. |
+| [deep-plan](skills/deep-plan/SKILL.md) | General workflow skill: interviews you about an idea and saves a phased plan. |
+| [implement-review-improve](skills/implement-review-improve/SKILL.md) | General workflow skill: implements one plan phase, reviews it, fixes and verifies. |
+
+All five skills work in Claude Code, Codex and Cursor from one shared copy. The two
+workflow skills run only when you invoke them by name.
 
 ## Quick start
 
-Requires **Python 3.10+**, **Git**, and **Claude Code or Codex**. No Python packages required.
+Requires **Python 3.10+**, **Git**, and **Claude Code, Codex or Cursor**. No Python packages required.
 
 ```sh
 git clone <repository URL> ~/crypto-research
@@ -40,7 +45,7 @@ In **Codex**:
 $crypto-token-due-diligence Research <TOKEN_ADDRESS>. Focus on liquidity, creator history, and whether the project has delivered what it claims.
 ```
 
-In **Claude Code**, use `/crypto-token-due-diligence` with the same request.
+In **Claude Code** or **Cursor**, use `/crypto-token-due-diligence` with the same request.
 You can also invoke either specialist directly. Include the network when known,
 relevant links, and any specific requirements—for example, “Can I exit 50,000 tokens?”
 

@@ -8,7 +8,7 @@ disable-model-invocation: true
 
 ## Purpose
 
-Turn an idea into a rigorously challenged, dependency-ordered plan that a fresh Codex task can execute by reading a saved Markdown file. Support software and non-software work: adapt the questions, deliverables, and validation to the actual goal.
+Turn an idea into a rigorously challenged, dependency-ordered plan that a fresh agent session can execute by reading a saved Markdown file. Support software and non-software work: adapt the questions, deliverables, and validation to the actual goal.
 
 This is a planning-only workflow. The only file changes permitted by this workflow are the requested plan Markdown file and creation of its parent directory. Do not implement code, modify project configuration, install dependencies, run builds or tests, or execute planned actions. Read-only context inspection is appropriate.
 
@@ -76,7 +76,7 @@ If the user corrects a section, update dependent decisions before continuing. Be
 
 ## Saved Plan Output
 
-- Save a normal Markdown file that future Codex tasks can read by path. A chat response or a tool's transient planning state is not a substitute for the file.
+- Save a normal Markdown file that future agent sessions can read by path. A chat response or a tool's transient planning state is not a substitute for the file.
 - Honor the user's save path. Otherwise follow an established project plan location, or use `plans/<short-topic-slug>-plan.md` at the repository root. For work without a repository, use the current workspace root.
 - State the proposed default location during the interview so the user can override it; do not require a separate location approval when the default is suitable.
 - Create the parent directory if needed. If the chosen file already exists and replacing or updating it has not been authorized, ask before overwriting it or choose an unused filename and disclose the new path.
@@ -139,7 +139,7 @@ paths, prerequisites, conventions, and validation procedures.]
 
 ## Implementation Phases
 
-Each phase must be executable in a fresh Codex task using this plan and its
+Each phase must be executable in a fresh agent session using this plan and its
 referenced sources. Complete a phase and its acceptance checks before starting
 the next phase. Recheck applicable guidance and current state before execution.
 

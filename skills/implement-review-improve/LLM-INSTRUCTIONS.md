@@ -1,4 +1,4 @@
-# Maintaining Implement Review Improve For Codex
+# Maintaining Implement Review Improve
 
 Read this file only when customizing or maintaining the skill, not during ordinary phase execution.
 
@@ -17,8 +17,8 @@ This is a personal, project-agnostic skill. Keep project-specific stacks, paths,
 
 ## Customization Guidance
 
-Prefer project guidance such as `AGENTS.md` for project-specific conventions instead of modifying this personal copy for one repository. If the user requests a separate project skill, use the skill locations supported by the active Codex environment and verify discovery rather than assuming duplicate-name precedence.
+Prefer project guidance such as `AGENTS.md` for project-specific conventions instead of modifying this personal copy for one repository. If the user requests a separate project skill, use the skill locations supported by the active agent tool (Claude Code, Codex or Cursor) and verify discovery rather than assuming duplicate-name precedence.
 
-Use available Codex tools and actual instruction precedence. Avoid obsolete tool names, capitalized `.Codex/` paths, embedded secrets, or assumptions about the source computer. Keep review criteria conditional on the changed behavior and the project's requirements.
+Use the tools actually available in the current agent and its real instruction precedence. Avoid obsolete tool names, capitalized `.Codex/` paths, embedded secrets, or assumptions about the source computer. Keep review criteria conditional on the changed behavior and the project's requirements.
 
 After editing, validate the frontmatter and invocation policy, then inspect the workflow for scope leaks, unnecessary approval loops, and false completion claims. Check that the required inputs can be resolved from existing context and that failures lead to repair or a concrete blocker, not premature success.

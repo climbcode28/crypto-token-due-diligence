@@ -37,7 +37,7 @@ Read the complete plan for context, decisions, execution notes, and dependencies
 ### Discover Guidance And Patterns
 
 - Read applicable ancestor and nested `AGENTS.md` files for affected paths. Follow the actual instruction hierarchy and path scope; do not invent a precedence list in which root guidance always overrides nested guidance.
-- Read relevant contribution docs, architecture notes, ADRs, and existing project instructions. Legacy `.cursor/rules/`, `.cursorrules`, `CLAUDE.md`, or similar files may provide useful project conventions; apply relevant content without treating tool-specific commands or metadata as Codex capabilities.
+- Read relevant contribution docs, architecture notes, ADRs, and existing project instructions. Legacy `.cursor/rules/`, `.cursorrules`, `CLAUDE.md`, or similar files may provide useful project conventions; apply relevant content without treating tool-specific commands or metadata as capabilities of the current agent.
 - Use applicable skills exposed in the current session when they materially help. Do not bulk-load every skill or assume unsupported discovery locations.
 - Identify affected modules, interfaces, dependencies, schemas, migrations, routes, configuration, and deliverables.
 - Find a maintained reference implementation and reuse shared utilities, UI primitives, clients, test helpers, schemas, and naming conventions. Respect areas marked legacy or undergoing migration.
