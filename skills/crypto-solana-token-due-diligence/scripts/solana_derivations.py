@@ -3,7 +3,7 @@ import re
 from solana_common import need,target_identity,pubkey
 from solana_programs import observed_account
 
-VERSION='1.2.0'  # Persisted derivation contract; bumped whenever any operation's output shape changes.
+VERSION='1.3.0'  # Persisted derivation contract; bumped whenever any operation's output shape changes.
 RUNTIME_VERSION='1.5.0'
 # The contract version in which each operation's output last changed. A derivation recorded
 # before its operation last changed cannot be recomputed by this engine: read or replay it
@@ -16,7 +16,9 @@ RUNTIME_VERSION='1.5.0'
 # tail fields, absent_fields and exotic flat fees; transaction effects decode PumpSwap trades with router accounts and
 # carry rebate_accounts (decoder 1.3.0). controls gained an optional newer_unpinned note in the same release; a controls
 # derivation recorded without it still recomputes, so its entry stays at 1.1.0.
-CHANGED_IN={**{op:'1.1.0' for op in ('controllers','discovery_pools','holders','mint','controls','history')},'pool':'1.2.0','transaction':'1.2.0','sales':'1.2.0','rebuys':'1.2.0'}
+# 1.3.0 (2026-09-12, night): sales/rebuys rows carry spending_owner and custody (router custody legs verify with the
+# beneficial wallet as seller) and curve trades verify through native or token quote legs.
+CHANGED_IN={**{op:'1.1.0' for op in ('controllers','discovery_pools','holders','mint','controls','history')},'pool':'1.2.0','transaction':'1.3.0','sales':'1.3.0','rebuys':'1.3.0'}
 
 
 def version_tuple(value):

@@ -9,8 +9,8 @@ PROGRAM=CURVE_PROGRAM
 GLOBAL=pda(PROGRAM,b'global')
 CAPABILITY=capability('pump_curve',PROGRAM,REVISION,model='bonding_curve_real_and_virtual_separate',
     dependencies=['curve','global','base_mint','base_holding','quote_holding_if_non_native','fee_config','program_control'])
-CAPABILITY.update(version='1.3.0',allocation_bytes=[115,124,125,151],reserved_tail_policy='known fields, the creator-fee/holder-reward tail group when the allocation holds it, then an all-zero trailing allocation of any length; a truncated account or any nonzero tail is refused',migration='successful exact migration instruction plus current destination pool required',
-    quote=False,historical_execution='typed create/migrate/trade-intent/fee roles; native direct lamport effects may remain unresolved')
+CAPABILITY.update(version='1.4.0',allocation_bytes=[115,124,125,151],reserved_tail_policy='known fields, the creator-fee/holder-reward tail group when the allocation holds it, then an all-zero trailing allocation of any length; a truncated account or any nonzero tail is refused',migration='successful exact migration instruction plus current destination pool required',
+    quote=False,historical_execution='typed create/migrate/fee roles; legacy native-quote trades reconciled from lamport balance deltas, v2 token-quote trades verified as ordinary legs')
 
 
 def decode_pool(account):

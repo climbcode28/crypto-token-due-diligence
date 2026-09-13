@@ -34,12 +34,16 @@ attempt; it applies to whoever is running the skill from this checkout.
 - Verified EVM tokens use EVM diligence; exact Solana mints use Solana diligence. Native
   assets remain native-asset research. Address shape, ticker and brokerage listings
   alone do not verify a deployment. Never substitute testnet for mainnet.
-- Solana currently uses public RPC/explorer/API sources; custom Solana dRPC is deferred.
-  The standalone Solana transport reads `SOLANA_RPC_URL`, not the EVM endpoint.
+- Solana defaults to the public RPC/explorer/API sources and can use a personal dRPC
+  endpoint when a run authorizes paid use (`--cost-policy paid --allow-paid`): the shared
+  `DRPC_API_KEY` plus an optional credential-free `SOLANA_DRPC_URL` (default
+  `https://lb.drpc.org/solana`). `SOLANA_RPC_URL` only overrides the public root. A key
+  alone is not authorization to spend.
 - Solana v2 workflow 2.0.0 is the default after functional acceptance. The 2026-09-11 review
   found and fixed the public-endpoint failure that had kept every live run partial; see
-  `plans/solana-review-fixes-2026-09-11.md` for the live evidence. The Solana skill reads no
-  provider policy file and needs no private env. One broad start shares
+  `plans/solana-review-fixes-2026-09-11.md` for the live evidence. The Solana skill needs no
+  private env for the public tier; dRPC use reads the shared `DRPC_API_KEY`/`SOLANA_DRPC_URL`
+  from the documented env file. One broad start shares
   original receipt/deadline and 120-attempt/64-MiB grants across typed controls,
   supported pools/positions, two bounded lanes and at most two coordinator presets.
   Compose/finalize returns a frozen readable report/checklist/citations; partial work

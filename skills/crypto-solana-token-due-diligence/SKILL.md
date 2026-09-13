@@ -29,7 +29,7 @@ Direct and routed ordinary work use the same original clock: target receipt +420
 seconds, maximum receipt +600 seconds; honor shorter user deadlines. Preserve a
 router's `received_at`, `target_at`, `deadline_at`, complete question, focus and URLs.
 Stop collection at min(receipt +480, deadline −120), reserving two minutes for notes,
-validation and delivery. Lanes stop at min(receipt +240, deadline −120). Delayed
+validation and delivery. Lanes stop at min(receipt +300, deadline −120). Delayed
 routing/spawn/retries and helper/model latency consume this same wall-clock budget.
 
 One session permits at most 120 actual sends and 64 MiB response bytes, RPC concurrency
@@ -87,7 +87,7 @@ presets; raw evidence remains available for material disputes.
    two pointer prompts. Typical wall clock is one to two minutes.
 2. **Lanes:** dispatch two general-purpose subagents (the default subagent type) with the two printed pointer prompts,
    verbatim, in the same turn that `start` returns and before reading facts yourself;
-   the lane cutoff is receipt + 240 s whenever they are dispatched, so every minute
+   the lane cutoff is receipt + 300 s whenever they are dispatched, so every minute
    spent first is taken from them. Do not retype the briefs or create persistent
    agent definitions. Liquidity and project agents own only their notes,
    grants, checklists and cutoff. They cannot run RPC, source credentials, create

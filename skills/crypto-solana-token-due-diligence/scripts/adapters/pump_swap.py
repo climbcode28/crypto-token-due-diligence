@@ -10,7 +10,7 @@ PROGRAM=SWAP_PROGRAM
 GLOBAL=pda(PROGRAM,b'global_config')
 CAPABILITY=capability('pumpswap',PROGRAM,REVISION,model='fungible_token2022_lp_actual_vaults_with_separate_virtual_quote',
     dependencies=['pool','global_config','mints','vaults','lp_mint','fee_config','program_control'])
-CAPABILITY.update(version='1.3.0',allocation_bytes=[261,271,301],reserved_tail_policy='known fields, the creator-fee/holder-reward tail group when the allocation holds it, then an all-zero trailing allocation of any length; a truncated account or any nonzero tail is refused',quote=False,historical_execution='pinned create/swap/withdraw/fee roles; exact transfer reconciliation separate')
+CAPABILITY.update(version='1.4.0',allocation_bytes=[261,271,301],reserved_tail_policy='known fields, the creator-fee/holder-reward tail group when the allocation holds it, then an all-zero trailing allocation of any length; a truncated account or any nonzero tail is refused',quote=False,historical_execution='pinned create/swap/withdraw/fee roles; exact transfer reconciliation separate')
 
 
 def decode_pool(account):

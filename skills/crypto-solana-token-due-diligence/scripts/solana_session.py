@@ -13,6 +13,9 @@ from solana_common import need, target_identity
 
 SCHEMA = 1
 TRANSIENT = {"timeout", "transport_failure", "http_429", "http_502", "http_503", "http_504", "node_lag"}
+NODE_LAG_RETRIES = 3  # a load-balanced backend behind the pinned context slot is retried after waiting out the slot gap
+COLLECTION_SECONDS = 480  # collection stops this long after receipt (or 120 s before the deadline, whichever is earlier)
+LANE_SECONDS = 300  # lanes stop this long after receipt (or 120 s before the deadline); assets/release.json repeats it
 OWNERS = {"ordinary", "liquidity", "project", "final", "contingency"}
 # Public mainnet free-tier windows per method per 10 s, measured on 2026-09-11 from the
 # x-ratelimit-method-limit header of api.mainnet-beta.solana.com; also recorded in
@@ -119,8 +122,8 @@ class Session:
         metadata = {"schema_version": SCHEMA, "investigation_id": str(uuid.uuid4()), "target": target,
             "question": question, "focus": focus or [], "urls": urls or [], "scope": scope,
             "received_at": utc(received), "target_at": utc(desired), "deadline_at": utc(deadline),
-            "deadline_unix": deadline, "collection_cutoff": min(received + 480, deadline - 120),
-            "lane_cutoff": min(received + 240, deadline - 120), "synthetic": synthetic,
+            "deadline_unix": deadline, "collection_cutoff": min(received + COLLECTION_SECONDS, deadline - 120),
+            "lane_cutoff": min(received + LANE_SECONDS, deadline - 120), "synthetic": synthetic,
             "user_hard_deadline": user_hard_deadline, "max_requests": max_requests, "max_bytes": max_bytes,
             "rpc_concurrency": rpc_concurrency, "web_origin_concurrency": web_origin_concurrency,
             "method_limits": method_limits}
@@ -225,7 +228,10 @@ class Session:
             if remaining <= 0:
                 raise LimitError("deadline")
             previous = self.db.execute("SELECT status FROM attempts WHERE family=? ORDER BY id", (family,)).fetchall()
-            if previous and not (retry and len(previous) == 1 and previous[0][0] in TRANSIENT):
+            # One transient failure earns one retry; node lag earns a few paced retries, since the backend catches up.
+            eligible = bool(retry and previous) and ((len(previous) == 1 and previous[0][0] in TRANSIENT) or
+                                                     (len(previous) <= NODE_LAG_RETRIES and all(s[0] == "node_lag" for s in previous)))
+            if previous and not eligible:
                 raise LimitError("retry_ineligible")
             if retry and not previous:
                 raise LimitError("retry_without_attempt")

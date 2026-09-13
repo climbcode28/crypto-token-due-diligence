@@ -1,5 +1,5 @@
 from pathlib import Path
-import sys,tempfile,unittest,unittest.mock,time,json,copy
+import sys,os,tempfile,unittest,unittest.mock,time,json,copy
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'scripts'))
 from broad_fixture import RichRpc,Web
 import solana_session
@@ -355,6 +355,126 @@ class ImporterBoundaryTests(unittest.TestCase):
         # The newest pool read is unpinned; the pool fact keeps the earlier pinned read instead of becoming a coverage gap.
         after=json.loads((root/'draft/facts.json').read_text());self.assertTrue(next(x for x in after['facts'] if x['evidence_id']==pid)['usable'])
         m=json.loads((root/'draft/manifest.json').read_text());self.assertTrue([s for s in m['samples'] if s['observation_id'].startswith('late_') and s['status']=='partial'])
+
+    def test_node_lag_is_retried_a_few_times_before_a_read_fails(self):
+        from solana_transport import NODE_LAG_CODES
+        root,target,opts=self.setup_run();original=RichRpc.__call__;lagged={'n':0}
+        def lagging(rpc,request):
+            if request['method']=='getEpochInfo' and lagged['n']<2:
+                lagged['n']+=1;return {'jsonrpc':'2.0','id':request['id'],'error':{'code':sorted(NODE_LAG_CODES)[0],'message':'Minimum context slot has not been reached'}}
+            return original(rpc,request)
+        import solana_collect_v2;sleeps=[]
+        with unittest.mock.patch.object(RichRpc,'__call__',lagging),unittest.mock.patch.object(solana_collect_v2,'SLEEP',sleeps.append):result=start(root,target,**opts)
+        self.assertFalse(result['diagnostics'],result['diagnostics'])
+        import sqlite3;rows=[r for r in sqlite3.connect(root/'session.sqlite').execute("select request_id,status from attempts where family='baseline_epoch' order by id")]
+        self.assertEqual([r[1] for r in rows],['node_lag','node_lag','ok']);self.assertEqual([r[0][-1] for r in rows],['0','1','2'])
+        self.assertEqual([s for s in sleeps if s==2.0],[2.0,2.0])  # an error naming no backend slot waits the default before each retry
+
+    def test_node_lag_stops_at_the_retry_budget(self):
+        from solana_transport import NODE_LAG_CODES
+        root,target,opts=self.setup_run();original=RichRpc.__call__
+        def always_lag(rpc,request):
+            if request['method']=='getEpochInfo':return {'jsonrpc':'2.0','id':request['id'],'error':{'code':sorted(NODE_LAG_CODES)[0],'message':'Minimum context slot has not been reached'}}
+            return original(rpc,request)
+        import solana_collect_v2
+        with unittest.mock.patch.object(RichRpc,'__call__',always_lag),unittest.mock.patch.object(solana_collect_v2,'SLEEP',lambda s:None):start(root,target,**opts)
+        import sqlite3;rows=[r[0] for r in sqlite3.connect(root/'session.sqlite').execute("select status from attempts where family='baseline_epoch' order by id")]
+        self.assertEqual(rows,['node_lag']*(solana_collect_v2.NODE_LAG_RETRIES+1))  # capped at the retry budget, never an unbounded loop
+        self.assertFalse((root/'read-intents'/'baseline_epoch_4.json').exists())
+
+    def test_a_transient_failure_before_node_lag_does_not_extend_the_retry_budget(self):
+        import urllib.error,io
+        from solana_transport import NODE_LAG_CODES
+        root,target,opts=self.setup_run();original=RichRpc.__call__;seen={'n':0}
+        def transient_then_lag(rpc,request):
+            if request['method']=='getEpochInfo':
+                seen['n']+=1
+                if seen['n']==1:raise urllib.error.HTTPError('u',503,'busy',{},io.BytesIO(b''))
+                return {'jsonrpc':'2.0','id':request['id'],'error':{'code':sorted(NODE_LAG_CODES)[0],'message':'Minimum context slot has not been reached'}}
+            return original(rpc,request)
+        import solana_collect_v2
+        with unittest.mock.patch.object(RichRpc,'__call__',transient_then_lag),unittest.mock.patch.object(solana_collect_v2,'SLEEP',lambda s:None):result=start(root,target,**opts)
+        import sqlite3;rows=[r[0] for r in sqlite3.connect(root/'session.sqlite').execute("select status from attempts where family='baseline_epoch' order by id")]
+        self.assertEqual(rows,['http_503','node_lag'])  # one transient retry only; node lag after it does not buy more attempts
+        self.assertFalse((root/'read-intents'/'baseline_epoch_2.json').exists())  # no ineligible third attempt/intent
+        self.assertFalse([d for d in result['diagnostics'] if d.get('category')=='unsent_reads'],result['diagnostics'])
+
+    def test_node_lag_wait_is_the_slot_gap_the_error_names(self):
+        from solana_collect_v2 import lag_delay
+        request={'method':'getMultipleAccounts','params':[['m'],{'commitment':'finalized','minContextSlot':1000}]}
+        lag=lambda slot:{'status':'node_lag','response':{'error':{'code':-32016,'message':'Minimum context slot has not been reached','data':{'contextSlot':slot}}}}
+        self.assertEqual(lag_delay(request,lag(970)),13.0)  # 30 slots behind at 0.4 s each, plus a second
+        self.assertEqual(lag_delay(request,lag(10)),20.0)  # bounded
+        self.assertEqual(lag_delay(request,lag(1000)),2.0)  # not behind the floor (another lag code): the default
+        self.assertEqual(lag_delay(request,{'status':'node_lag','response':{'error':{'code':-32004,'message':'Block not available'}}}),2.0)
+        self.assertEqual(lag_delay({'method':'getEpochInfo','params':[{'commitment':'finalized'}]},lag(1)),2.0)  # no floor pinned
+
+    def test_account_census_methods_get_a_longer_request_timeout(self):
+        from solana_collect_v2 import request_timeout
+        self.assertEqual((request_timeout('getTokenLargestAccounts'),request_timeout('getProgramAccounts'),request_timeout('getAccountInfo'),request_timeout('getTransaction')),(20,20,5,5))
+
+    def test_candidates_rank_within_one_indexer_scale_at_a_time(self):
+        import solana_broad_collect as module
+        docs=[{'source':'geckoterminal','candidates':[{'pool':'GT','liquidity_usd':'9000000'},{'pool':'D2','liquidity_usd':'5'}]},
+              {'source':'dexscreener','candidates':[{'pool':'D1','liquidity_usd':'100'},{'pool':'D2','liquidity_usd':'200'}]}]
+        with unittest.mock.patch.object(module,'market_documents',lambda root,target:docs):rows=module.candidates('.',{'mint':'x'})
+        # Primary-listed pools first by the primary's figure (D2 200 over D1 100); the alternate-only pool's larger figure is a different scale and ranks after.
+        self.assertEqual([(r['pool'],r['liquidity_usd']) for r in rows],[('D2','200'),('D1','100')])
+        docs[1]['candidates']=[{'pool':'D1','liquidity_usd':'100'}]
+        with unittest.mock.patch.object(module,'market_documents',lambda root,target:docs):self.assertEqual([r['pool'] for r in module.candidates('.',{'mint':'x'})],['D1','GT'])
+        # When every shared pool agrees within a factor of two the indexers report one scale, and an alternate-only pool
+        # larger than the primary's second pool ranks by its figure instead of being lost (the DLMM diversity run).
+        docs=[{'source':'geckoterminal','candidates':[{'pool':'Z','liquidity_usd':'4599051'},{'pool':'GT','liquidity_usd':'3698062'},{'pool':'A','liquidity_usd':'1314361'}]},
+              {'source':'dexscreener','candidates':[{'pool':'A','liquidity_usd':'1314878'},{'pool':'Z','liquidity_usd':'4614790'},{'pool':'D','liquidity_usd':'1405944'}]}]
+        with unittest.mock.patch.object(module,'market_documents',lambda root,target:docs):self.assertEqual([(r['pool'],r['liquidity_usd']) for r in module.candidates('.',{'mint':'x'})],[('Z','4614790'),('GT','3698062')])
+        docs[0]['candidates'][0]['liquidity_usd']='45990510'  # one shared pool ten times apart: different scales again
+        with unittest.mock.patch.object(module,'market_documents',lambda root,target:docs):self.assertEqual([r['pool'] for r in module.candidates('.',{'mint':'x'})],['Z','D'])
+
+    def test_run_keeps_its_provider_and_degraded_reads_are_diagnosed(self):
+        from solana_broad_collect import run_provider,check_config,provider_diagnostics,collect
+        root,target,opts=self.setup_run();start(root,target,**opts)
+        recorded=json.loads((root/'provider.json').read_text());self.assertEqual((recorded['provider'],bool(recorded['namespace'])),('public',True));self.assertNotIn('synthetic.invalid',json.dumps(recorded))
+        with self.assertRaisesRegex(ValueError,'started on the public provider'):
+            collect(root,{'id':'followup','kind':'creator_history','parameters':{'keys':[target['mint']]}},{'url':'https://synthetic.invalid','headers':{'Drpc-Key':'x'},'provider':'drpc'},factory=RichRpc)
+        with self.assertRaisesRegex(ValueError,'started on the public provider'):run_provider(root,{'url':'https://synthetic.invalid','headers':{},'provider':'drpc'},RichRpc)
+        from solana_transport import HttpTransport
+        with self.assertRaisesRegex(ValueError,'started on the public provider'):run_provider(root,{'url':'https://api.mainnet-beta.solana.com','headers':{}},HttpTransport)  # same provider, a real endpoint namespace != the recorded one
+        self.assertEqual(run_provider(root,opts['config'],RichRpc),'public')
+        # A live start accepts only the preflighted shapes: the bare public root, or a dRPC network URL with its key header.
+        ready={'status':'ready'}
+        self.assertEqual(check_config({'url':'https://api.mainnet-beta.solana.com','headers':{},'preflight':ready,'provider':'public'}),'public')
+        self.assertEqual(check_config({'url':'https://lb.drpc.org/solana','headers':{'Drpc-Key':'k'},'preflight':ready,'provider':'drpc'}),'drpc')
+        for bad in ({'url':'https://api.mainnet-beta.solana.com','headers':{},'provider':'public'},{'url':'https://lb.drpc.org/solana','headers':{},'preflight':ready,'provider':'drpc'},
+                    {'url':'https://api.mainnet-beta.solana.com/?x=1','headers':{},'preflight':ready,'provider':'public'},{'url':'https://lb.drpc.org/solana','headers':{'Drpc-Key':'k'},'preflight':ready,'provider':'public'}):
+            with self.assertRaises(ValueError):check_config(bad)
+        self.assertEqual(check_config({'url':'https://synthetic.invalid','headers':{}},True),'public')
+        facts_path=root/'draft/facts.json';f=json.loads(facts_path.read_text());f['missing_reads']=[{'id':'baseline_mint_0','reason':'context below requested floor'},{'id':'other_read'}]
+        facts_path.write_text(json.dumps(f));rows=[r for r in provider_diagnostics(root) if r['category']=='degraded_reads']
+        self.assertEqual((len(rows),rows[0]['count'],rows[0]['reads']),(1,1,[{'read':'baseline_mint_0','reason':'context below requested floor'}]))
+
+    def test_release_lane_seconds_match_the_session_constant(self):
+        release=json.loads((Path(__file__).resolve().parents[1]/'assets/release.json').read_text())
+        budget=next(v for v in release.values() if isinstance(v,dict) and 'lane_seconds' in v)
+        self.assertEqual((budget['lane_seconds'],budget['collection_seconds']),(solana_session.LANE_SECONDS,solana_session.COLLECTION_SECONDS))
+
+    def test_capture_accepts_the_runs_paid_flags(self):
+        import subprocess,sys
+        script=Path(__file__).resolve().parents[1]/'scripts/solana_broad_collect.py'
+        with tempfile.TemporaryDirectory() as d:
+            for policy in ('free','paid'):
+                out=subprocess.run([sys.executable,str(script),'capture',d+'/missing','--owner','liquidity','--allow-network','--cost-policy',policy,'--url','https://example.invalid/x'],capture_output=True,text=True,env={'PYTHONDONTWRITEBYTECODE':'1','PATH':os.environ.get('PATH','')})
+                message=json.loads(out.stdout)['errors'][0]['message'];self.assertNotIn('cost-policy',message,policy)  # refused for the missing run, never for the flag
+            out=subprocess.run([sys.executable,str(script),'capture',d+'/missing','--owner','liquidity','--allow-network','--url','https://example.invalid/x'],capture_output=True,text=True,env={'PYTHONDONTWRITEBYTECODE':'1','PATH':os.environ.get('PATH','')})
+            self.assertIn('cost-policy',json.loads(out.stdout)['errors'][0]['message'])
+
+    def test_unusable_fact_finding_names_the_degraded_reads(self):
+        from solana_pipeline_note import findings
+        fact={'id':'fact-auto-controls','evidence_id':'auto-controls','operation':'controls','category':'controls','subject':{'genesis_hash':'g','kind':'mint','address':'m'},
+              'usable':False,'status':'observed','captured_at':'2026-09-12T00:00:00+00:00','sample_ids':['s'],'dependencies':['auto-controls','baseline_mint_0','baseline_header_1_0'],
+              'input_digests':{},'data':{},'summary':'x','limits':[],'attention':[]}
+        rows=findings({'facts':[fact],'missing_reads':[{'id':'baseline_header_1_0','status':'ok','reason':'critical recheck unavailable'},{'id':'other_0','status':'timeout','reason':None}]})
+        gap=next(r for r in rows if r['id']=='pipeline-auto-controls');self.assertEqual(gap['claim'],'coverage_gap');self.assertIn('baseline_header_1_0: critical recheck unavailable',gap['limitations'])
+        self.assertFalse(any('other_0' in l for l in gap['limitations']))
 
     def test_leads_follow_discovery_liquidity_order(self):
         from solana_broad_collect import ordered_leads

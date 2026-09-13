@@ -51,7 +51,7 @@ identity. Replans need a recorded trigger and cannot enlarge authorized ceilings
 or override a hard deadline. Provider preflight is offline and read-only.
 
 Collection stops by `deadline_at - 120 seconds` or the selected shorter window.
-Lane cutoff is the earliest of received time +240 seconds, collection cutoff and
+Lane cutoff is the earliest of received time +300 seconds, collection cutoff and
 user limit. Late starts get the remaining time, never a fresh window. The
 [work plan template](../assets/work-plan.template.json) lists the eleven surfaces.
 Work states are `pending`, `running`, `done`, `blocked`; a task's blocked state

@@ -8,7 +8,7 @@ from solana_pipeline_note import build_note
 from solana_profile import (PROFILE,DIMENSIONS,AXES,Evidence,ProfileError,regular,strict_json,check,
     validate_report,findings as validate_findings,coverage as validate_coverage,decision as validate_decision)
 
-VERSION='1.1.0'
+VERSION='1.3.0'
 OWNERS=('coordinator','liquidity','project')
 CHECKLISTS={'liquidity':('discovery','custody','activity','exits','assigned_asks'),
  'project':('identity','delivery','audit_scope','economics','creator_history','contrary_evidence','assigned_asks')}

@@ -40,9 +40,10 @@ class GuidanceTests(unittest.TestCase):
         handoff=REPO/'HANDOFF.md'
         if not handoff.exists():self.skipTest('installed copy without repository handoff')
         text=handoff.read_text()
-        for sentence in ('The standalone Solana transport reads `SOLANA_RPC_URL`, not the EVM endpoint.','reads no\n  provider policy file'):
+        for sentence in ('`SOLANA_RPC_URL` only overrides the public root.','needs no\n  private env for the public tier','can use a personal dRPC','A key\n  alone is not authorization to spend.'):
             self.assertIn(sentence,text)
         self.assertNotIn('four folders under',text)
+        self.assertNotIn('custom Solana dRPC is deferred',text)  # the policy now permits it
         link=REPO/'.agents/skills/crypto-evm-token-due-diligence'
         if link.is_symlink():self.assertEqual(link.resolve(),REPO/'skills/crypto-evm-token-due-diligence')
         skill=(S/'SKILL.md').read_text()

@@ -133,6 +133,43 @@ class RouteTests(unittest.TestCase):
         for data,keys in ((tag('buy')+struct.pack('<QQ',2000,1)+b'\x02',accounts[:23]),(tag('buy')+struct.pack('<QQ',2000,1),accounts[:22]),(tag('sell')+struct.pack('<QQ',1000,1)[:15],accounts)):
             with self.assertRaises(ValueError):swap_decode(pump.PROGRAM,data,keys)
 
+    def test_router_custody_leg_verifies_with_the_beneficial_wallet_as_seller(self):
+        target,a,p,b=fixture(custody=True);e=decode_transaction(target,p,b);self.assertEqual(e['gaps'],[])
+        row=verify_sales(target,[{'pool':a['pool'],'execution':e}])['receipts'][0]
+        self.assertEqual((row['status'],row['seller'],row['spending_owner'],row['input_atomic'],row['output_atomic'],row['counter_asset_realization']),
+            ('verified_sale',a['owner'],a['router'],'1000','500','forwarded_to_beneficial_owner'),row['gaps'])
+        self.assertEqual((row['custody']['input_source'],row['custody']['output_destination'],row['custody']['router_authority']),(a['user_source'],a['user_destination'],a['router']))
+        # The wallet behind the custody sides must have signed: a program-owned account or another router layer is not a wallet's sale.
+        e['signers']=[a['payer']];row=verify_sales(target,[{'pool':a['pool'],'execution':e}])['receipts'][0];self.assertEqual(row['status'],'unverified');self.assertIn('did not sign',row['gaps'][0])
+        # The trader owns and signed for the leg accounts (a router only pre-funds the exact amount): the trader stays the
+        # seller, not the far-end account, and the funding accounts are recorded under custody. (The live PumpSwap shape.)
+        target,a,p2,b=fixture(custody=True);e=decode_transaction(target,p2,b);e['signers']=e['signers']+[a['router']]  # the owner of the leg's own accounts now signs
+        row=verify_sales(target,[{'pool':a['pool'],'execution':e}])['receipts'][0]
+        self.assertEqual((row['status'],row['seller'],row['spending_owner']),('verified_sale',a['router'],None),row['gaps'])
+        self.assertEqual((row['custody']['input_source'],row['custody']['output_destination']),(a['user_source'],a['user_destination']))
+        # Proceeds forwarded to another wallet: the two custody sides no longer belong to one wallet.
+        target,a,p,b=fixture(custody=True);tx=p['response']['result'];keys=tx['transaction']['message']['accountKeys']
+        for r in tx['meta']['preTokenBalances']+tx['meta']['postTokenBalances']:
+            if r['accountIndex']==keys.index(a['user_destination']):r['owner']=key(23)
+        row=verify_sales(target,[{'pool':a['pool'],'execution':decode_transaction(target,p,b)}])['receipts'][0];self.assertEqual(row['status'],'unverified');self.assertIn('one distinct wallet',row['gaps'][0])
+        # Only part of the output forwarded: not a custody leg, and the stray transfer touching the leg's output account refuses it.
+        target,a,p,b=fixture(custody=True);tx=p['response']['result'];msg=tx['transaction']['message'];forward=msg['instructions'][a['swap_index']+1]
+        forward['data']=b58encode(struct.pack('<BQB',12,400,6))
+        row=verify_sales(target,[{'pool':a['pool'],'execution':decode_transaction(target,p,b)}])['receipts'][0];self.assertEqual(row['status'],'unverified');self.assertIn('touch sale accounts',row['gaps'][0])
+        # A plain sell is unchanged: no custody, the owner is both spending and beneficial.
+        target,a,p,b=fixture();row=verify_sales(target,[{'pool':a['pool'],'execution':decode_transaction(target,p,b)}])['receipts'][0]
+        self.assertEqual((row['status'],row['seller'],row['spending_owner'],row['custody']),('verified_sale',a['owner'],None,None))
+        # Custody in, then the proceeds converted onward into a second decoded leg: the wallet that supplied the tokens is the seller.
+        target,a,p,b=fixture(custody=True);e=decode_transaction(target,p,b);forward=next(x for x in e['effects'] if x['kind']=='transfer' and x['participants']['source']==a['destination'])
+        vault2=key(81);forward['participants']['destination']=vault2;swap2={**next(x for x in e['effects'] if x['kind']=='swap_instruction'),'id':'swap2','pool':key(80),'input_account':a['destination'],'output_account':key(82),'vaults':[vault2,key(83)],'mints':[a['output_mint'],key(84)]}
+        e['effects'].append(swap2);e['post_token_balances'].pop(a['user_destination'],None);e['pre_token_balances'].pop(a['user_destination'],None)
+        row=verify_sales(target,[{'pool':a['pool'],'execution':e}])['receipts'][0]
+        self.assertEqual((row['status'],row['seller'],row['spending_owner'],row['counter_asset_realization'],row['custody']['output_destination']),('verified_sale',a['owner'],a['router'],'converted_within_route',None),row['gaps'])
+        # Custody in with the proceeds kept by the router is not the wallet's sale.
+        target,a,p,b=fixture(custody=True);e=decode_transaction(target,p,b);e['effects']=[x for x in e['effects'] if not (x['kind']=='transfer' and x['participants']['source']==a['destination'])]
+        e['post_token_balances'][a['destination']]['amount_atomic']='500';e['post_token_balances'][a['user_destination']]['amount_atomic']='0'
+        row=verify_sales(target,[{'pool':a['pool'],'execution':e}])['receipts'][0];self.assertEqual(row['status'],'unverified');self.assertIn('without a wallet or hop output',row['gaps'][0])
+
     def test_fee_inclusive_buy_verifies_leg_plus_fees_and_a_rebate_is_refused(self):
         from solana_transactions import verify_rebuys
         target,a,p,b=fixture(buy=True);e=decode_transaction(target,p,b);swap=next(x for x in e['effects'] if x['kind']=='swap_instruction')

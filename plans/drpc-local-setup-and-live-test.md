@@ -4,7 +4,9 @@
 > The private configuration now exists, bounded paid read-only research is authorized,
 > and a four-request authenticated collection succeeded. The no-flags availability
 > example and pending-approval instructions below describe the earlier setup stage;
-> do not use them as the current invocation or authorization policy.
+> do not use them as the current invocation or authorization policy. The EVM RPC variable
+> was later renamed `CRYPTO_RPC_URL` → `ROBINHOOD_DRPC_URL` (and Solana added
+> `SOLANA_DRPC_URL`); the old name below is the historical value.
 
 Prepared 2026-09-06 from clean `main` at `6d8ea99`. **Draft; no live RPC or paid use
 is authorized.** The user selected Robinhood Chain mainnet. Private environment setup

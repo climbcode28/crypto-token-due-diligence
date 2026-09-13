@@ -583,7 +583,7 @@ class Pipeline:
                 served = None
             return {"stage": stage, "category": "chain_mismatch", "rpc_chain_id": served, "requested_chain_id": self.target["chain_id"],
                     "message": f"The RPC endpoint answered eth_chainId with chain {served}, not the requested chain {self.target['chain_id']}.",
-                    "next_step": f"Point the RPC URL variable (CRYPTO_RPC_URL or --rpc-url-env) at an endpoint for chain {self.target['chain_id']} "
+                    "next_step": f"Point the RPC URL variable (ROBINHOOD_DRPC_URL or --rpc-url-env) at an endpoint for chain {self.target['chain_id']} "
                                  "and re-run the identical start command; this run directory accepts the restart."}
         category = acquisition.get("failure_category") or row.get("observation_status") or "unknown"
         return {"stage": stage, "category": category, "http_status": acquisition.get("http_status"), "rpc_error_code": acquisition.get("rpc_error_code"),

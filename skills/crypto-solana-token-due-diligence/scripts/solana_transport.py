@@ -163,6 +163,15 @@ def is_drpc_host(hostname):
     hostname = (hostname or "").rstrip(".")
     return any(hostname == h or hostname.endswith("." + h) for h in ("drpc.org", "drpc.live"))
 
+def credential_free_network_url(parts):
+    """The documented dRPC endpoint shapes without a key: /<network> or ?network=<network>; a key-bearing path
+    segment or dkey parameter is refused so a credential never reaches a URL, a ledger or a bundle."""
+    query = urllib.parse.parse_qs(parts.query, keep_blank_values=True)
+    network_path = re.fullmatch(r"/[a-z0-9-]+/?", parts.path) is not None and not parts.query
+    network_query = (parts.path in ("", "/") and set(query) == {"network"} and len(query["network"]) == 1
+                     and re.fullmatch(r"[a-z0-9-]+", query["network"][0]) is not None)
+    return network_path or network_query
+
 def configuration_settings(args):
     """Validate local URL/auth formats only; this does not grant execution permission."""
     url = os.environ.get(args.rpc_url_env, "")
@@ -173,11 +182,7 @@ def configuration_settings(args):
     if drpc or args.provider == "drpc":
         # Accept only credential-free documented endpoint shapes.
         need(hostname in ("lb.drpc.org", "lb.drpc.live"), "unsupported dRPC host")
-        query = urllib.parse.parse_qs(parts.query, keep_blank_values=True)
-        network_path = re.fullmatch(r"/[a-z0-9-]+/?", parts.path)
-        network_query = (parts.path in ("", "/") and set(query) == {"network"} and len(query["network"]) == 1
-                         and re.fullmatch(r"[a-z0-9-]+", query["network"][0]))
-        need((network_path and not parts.query) or network_query, "use a credential-free dRPC network URL")
+        need(credential_free_network_url(parts), "use a credential-free dRPC network URL")
         key = os.environ.get("DRPC_API_KEY", "")
         need(bool(key.strip()), "DRPC_API_KEY is not configured")
         need(all(32 <= ord(c) <= 126 for c in key), "invalid authentication header value")
@@ -229,7 +234,10 @@ def provider_availability(args):
         else:
             configuration_settings(args)
             blockers = invocation_blockers(args, drpc)
-    except (ValueError, TypeError):
+    except ValueError as exc:
+        # A key inside the URL is the one misconfiguration worth naming: the fix is to move it to DRPC_API_KEY.
+        reason = "rpc_url_carries_credential" if "credential-free" in str(exc) else "rpc_configuration_invalid"
+    except TypeError:
         reason = "rpc_configuration_invalid"
     # Configuration absence can select alternatives. Omitted flags first require the
     # agent to consult trusted context; Python cannot infer approval from a saved key.
@@ -286,7 +294,7 @@ def session_request(session, transport, request, *, family=None, owner="ordinary
             if strict and status == "ok":
                 status = validate_response(request, response)["status"]
             if isinstance(response, dict) and isinstance(response.get("error"), dict) and response["error"].get("code") in NODE_LAG_CODES:
-                status = "node_lag"  # Transient: the single retry applies after a short delay.
+                status = "node_lag"  # Transient: the collector paces a few retries, each after the slot-gap wait.
     except urllib.error.HTTPError as exc:
         status = "http_" + str(exc.code)
         if exc.code in (429, 503):

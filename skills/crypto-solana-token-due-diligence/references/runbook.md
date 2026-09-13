@@ -7,11 +7,30 @@ directory, for example `research/<mint>-<utc>`. The emitted lane context carries
 absolute paths. Replace example values with the exact request and mint. Never paste
 credentials into a command or artifact.
 
-Solana uses credential-free public RPC: the default `https://api.mainnet-beta.solana.com`
-or a public HTTPS root in `SOLANA_RPC_URL`. No policy file, private env, key or provider
-check is involved; the helper refuses custom/dRPC endpoints and runs its zero-request
-local preflight inside `start`. Host network permission is still enforced by the host;
-a flag does not bypass a denial.
+Solana defaults to the credential-free public RPC root `https://api.mainnet-beta.solana.com`
+(or a public HTTPS root in `SOLANA_RPC_URL`). That tier refuses `getTokenLargestAccounts`,
+throttles the bounded holder census and paces every method in 10-second windows, so
+holder concentration is usually a gap on it. A configured dRPC endpoint lifts those
+limits: with `DRPC_API_KEY` in the documented user env file (source
+`"$HOME/.config/crypto-research/env"` in the same shell invocation as the command, never
+print it) and optionally `SOLANA_DRPC_URL` (a credential-free `https://lb.drpc.org/solana`
+network URL, the default when unset), `--provider auto` (the default) uses dRPC when the
+invocation authorizes paid use
+(`--cost-policy paid --allow-paid`) and otherwise falls back to the public root, recording
+`provider_fallback` in `diagnostics` only when `SOLANA_DRPC_URL` is set (a key alone, which
+may be the EVM skill's, records nothing); `--provider drpc` requires it and `--provider public`
+never uses it. `SOLANA_RPC_URL` only overrides the public root. The key goes only in
+`DRPC_API_KEY` (sent as a `Drpc-Key` header); a URL that carries it (a `dkey` parameter or a
+key path segment) is refused with `rpc_url_carries_credential`. A keyed endpoint drops the
+public tier's per-method windows but keeps the default 40-sends-per-10-seconds pacing; it
+answers the account census methods slowly (`getTokenLargestAccounts` and
+`getProgramAccounts` get a 20-second request timeout, other reads 5 seconds), and its load
+balancer may answer a read behind the pinned context slot. Such node lag is retried up to
+three times after waiting out the slot gap the error names (about 0.4 s per slot, at most 20
+s per wait). A run records its provider in `provider.json` and every later `collect` must
+use the same provider flags; a mismatch is refused rather than mixing tiers. The helper's
+zero-request local preflight runs inside `start`; host network permission is still enforced
+by the host, and a flag does not bypass a denial.
 
 ## 1. Start once with original timing
 
@@ -19,7 +38,7 @@ Record the actual original request receipt time, the complete question, focus, e
 supplied URL and an absolute deadline. `--deadline-at` is receipt + 600 seconds (the
 maximum) unless the user set a shorter explicit deadline; aim to deliver by receipt +
 420 seconds (the ordinary target). Collection cutoff is min(receipt + 480, deadline −
-120); lanes stop at min(receipt + 240, deadline − 120), counted from receipt, not from
+120); lanes stop at min(receipt + 300, deadline − 120), counted from receipt, not from
 their dispatch. Routing delay counts. A new request creates a new run; continuation of an active
 request keeps the existing run.
 
@@ -30,6 +49,12 @@ python3 "$S/scripts/solana_broad_collect.py" start "$RUN" \
   --focus 'Explicit requested emphasis' --url 'https://public.example/requested-source' \
   --allow-network --cost-policy free
 ```
+
+With dRPC configured, source the user env file in the same invocation and add
+`--cost-policy paid --allow-paid` (the key is read from the environment, never from an
+argument); the same flags apply to every `collect` in that run. `capture` is web-only and
+keeps `--cost-policy free` (the lane briefs print it that way); the run's paid flags are
+accepted there too.
 
 `--mint`, `--question`, `--received-at` and `--deadline-at` are required; `--focus` and
 `--url` repeat; `--genesis-hash` defaults to mainnet; `--rpc-url-env` names the public
@@ -192,6 +217,7 @@ classifies its probes the same way (skipping signatures already sampled or class
 a probe with any receipt status other than `ok`, such as a budget refusal, timeout,
 provider error or empty result, keeps that status in `receipt-classification.json` and a
 later, differently named preset may probe it again) and can add up to four more
-receipts, which the sale and rebuy facts verify alongside start's (at most ten). Only
+receipts, which the sale and rebuy facts verify alongside start's (at most ten); a pump.fun
+curve is sampled like a pool and its trades verify with a native or token quote. Only
 supported historical swap effects with exact pool/mint/owner and balance reconciliation
 become sample sales. Empty/short history is not archive coverage or proof of no selling.

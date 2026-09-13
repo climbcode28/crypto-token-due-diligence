@@ -149,7 +149,7 @@ needed blocks/receipts. Narrow large windows first. A count reaching `--max-logs
 partial coverage. Errors/unavailable history never become empty results. A count below
 the threshold cannot prove the provider did not silently truncate results.
 
-Set `CRYPTO_RPC_URL` securely in the execution environment; never put credentials in
+Set `ROBINHOOD_DRPC_URL` securely in the execution environment; never put credentials in
 plans, CLI arguments, saved URLs or notes. Use a nonsensitive endpoint label. This
 command is appropriate only for an endpoint verified to have no paid usage:
 
@@ -219,7 +219,7 @@ Paid RPC execution requires current or standing user authorization covering that
 A configured key, research request or suggested trial budget is not approval. Honor
 existing permission without asking again; purchases, top-ups and plan changes need
 their own explicit approval. Within authorized network/provider/budget scope, obtain the exact network's credential-free HTTPS endpoint
-from current official configuration, set `CRYPTO_RPC_URL` and `DRPC_API_KEY` securely,
+from current official configuration, set `ROBINHOOD_DRPC_URL` and `DRPC_API_KEY` securely,
 and use `--provider drpc --allow-network --cost-policy paid --allow-paid --max-requests N`.
 A request-count cap is mandatory for bounded paid collection; it is not a dollar cap.
 

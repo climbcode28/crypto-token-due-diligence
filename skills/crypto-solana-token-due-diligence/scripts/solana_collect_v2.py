@@ -6,14 +6,29 @@ from pathlib import Path
 import time
 
 from solana_common import need, sha, target_identity, write_new, TOKEN_PROGRAM
-from solana_session import Session, TRANSIENT, encoded, label
+from solana_session import Session, TRANSIENT, NODE_LAG_RETRIES, encoded, label
 from solana_transport import HttpTransport, session_request
 from solana_wire import validate_response, consistency, STATE
 from solana_presets import read, validate_plan, account_batches, mint_baseline, holding_sample, holder_scan
 from solana_cache import ObservationCache
 
 MAX_WAIT_SECONDS = 30  # Longest wait for one read's provider window/backoff; remaining time bounds it too.
+SLOT_SECONDS = 0.4  # mainnet slot time; a lagging backend closes its gap to a pinned slot at about this rate
+NODE_LAG_WAIT_SECONDS = 20.0  # longest single wait for a backend to reach the pinned context slot
 SLEEP = time.sleep
+
+
+def lag_delay(request, packet):
+    """Seconds before retrying a read a lagging backend refused: the error names the backend's slot, so the wait is
+    the slot gap to the request's pinned floor (bounded), and a default when no slot is named."""
+    params = request.get("params") or []
+    settings = next((x for x in params[:2] if isinstance(x, dict)), {})
+    floor = settings.get("minContextSlot")
+    data = (((packet.get("response") or {}).get("error") or {}) if isinstance(packet.get("response"), dict) else {}).get("data")
+    slot = data.get("contextSlot") if isinstance(data, dict) else None
+    if isinstance(floor, int) and isinstance(slot, int) and slot < floor:
+        return min(NODE_LAG_WAIT_SECONDS, (floor - slot) * SLOT_SECONDS + 1.0)
+    return 2.0
 
 
 def block_params(slot):
@@ -33,13 +48,27 @@ def _packets(session, sample):
     return rows
 
 
+REQUEST_TIMEOUTS = {"getTokenLargestAccounts": 20, "getProgramAccounts": 20}  # account census methods; a keyed endpoint answers them slowly
+
+
+def request_timeout(method):
+    """Seconds one request may take: five for ordinary reads, longer for the two account census methods."""
+    return REQUEST_TIMEOUTS.get(method, 5)
+
+
 def execute(session_root, config, sample, row, owner="ordinary", factory=HttpTransport):
-    """Resume an explicitly named capture, or send at most its one transient retry."""
+    """Resume an explicitly named capture, or send its paced retries: one for an ordinary transient failure, a few for node lag (each after the slot-gap wait), and one for a final-owner recheck."""
     session = Session(session_root)
     try:
-        transport = factory(config["url"], config.get("headers", {}), timeout=5, max_bytes=1_000_000)
-        family = sample+"_"+row["name"]
-        for index in range(2):
+        transport = factory(config["url"], config.get("headers", {}), timeout=request_timeout(row["method"]), max_bytes=1_000_000)
+        family = sample+"_"+row["name"];statuses = [];delay = 1.0
+        # A final-owner recheck gets the single paced retry ensure_final_reserve budgets for it; ordinary reads may
+        # take the full node-lag retry count, but only while every failure so far was node lag (matching Session.acquire).
+        cap = 2 if owner == "final" else NODE_LAG_RETRIES+1
+        for index in range(NODE_LAG_RETRIES+1):
+            limit = cap if statuses and all(s == "node_lag" for s in statuses) else 2
+            if index >= limit:
+                break
             request = {"jsonrpc": "2.0", "id": family+"_"+str(index), "method": row["method"], "params": row["params"]}
             previous = next((r for r in session.observations() if r["request_id"] == request["id"]), None)
             if previous and previous["response"]:
@@ -59,11 +88,15 @@ def execute(session_root, config, sample, row, owner="ordinary", factory=HttpTra
                     need(json.loads(path.read_text()) == intent, "read intent changed")
                 else:
                     write_new(path, intent)
-                if index == 1:
-                    SLEEP(min(1, session.remaining_seconds(owner)))  # The single transient retry is never immediate.
-                packet = _send(session, transport, request, family=family, owner=owner, retry=index == 1)
+                if index >= 1:
+                    SLEEP(max(0.0, min(delay, session.remaining_seconds(owner))))  # A transient retry is never immediate.
+                packet = _send(session, transport, request, family=family, owner=owner, retry=index >= 1)
             if packet["status"] not in TRANSIENT:
                 return packet
+            # A load-balanced backend behind the pinned context slot is retried a few times after waiting out the
+            # slot gap the error names; other transient failures get the single paced retry (see cap/limit above).
+            statuses.append(packet["status"])
+            delay = lag_delay(request, packet) if packet["status"] == "node_lag" else 1.0
         return packet
     finally:
         session.close()

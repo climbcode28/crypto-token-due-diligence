@@ -6,7 +6,7 @@ from types import SimpleNamespace
 from concurrent.futures import ThreadPoolExecutor
 from solana_common import need,sha,pubkey
 from solana_session import Session,utc,label
-from solana_transport import HttpTransport,provider_availability,transport_settings,is_drpc_host,validate_endpoint
+from solana_transport import HttpTransport,provider_availability,transport_settings,is_drpc_host,validate_endpoint,credential_free_network_url
 from solana_collect_v2 import collect as collect_sample,execute,queue
 from solana_presets import mint_baseline,account_batches,read,settings,validate_plan
 from solana_web_capture import register_urls,capture as capture_sources,clean_url
@@ -16,25 +16,47 @@ from solana_facts import encoded,atomic,build,compact
 from solana_profile import regular,strict_json,PROFILE,DIMENSIONS,Evidence,validate_report
 from solana_compose import CHECKLISTS,empty_coverage,expand_finding,note_header,validate_imports,ComposeError,preflight
 
-VERSION='1.2.0'
+VERSION='1.3.2'
 ASSETS=Path(__file__).resolve().parents[1]/'assets'
 STAGES=('identity_discovery','related_accounts_controllers','pool_transaction_quote_dependencies','final_consistency_checks')
 
 
-def public_config(*,allow_network,cost_policy,rpc_url_env='SOLANA_RPC_URL'):
-    # No custom dRPC configuration in this release. Existing EVM credentials are irrelevant.
-    need(allow_network and cost_policy=='free','Public collection needs explicit --allow-network --cost-policy free.')
-    url=os.environ.get(rpc_url_env,'https://api.mainnet-beta.solana.com');parts=validate_endpoint(url)
-    need(not is_drpc_host(parts.hostname) and not parts.query and parts.path in ('','/'),'Use a credential-free public Solana RPC root; custom dRPC is deferred.')
-    args=SimpleNamespace(provider='public',rpc_url_env=rpc_url_env,auth_env=None,auth_header='Authorization',allow_network=True,cost_policy='free',allow_paid=False)
+PUBLIC_ROOT='https://api.mainnet-beta.solana.com'
+DRPC_ROOT='https://lb.drpc.org/solana'
+DRPC_URL_ENV='SOLANA_DRPC_URL'
+
+
+def public_config(*,allow_network,cost_policy,rpc_url_env='SOLANA_RPC_URL',provider='auto',allow_paid=False):
+    """Endpoint selection without a network request. The keyed endpoint is dRPC: DRPC_API_KEY (shared with the EVM
+    skill) plus an optional SOLANA_DRPC_URL, a credential-free lb.drpc.org network URL that defaults to the Solana
+    network URL. `auto` uses it when the invocation authorizes paid use (--cost-policy paid --allow-paid) and
+    otherwise the credential-free public root (SOLANA_RPC_URL may name another public root); `drpc` requires it;
+    `public` never uses it. A fallback is a workflow decision recorded in the result, never evidence; it is recorded
+    only when a dRPC URL is configured explicitly, since a key alone may serve the EVM skill."""
+    need(allow_network and cost_policy in ('free','paid') and provider in ('auto','public','drpc'),'Collection needs explicit --allow-network and --cost-policy free|paid.')
+    public_root=os.environ.get(rpc_url_env,'');keyed_url=os.environ.get(DRPC_URL_ENV,'')
+    if public_root and is_drpc_host(validate_endpoint(public_root).hostname):keyed_url,public_root=keyed_url or public_root,''  # a dRPC URL under the public name still means dRPC
+    key=bool(os.environ.get('DRPC_API_KEY','').strip());paid=cost_policy=='paid' and allow_paid;fallback=None
+    if keyed_url:
+        parts=validate_endpoint(keyed_url);need(is_drpc_host(parts.hostname),DRPC_URL_ENV+' is not a dRPC URL.')
+        need(credential_free_network_url(parts),DRPC_URL_ENV+' carries the key (rpc_url_carries_credential): use the credential-free network URL (for example https://lb.drpc.org/solana); the key belongs only in DRPC_API_KEY.')
+    if provider=='drpc':need(key,'DRPC_API_KEY is not configured.');need(paid,'dRPC use needs --cost-policy paid --allow-paid.')
+    use_drpc=provider=='drpc' or (provider=='auto' and key and paid)
+    if provider=='auto' and keyed_url and not use_drpc:fallback='drpc_key_missing' if not key else 'paid_usage_not_authorized'
+    if use_drpc:url=keyed_url or DRPC_ROOT
+    else:
+        url=public_root or PUBLIC_ROOT;public=validate_endpoint(url)
+        need(not public.query and public.path in ('','/'),'Use a credential-free public Solana RPC root.')
+    args=SimpleNamespace(provider='drpc' if use_drpc else 'public',rpc_url_env=rpc_url_env,auth_env=None,auth_header='Authorization',allow_network=True,
+        cost_policy='paid' if use_drpc else 'free',allow_paid=use_drpc)
     # Provider preflight is local configuration validation and makes zero network requests.
     old=os.environ.get(rpc_url_env)
     try:
-        os.environ[rpc_url_env]=url;result=provider_availability(args);need(result['status']=='ready','public provider preflight not ready');url,headers=transport_settings(args)
+        os.environ[rpc_url_env]=url;result=provider_availability(args);need(result['status']=='ready','provider preflight not ready: '+str(result.get('reason') or result.get('blocking_reasons')));url,headers=transport_settings(args)
     finally:
         if old is None:os.environ.pop(rpc_url_env,None)
         else:os.environ[rpc_url_env]=old
-    return {'url':url,'headers':headers,'preflight':result}
+    return {'url':url,'headers':headers,'preflight':result,'provider':'drpc' if use_drpc else 'public','fallback':fallback}
 
 
 def status(root):
@@ -108,11 +130,24 @@ def token_info_documents(root,target):
 
 
 def candidates(root,target):
+    """Exact-mint pool leads ranked by indexed liquidity. The plan's primary (DEX Screener) and alternate (GeckoTerminal)
+    report liquidity on their own scales, so their figures are compared with each other only when every pool both list
+    agrees within a factor of two; otherwise primary-listed pools rank first by the primary's figure and alternate-only
+    pools after them by the alternate's. A pool both list always takes the primary's figure."""
     from decimal import Decimal
-    rows=[r for d in market_documents(root,target) for r in d['candidates']];chosen={}
-    for r in sorted(rows,key=lambda r:(-(Decimal(r['liquidity_usd']) if r['liquidity_usd'] is not None else Decimal(-1)),r['pool'])):
-        chosen.setdefault(r['pool'],r)
-    return list(chosen.values())[:2]
+    rows={};figures={};docs=market_documents(root,target)
+    for source in ('dexscreener','geckoterminal'):
+        for d in docs:
+            if d.get('source')==source:
+                for r in d['candidates']:
+                    rows.setdefault(r['pool'],(source,r))
+                    figures.setdefault(r['pool'],{}).setdefault(source,Decimal(r['liquidity_usd']) if r['liquidity_usd'] is not None else None)
+    shared=[f for f in figures.values() if len(f)==2 and all(v is not None and v>0 for v in f.values())]
+    comparable=bool(shared) and all(Decimal('0.5')<=f['dexscreener']/f['geckoterminal']<=2 for f in shared)
+    def rank(item):
+        source,r=item;liquidity=Decimal(r['liquidity_usd']) if r['liquidity_usd'] is not None else Decimal(-1)
+        return (0 if comparable or source=='dexscreener' else 1,-liquidity,r['pool'])
+    return [r for _,r in sorted(rows.values(),key=rank)][:2]
 
 
 def importer_view(root):
@@ -208,6 +243,11 @@ def provider_diagnostics(root):
     finally:session.close()
     unresolved={fam:st for fam,st in families.items() if 'ok' not in st and not all(x=='method_unavailable' for x in st)}
     if unresolved:rows.append({'stage':'collection','category':'unresolved_reads','count':len(unresolved),'reads':[{'read':f,'status':st[-1]} for f,st in list(unresolved.items())[:12]],'reason':'No usable response from the provider (a definitive refusal is not retried); dependent facts keep explicit gaps.'})
+    facts_path=root/'draft/facts.json'
+    if facts_path.exists():
+        try:degraded=[r for r in strict_json(facts_path.read_bytes(),'facts.json').get('missing_reads',[]) if r.get('reason')]
+        except (ValueError,KeyError,TypeError):degraded=[]
+        if degraded:rows.append({'stage':'evidence','category':'degraded_reads','count':len(degraded),'reads':[{'read':r['id'],'reason':r['reason']} for r in degraded[:12]],'reason':'These retained reads passed no check that a resolved fact needs; facts built on them are gaps until re-sampled.'})
     if any(f.endswith('_holderscan') for f in unresolved):
         rows.append({'stage':'collection','category':'holder_scan_failed','reason':'The bounded holder census already ran and failed, so a holders preset would repeat it; holder concentration stays an explicit gap for this run.'})
     # A pool whose every listed recent signature failed on chain yields no receipt although its history read succeeded.
@@ -363,19 +403,42 @@ def write_briefs(root):
     return pointers
 
 
+def check_config(config,synthetic=False):
+    """A live start takes only what public_config returns after its preflight: the credential-free public root without
+    headers, or the dRPC network URL with its key header. A synthetic run takes any injected URL."""
+    need(isinstance(config,dict) and isinstance(config.get('url'),str),'Explicit preflighted public configuration required.')
+    keyed=config.get('provider')=='drpc'
+    if not synthetic:
+        parts=validate_endpoint(config['url'])
+        need(config.get('preflight',{}).get('status')=='ready' and (keyed and is_drpc_host(parts.hostname) and bool(config.get('headers')) and credential_free_network_url(parts) or not keyed and not config.get('headers') and not is_drpc_host(parts.hostname) and not parts.query and parts.path in ('','/')),
+            'Preflighted RPC configuration required: the credential-free public root, or the configured credential-free dRPC network URL with its key header.')
+    return 'drpc' if keyed else 'public'
+
+
+def run_provider(root,config,factory,*,create=False):
+    """One run stays on the provider it started with: a later collect on the other tier would mix the public tier's
+    windows and a keyed endpoint's answers in one session. The record names the provider and the endpoint's namespace
+    hash, never a URL or key; a run without the record predates it."""
+    path=Path(root)/'provider.json'
+    identity={'provider':config.get('provider','public'),'namespace':factory(config['url'],config.get('headers',{}),timeout=5,max_bytes=1_000_000).namespace}
+    if path.exists():
+        recorded=strict_json(path.read_bytes(),path.name)
+        need(recorded==identity,'This run started on the '+str(recorded.get('provider'))+' provider with another endpoint; use the same provider flags and endpoint for every collect in it.')
+    elif create:atomic(path,encoded(identity))
+    return identity['provider']
+
+
 def start(root,target,*,question,received_at,deadline_at,focus=None,urls=None,scope='broad',surfaces=None,config=None,
           synthetic=False,factory=HttpTransport,opener_factory=None):
     root=Path(root).resolve();need(factory is HttpTransport and opener_factory is None or synthetic,'Injected transports require explicit synthetic mode.')
-    need(config is not None,'Explicit preflighted public configuration required.')
-    if not synthetic:
-        parts=validate_endpoint(config['url'])
-        need(not config.get('headers') and not is_drpc_host(parts.hostname) and not parts.query and parts.path in ('','/') and config.get('preflight',{}).get('status')=='ready','Public preflighted unauthenticated RPC configuration required.')
+    provider=check_config(config,synthetic)
     if root.exists():
         s=Session(root,target=target,synthetic=synthetic)
         try:need(s.meta['question']==question and s.meta['received_at']==utc(float(received_at)) and s.meta['deadline_at']==utc(float(deadline_at)) and s.meta['focus']==(focus or []) and s.meta['urls']==(urls or []) and s.meta['scope']==scope,'Resume must preserve original intake and absolute timing.')
         except BaseException:s.close();raise
-    else:s=Session.create(root,target,question=question,received_at=received_at,deadline_at=deadline_at,focus=focus,urls=urls,scope=scope,synthetic=synthetic)
-    meta=s.meta;s.close();surfaces=surfaces or (list(DIMENSIONS) if scope=='broad' else ['token_controls'])
+    else:s=Session.create(root,target,question=question,received_at=received_at,deadline_at=deadline_at,focus=focus,urls=urls,scope=scope,synthetic=synthetic,
+        method_limits={} if provider=='drpc' else None)  # a keyed endpoint drops the public tier's per-method windows; the default window and connection pacing still apply
+    meta=s.meta;s.close();run_provider(root,config,factory,create=True);surfaces=surfaces or (list(DIMENSIONS) if scope=='broad' else ['token_controls'])
     need(set(surfaces)<=set(DIMENSIONS),'Unknown focused surface.')
     selected_path=root/'selected-surfaces.json'
     if selected_path.exists():need(strict_json(selected_path.read_bytes(),selected_path.name)==surfaces,'Resume cannot change selected scope.')
@@ -384,6 +447,7 @@ def start(root,target,*,question,received_at,deadline_at,focus=None,urls=None,sc
         result=strict_json(regular(root,'start-result.json').read_bytes(),'start-result.json')
         result.update(resumed=True,session=status(root));return result
     atomic(root/'intake.json',encoded(meta));diagnostics=[]
+    if config.get('fallback'):diagnostics.append({'stage':'provider','category':'provider_fallback','reason':'A dRPC configuration was present but not usable ('+config['fallback']+'); the credential-free public root was used. This is a workflow decision, not evidence.'})
     work=json.loads((ASSETS/'work-plan.template.json').read_text());work.update({k:meta[k] for k in ('scope','received_at','target_at','deadline_at','user_hard_deadline')})
     work['investigation_id']=meta['investigation_id'];work['target']=target;work['question']=question;work['focus']=focus or [];work['urls']=urls or []
     work['surfaces']=[{**row,'required':row['dimension'] in surfaces} for row in work['surfaces']]
@@ -440,7 +504,7 @@ def start(root,target,*,question,received_at,deadline_at,focus=None,urls=None,sc
     # which comes last; a truncated display still shows what must happen first.
     output={'lane_pointers':pointers,'next':'Dispatch both pointers before a separate facts-reading step; then complete notes and compose.' if scope=='broad' else 'Answer the focused request with its dependencies and limits; no final broad delivery.',
       'run':str(root),'draft':str(root/'draft'),'profile':PROFILE,'investigation_id':meta['investigation_id'],'research_status':'partial',
-      'diagnostics':diagnostics,'session':status(root),'collection':result or first,'facts_summary':summary}
+      'provider':provider,'diagnostics':diagnostics,'session':status(root),'collection':result or first,'facts_summary':summary}
     atomic(root/'start-result.json',encoded(output));return output
 
 
@@ -456,8 +520,9 @@ def _collect(root,spec,config,*,factory=HttpTransport):
     root=Path(root).resolve();ident=label(spec['id']);need(len(ident)<=12,'Preset ID at most 12 characters.');s=Session(root)
     try:
         need(factory is HttpTransport or s.meta['synthetic'],'Injected RPC requires synthetic session.');need(s.remaining_seconds()>0,'Original collection cutoff reached.')
-        target=s.meta['target']
+        target=s.meta['target'];synthetic=s.meta['synthetic']
     finally:s.close()
+    check_config(config,synthetic);run_provider(root,config,factory)
     kind=spec['kind'];args=spec.get('parameters',{});accounts,objects,_=importer_view(root)
     lead_rows=None
     if kind in ('pool','positions'):
@@ -567,9 +632,10 @@ def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('action',choices=('start','collect','brief','capture','lane-check','refresh','status'));p.add_argument('root',type=Path)
     p.add_argument('--mint');p.add_argument('--genesis-hash',default=MAINNET);p.add_argument('--question');p.add_argument('--received-at');p.add_argument('--deadline-at');p.add_argument('--focus',action='append',default=[]);p.add_argument('--url',action='append',default=[])
     p.add_argument('--scope',choices=('broad','focused'),default='broad');p.add_argument('--surface',action='append');p.add_argument('--owner',choices=('ordinary','liquidity','project'),default='ordinary');p.add_argument('--dimension',choices=DIMENSIONS);p.add_argument('--request',type=Path)
-    p.add_argument('--allow-network',action='store_true');p.add_argument('--cost-policy',choices=('free',));p.add_argument('--rpc-url-env',default='SOLANA_RPC_URL');p.add_argument('--allow-synthetic',action='store_true');a=p.parse_args()
+    p.add_argument('--allow-network',action='store_true');p.add_argument('--cost-policy',choices=('free','paid'));p.add_argument('--allow-paid',action='store_true');p.add_argument('--provider',choices=('auto','public','drpc'),default='auto')
+    p.add_argument('--rpc-url-env',default='SOLANA_RPC_URL');p.add_argument('--allow-synthetic',action='store_true');a=p.parse_args()
     try:
-        if a.action in ('start','collect'):config=public_config(allow_network=a.allow_network,cost_policy=a.cost_policy,rpc_url_env=a.rpc_url_env)
+        if a.action in ('start','collect'):config=public_config(allow_network=a.allow_network,cost_policy=a.cost_policy,rpc_url_env=a.rpc_url_env,provider=a.provider,allow_paid=a.allow_paid)
         if a.action=='start':
             from solana_session import epoch
             need(a.mint and a.question and a.received_at and a.deadline_at,'Start needs exact mint, original question, received-at and deadline-at.')
@@ -577,7 +643,7 @@ def main():
         elif a.action=='collect':need(a.request is not None,'A bounded preset JSON request is required.');result=collect(a.root,strict_json(a.request.read_bytes(),'preset request'),config)
         elif a.action=='brief':result={'lane_pointers':write_briefs(a.root)}
         elif a.action=='capture':
-            need(a.allow_network and a.cost_policy=='free','Public capture requires --allow-network --cost-policy free.')
+            need(a.allow_network and a.cost_policy in ('free','paid'),'Capture requires --allow-network --cost-policy free; a run\'s paid RPC flags are accepted (web captures cost nothing).')
             result=capture(a.root,a.url,a.owner,dimension=a.dimension)
         elif a.action=='lane-check':result=lane_check(a.root,a.owner,allow_synthetic=a.allow_synthetic)
         elif a.action=='refresh':

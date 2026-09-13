@@ -77,9 +77,11 @@ chmod 600 ~/.config/crypto-research/env
 ```
 
 The example points at the free public endpoint for Robinhood Chain mainnet (chain 4663).
-For another chain, put any HTTPS JSON-RPC endpoint for it in `CRYPTO_RPC_URL`; the skill
-verifies `eth_chainId` before trusting it. The Solana skill uses the public mainnet endpoint
-unless you set `SOLANA_RPC_URL`. A paid provider (for example dRPC) is optional and is used
+For another chain, put any HTTPS JSON-RPC endpoint for it in `ROBINHOOD_DRPC_URL` (or name
+another variable with `--rpc-url-env`); the skill verifies `eth_chainId` before trusting it.
+The Solana skill uses the public mainnet endpoint unless you set `SOLANA_RPC_URL`, and a dRPC
+endpoint (`SOLANA_DRPC_URL`, credential-free, plus the shared `DRPC_API_KEY`) when a run
+authorizes paid use. A paid provider (for example dRPC) is optional and is used
 only when you configure it and authorize it; personal standing authorizations belong in an
 untracked `HANDOFF.local.md` next to `HANDOFF.md`, whose generic policy is what the skill
 reads otherwise. The first research call may ask your tool for network permission; grant it
@@ -468,7 +470,7 @@ bundled code, while isolated replay requires explicit trust. Operational feedbac
 bounded, nonblocking and separately reviewed; no active lessons are installed.
 
 All three unittest suites above remain mandatory. Current implementation checks:
-Solana **401**, router **30**, EVM **429** are the current suite counts (Solana grew with the 2026-09-11 review fixes and the 2026-09-12 delivery work and review),
+Solana **417**, router **30**, EVM **429** are the current suite counts (Solana grew with the 2026-09-11 review fixes, the 2026-09-12 delivery work and review, and the dRPC/custody/curve round),
 including independent outcome, live-regression, legacy and default-dispatch tests. See [implementation](plans/solana-evm-parity-2026-09-11/implementation.md)
 and [evidence tools](skills/crypto-solana-token-due-diligence/references/evidence-and-tools.md).
 Targets are seven-minute ordinary research and ten-minute handling, with two minutes
@@ -494,9 +496,13 @@ If configuring dRPC later, keep personal exports in `~/.config/crypto-research/e
 this shareable project, with file permissions `600`:
 
 ```sh
-export CRYPTO_RPC_URL='YOUR_DRPC_ENDPOINT_WITHOUT_THE_API_KEY'
-export DRPC_API_KEY='YOUR_API_KEY'
+export ROBINHOOD_DRPC_URL='https://lb.drpc.live/robinhood'   # the network URL only, never the key
+export SOLANA_DRPC_URL='https://lb.drpc.org/solana'          # optional; this is the default when unset
+export DRPC_API_KEY='YOUR_API_KEY'                           # the only place the key goes
 ```
+
+Both skills send the key as a `Drpc-Key` header and refuse a URL that carries it (a `dkey`
+parameter or a key path segment) with the reason `rpc_url_carries_credential`.
 
 Source that file in the **same shell invocation** as each collector command, with shell
 tracing disabled (`set +x`). The collector reads environment variables; it does not

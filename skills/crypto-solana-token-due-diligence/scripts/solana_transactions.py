@@ -3,8 +3,9 @@ from solana_common import need, natural, pubkey, signature, target_identity, ALP
 from solana_wire import validate_response, amount
 from solana_swaps import decode as decode_swap,position_instruction
 from adapters.pump_instructions import decode as decode_pump
+from adapters.pump_common import CURVE_PROGRAM
 
-VERSION='1.3.0'
+VERSION='1.4.0'
 SYSTEM='11111111111111111111111111111111'
 WSOL='So11111111111111111111111111111111111111112'
 
@@ -65,7 +66,7 @@ def token_effect(raw,a,balances,program):
             kind='burn';mint=a[1];participants={'source':a[0],'authority':a[2]}
         if checked:
             for addr in participants.values():
-                if addr in balances:need(balances[addr]['decimals']==raw[9],'checked decimals mismatch')
+                if addr in balances and balances[addr]['decimals'] is not None:need(balances[addr]['decimals']==raw[9],'checked decimals mismatch')
         for addr in participants.values():
             if addr in balances:
                 need(balances[addr]['program'] in (None,program),'historical token program mismatch')
@@ -222,6 +223,10 @@ def decode_transaction(target,packet,block_packet):
                             for role in ('source','destination','account'):
                                 if role in effect['participants']:need(effect['participants'][role] in writable,'effect account is readonly in historical message')
                         effect.update(id=ident,program=program,locator=locator,stack_height=raw_ix.get('stackHeight'),transaction_evidence_id=req['id'],slot=tx['slot'])
+                        if effect['kind']=='token_account_initialize' and effect['participants']['account'] not in balances:
+                            # A temporary account opened in this transaction has no boundary balance; its initialization names
+                            # the mint, so a later unchecked transfer from it (a legacy `transfer`) still resolves.
+                            balances[effect['participants']['account']]={'mint':effect['mint'],'owner':effect['participants']['owner'],'program':program,'decimals':None,'amount_atomic':None}
                         pending.append(effect);entry['recognized']=True
                 except ValueError as exc:
                     entry['gap']=str(exc);result['gaps'].append(ident+': '+str(exc))
@@ -320,7 +325,7 @@ def _verify_trades(target,candidates,*,buy=False):
         if sig in seen:
             rows.append({'signature':sig,'pool':pool,'status':'unverified','gaps':['duplicate receipt: the same signature was supplied twice']});continue
         seen.add(sig)
-        row={'signature':sig,'pool':pool,'status':'unverified','seller':None,'input_atomic':None,'output_atomic':None,
+        row={'signature':sig,'pool':pool,'status':'unverified','seller':None,'spending_owner':None,'custody':None,'input_atomic':None,'output_atomic':None,
              'counter_mint':None,'effect_ids':[],'native_proceeds':None,'profit':None,'route':None,'protocol_fees_atomic':None,
              'counter_asset_realization':None,'gaps':[]}
         rows.append(row)
@@ -328,6 +333,10 @@ def _verify_trades(target,candidates,*,buy=False):
             need(execution['target']==target and execution['execution_status']=='succeeded' and execution['block_evidence_id'],'sale needs matching target and bound successful execution')
             effects=execution['effects'];all_swaps=[e for e in effects if e['kind']=='swap_instruction']
             swaps=[e for e in all_swaps if e['pool']==pool]
+            trades=[e for e in effects if e['kind']=='protocol_trade_instruction' and e.get('curve')==pool]
+            if not swaps and len(trades)==1:
+                if trades[0].get('quote_native'):_verify_native_curve_trade(target,execution,trades[0],buy,row,all_swaps);continue
+                swap=_curve_leg(trades[0]);all_swaps=all_swaps+[swap];swaps=[swap]  # a token-quote curve trade is an ordinary leg
             need(len(swaps)==1,'ordinary sale requires exactly one supported swap at the exact pool')
             swap=swaps[0];frame,direct=_frame(execution,swap)
             route='direct' if swap['locator']['inner_index'] is None and len(all_swaps)==1 else 'aggregated'
@@ -354,9 +363,21 @@ def _verify_trades(target,candidates,*,buy=False):
             need(all(i['recognized'] for i in execution['instructions'] if i['program'] in (TOKEN_PROGRAM,TOKEN_2022) and i['id'] in frame),'unrecognized token effect inside swap')
             relevant={swap['input_account'],swap['output_account'],*swap['vaults']}
             other_vaults={v for x in all_swaps if x['id']!=swap['id'] for v in x['vaults']}
+            # Router custody: the leg's input account may be filled by exactly one transfer from a non-vault account before
+            # the leg (the wallet's tokens entering the router) and its output account drained by exactly one transfer to a
+            # non-vault account after it (proceeds leaving to the wallet), each at the leg's exact amount. Each side is
+            # otherwise a hop between decoded swap vaults; the wallet behind a custody side is the beneficial trader and
+            # the router authority only the spending owner. Anything else touching the leg's accounts refuses it below.
+            all_vaults={v for x in all_swaps for v in x['vaults']}
+            custody_in=[e for e in effects if e['kind']=='transfer' and e['id']!=inp['id'] and e['mint']==inp['mint'] and e['participants'].get('destination')==swap['input_account']
+                and e['participants'].get('source') not in all_vaults and effects.index(e)<effects.index(inp) and e['amount_atomic']==inp['amount_atomic']]
+            custody_out=[e for e in effects if e['kind']=='transfer' and e['id']!=out['id'] and e['mint']==out['mint'] and e['participants'].get('source')==swap['output_account']
+                and e['participants'].get('destination') not in all_vaults and effects.index(e)>effects.index(out) and e['amount_atomic']==out['amount_atomic']]
+            fed=custody_in[0] if len(custody_in)==1 else None;drained=custody_out[0] if len(custody_out)==1 else None
+            custody_ids={e['id'] for e in (fed,drained) if e}
             hops=set()
             for e in effects:
-                if e['id'] in (inp['id'],out['id'],*[f['id'] for f in fees]):continue
+                if e['id'] in (inp['id'],out['id'],*[f['id'] for f in fees]) or e['id'] in custody_ids:continue
                 if e['kind'] in ('transfer','mint','burn','authority_change') and set(e['participants'].values())&relevant:
                     p=e['participants']
                     # In an aggregated route the leg's counter-asset may feed the next hop, or the
@@ -369,6 +390,25 @@ def _verify_trades(target,candidates,*,buy=False):
             seller=historical_owner(execution,swap['input_account'],inp['mint'])
             recipient=historical_owner(execution,swap['output_account'],out['mint'])
             need(seller==recipient,'swap counter-asset recipient differs from observed source owner')
+            beneficial,spending=seller,None;custody=bool(fed or drained)
+            if custody:
+                # A custody side pairs with a custody or hop side opposite it; a router that keeps the proceeds or sells
+                # its own inventory to a wallet is not a wallet's sale.
+                need(fed or swap['input_account'] in hops,'router custody output without a wallet or hop input')
+                need(drained or swap['output_account'] in hops,'router custody input without a wallet or hop output')
+                if seller in execution['signers']:
+                    # The trader owns and signed for the leg's own accounts; a same-amount transfer that funds the input
+                    # or forwards the output is a router serving the trader, not a change of beneficial owner. The
+                    # funding/forwarding accounts are recorded under `custody`; the trader stays the seller.
+                    beneficial,spending=seller,None
+                else:
+                    # The leg's own accounts are owned by a router, not the trader: the beneficial wallet is the far end
+                    # of the custody transfer, inferred through one more hop than a plain leg's owner, so it must have
+                    # signed this transaction; a program-owned account or another router layer is not a wallet's sale.
+                    wallets={historical_owner(execution,fed['participants']['source'],inp['mint']) if fed else None,historical_owner(execution,drained['participants']['destination'],out['mint']) if drained else None}-{None}
+                    need(len(wallets)==1 and seller not in wallets,'router custody flows do not belong to one distinct wallet')
+                    beneficial,spending=wallets.pop(),seller
+                    need(beneficial in execution['signers'],'router custody wallet did not sign the transaction')
             for e in effects:
                 if e['participants'].get('account')==swap['output_account']:
                     if e['kind']=='token_account_initialize':need(effects.index(e)<effects.index(out),'output account initialized after swap')
@@ -384,6 +424,8 @@ def _verify_trades(target,candidates,*,buy=False):
             # Every account the leg touches must move by exactly the net of the leg's own flows
             # (trade legs plus declared fee flows); a vault paying a fee moves by output plus fee.
             expected={swap['input_account']:wrap} if wrap else {}
+            if fed:expected[swap['input_account']]=expected.get(swap['input_account'],0)+int(fed['amount_atomic'])
+            if drained:expected[swap['output_account']]=expected.get(swap['output_account'],0)-int(drained['amount_atomic'])
             for e in (inp,out,*fees):
                 expected[e['participants']['source']]=expected.get(e['participants']['source'],0)-int(e['amount_atomic'])
                 expected[e['participants']['destination']]=expected.get(e['participants']['destination'],0)+int(e['amount_atomic'])
@@ -408,14 +450,17 @@ def _verify_trades(target,candidates,*,buy=False):
                 need(paid==specified and amount_out>=threshold,'swap spendable-input/threshold contradiction')
             else:need(False,'partial-fill ordinary-sale classification unsupported')
             converted=swap['output_account'] in hops
-            row.update(status='verified_rebuy' if buy else 'verified_sale',seller=seller,input_atomic=str(amount_in),output_atomic=str(amount_out),counter_mint=inp['mint'] if buy else out['mint'],
+            row.update(status='verified_rebuy' if buy else 'verified_sale',seller=beneficial,spending_owner=spending,input_atomic=str(amount_in),output_atomic=str(amount_out),counter_mint=inp['mint'] if buy else out['mint'],
+                custody={'router_authority':spending,'input_source':fed['participants']['source'] if fed else None,'output_destination':drained['participants']['destination'] if drained else None,
+                    'effect_ids':[e['id'] for e in (fed,drained) if e]} if custody else None,
                 effect_ids=[swap['id'],inp['id'],out['id'],*[f['id'] for f in fees]],transaction_evidence_id=execution['transaction_evidence_id'],block_evidence_id=execution['block_evidence_id'],slot=execution['slot'],
                 route=route,protocol_fees_atomic=[{'effect_id':f['id'],'mint':f['mint'],'amount_atomic':f['amount_atomic'],'destination':f['participants']['destination']} for f in fees],
-                counter_asset_realization='converted_within_route' if converted else 'retained_in_recipient_account',
+                counter_asset_realization='converted_within_route' if converted else 'forwarded_to_beneficial_owner' if drained else 'retained_in_recipient_account',
                 token_programs=sorted({inp['program'],out['program']}),
                 evidence_scope='one successful supported swap leg at the exact pool with same-owner source/output and matched vault deltas; beneficial ownership/profit unknown')
             if out['mint']==WSOL and not buy and not converted:
-                try:row['native_proceeds']=_native_proceeds(execution,seller,swap['output_account'],amount_out)
+                # Through custody the wallet's own WSOL account receives and closes the proceeds; otherwise the leg's output account does.
+                try:row['native_proceeds']=_native_proceeds(execution,beneficial,drained['participants']['destination'] if drained else swap['output_account'],amount_out)
                 except ValueError as exc:row['gaps'].append(str(exc))
         except (ValueError,KeyError,TypeError) as exc:row['gaps'].append(str(exc))
     return {'schema_version':1,'target':target,'requested_receipts':len(candidates),'maximum_receipts':MAX_TRADE_RECEIPTS,
@@ -442,6 +487,12 @@ def classify_receipt(target,packet,pool):
                 program=index(raw_ix['programIdIndex'],keys);accounts=[index(i,keys) for i in raw_ix['accounts']]
                 try:swap=decode_swap(program,data_bytes(raw_ix['data']),accounts)
                 except ValueError:swap=None
+                if not swap and program==CURVE_PROGRAM:
+                    # A curve trade is a supported swap at the curve: its quote may be native SOL, verified separately.
+                    try:trade=decode_pump(program,data_bytes(raw_ix['data']),accounts)
+                    except ValueError:trade=None
+                    if trade and trade['kind']=='protocol_trade_instruction' and trade['curve']==pool:
+                        result.update(swap=True,route='direct' if j is None else 'aggregated',direction='sell' if trade['direction']=='sell_base' else 'buy');return result
                 if not swap or swap['pool']!=pool:continue
                 source_mint=mints.get(swap['input_account']);dest_mint=mints.get(swap['output_account'])
                 result.update(swap=True,route='direct' if j is None else 'aggregated',
@@ -450,6 +501,101 @@ def classify_receipt(target,packet,pool):
         result['reason']='no supported swap at the exact pool'
     except (ValueError,KeyError,TypeError) as exc:result['reason']=str(exc) if isinstance(exc,ValueError) else 'malformed receipt'
     return result
+
+
+def _curve_leg(trade):
+    """A v2 Pump curve trade with a token quote as a pool leg: the curve's base and quote holdings are its vaults, the
+    protocol, buyback and creator quote accounts its fee sinks and the user's volume-accumulator account a rebate."""
+    p=trade['participants'];sell=trade['direction']=='sell_base'
+    return {'kind':'swap_instruction','adapter':'pump_curve','id':trade['id'],'locator':trade['locator'],'stack_height':trade.get('stack_height'),'pool':trade['curve'],
+        'input_account':p['base_account'] if sell else p['quote_account'],'output_account':p['quote_account'] if sell else p['base_account'],'trader':p['user'],
+        'vaults':[p['curve_holding'],p['quote_holding']],'mints':[trade['mint'],trade['quote_mint']],'mode':trade['mode'],
+        'specified_amount_atomic':trade['specified_atomic'],'threshold_atomic':trade['threshold_atomic'],
+        'fee_accounts':[p['quote_fee_account'],p['quote_buyback_account'],p['quote_creator_account']],'rebate_accounts':[p['rebate']]}
+
+
+def _closed_refund(execution,account):
+    """Lamports a closed token account returned: its opening lamports plus every native and wrapped-SOL inflow minus
+    every outflow, which the closure sends to its destination."""
+    native=execution['native_balances'];need(account in native and native[account]['post']=='0','closed account balances missing or not emptied')
+    total=int(native[account]['pre'])
+    for e in execution['effects']:
+        p=e['participants'];amount=int(e['amount_atomic']) if e.get('amount_atomic') else 0
+        if e['kind']=='native_account_create' and p.get('account')==account:total+=amount
+        if e['kind']=='native_transfer':total+=amount*((p.get('destination')==account)-(p.get('source')==account))
+        if e['kind']=='transfer' and e.get('mint')==WSOL:total+=amount*((p.get('destination')==account)-(p.get('source')==account))
+    need(total>=0,'closed account lamport reconstruction negative');return total
+
+
+def _verify_native_curve_trade(target,execution,trade,buy,row,other_swaps=()):
+    """A Pump curve trade with a SOL quote pays or receives lamports through program-internal moves, so the quote leg is
+    reconciled from the lamport balance deltas of the curve, the fee recipients and the trader (with the trader's own
+    explicit native flows netted out); the base leg is one SPL transfer between the trader's account and the curve
+    holding, reconciled against both accounts' historical balances."""
+    p=trade['participants'];sell=trade['direction']=='sell_base';mint=target['mint'];user=p['user'];curve=trade['curve']
+    need(sell!=buy,'curve trade direction does not match the requested verification')
+    frame,direct=_frame(execution,trade);effects=execution['effects']
+    legs=[e for e in effects if e['kind']=='transfer' and e['id'] in direct and e['mint']==mint and
+        ((e['participants']['source'],e['participants']['destination'])==((p['base_account'],p['curve_holding']) if sell else (p['curve_holding'],p['base_account'])))]
+    need(len(legs)==1,'exact curve base leg not observed');leg=legs[0];amount=int(leg['amount_atomic'])
+    need(len([e for e in effects if e['kind']=='transfer' and e['id'] in direct])==1,'curve trade token flow count ambiguous')
+    need(leg['program'] in (TOKEN_PROGRAM,TOKEN_2022),'unsupported token program in curve leg');need(amount>0,'curve base amount absent')
+    need(trade['mode']=='exact_in_fee_inclusive' or amount==int(trade['specified_atomic']),'curve base amount and instruction disagree')
+    need(historical_owner(execution,p['base_account'],mint)==user,'curve trade base account is not the user\'s')
+    before=execution['pre_token_balances'];after=execution['post_token_balances']
+    for account,sign in ((leg['participants']['source'],-1),(leg['participants']['destination'],1)):
+        if account in before and account in after:need(int(after[account]['amount_atomic'])-int(before[account]['amount_atomic'])==sign*amount,'curve base amount and historical token delta disagree')
+        else:need(account==p['base_account'],'missing curve holding boundary balance')  # the trader's account may be created or closed in this transaction; the holding's delta pins the amount
+    native=execution['native_balances'];threshold=int(trade['threshold_atomic'])
+    need(all(x in native for x in (user,curve,p['fee_recipient'])),'curve trade native balances missing')
+    delta=lambda addr:int(native[addr]['delta']) if addr in native else 0
+    fee=int(execution['network_fee_lamports']) if execution['fee_payer']==user else 0
+    other=0  # the trader's explicit native flows outside the trade frame: rent for accounts they create, tips, wraps and closures
+    for e in effects:
+        q=e['participants']
+        if e['kind']=='native_account_create' and q.get('source')==user:other-=int(e['amount_atomic'])
+        if e['kind']=='native_transfer' and e['id'] not in direct:
+            if q.get('source')==user:other-=int(e['amount_atomic'])
+            if q.get('destination')==user:other+=int(e['amount_atomic'])
+        if e['kind']=='token_account_close' and q.get('destination')==user:other+=_closed_refund(execution,q['account'])
+    sinks={x for x in (p['fee_recipient'],p.get('buyback'),p.get('creator_vault')) if x};creator_vault=p.get('creator_vault')
+    other_swaps=[x for x in other_swaps if x['id']!=trade['id']]
+    route='direct' if trade['locator']['inner_index'] is None and not other_swaps else 'aggregated'
+    if sell:
+        need(not [e for e in effects if e['kind']=='native_transfer' and e['id'] in direct],'explicit native transfers inside a curve sale are unexpected')
+        paid={sink:delta(sink) for sink in sinks};need(all(v>=0 for v in paid.values()) and delta(curve)<0,'curve sale lamport flows do not reconcile');gross=-delta(curve)-sum(paid.values())
+        need(gross>0 and gross>=threshold,'curve sale proceeds below the instruction minimum or absent')
+        residual=delta(user)-(gross-fee+other)
+        need(residual==0,'seller native delta does not reconcile curve proceeds, fees and other flows (residual '+str(residual)+' lamports; a trader cashback rebate or another program-internal lamport move is not itemized)')
+        # Proceeds the trader wrapped after the trade and fed into another decoded leg were converted within the route,
+        # not kept as lamports; the wallet's own lamport gain is still reconciled above.
+        wsol_accounts={acc for table in (before,after) for acc,rec in table.items() if rec.get('mint')==WSOL}|{e['participants']['account'] for e in effects if e['kind']=='token_account_initialize' and e.get('mint')==WSOL}
+        rewrapped={e['participants']['destination'] for e in effects if e['kind']=='native_transfer' and e['id'] not in direct and e['participants'].get('source')==user
+            and e['participants'].get('destination') in wsol_accounts and effects.index(e)>effects.index(leg)}
+        converted=any(x['input_account'] in rewrapped for x in other_swaps)
+        fees=[{'effect_id':None,'mint':None,'amount_atomic':str(paid[sink]),'destination':sink} for sink in (p['fee_recipient'],p.get('buyback'),creator_vault) if sink]
+        row.update(status='verified_sale',seller=user,input_atomic=str(amount),output_atomic=str(gross),counter_mint=None,quote='native_sol',
+            effect_ids=[trade['id'],leg['id']],transaction_evidence_id=execution['transaction_evidence_id'],block_evidence_id=execution['block_evidence_id'],slot=execution['slot'],
+            route=route,protocol_fees_atomic=fees,counter_asset_realization='converted_within_route' if converted else 'native_lamports_to_wallet',token_programs=[leg['program']],
+            native_proceeds={'net_sale_after_seller_network_fee_lamports':str(gross-fee),'seller_network_fee_lamports':str(fee),'gross_sale_lamports':str(gross),
+                'other_native_delta_lamports':str(other),'observed_seller_native_delta_lamports':str(delta(user)),
+                'scope':'reconciled curve sale; protocol and creator fees left the curve to their recipients'+('; the trader re-wrapped proceeds into a later leg of this route' if converted else '')},
+            evidence_scope='one Pump curve sale with native quote reconciled from lamport balance deltas; beneficial ownership/profit unknown')
+    else:
+        need(trade['mode']!='exact_in_fee_inclusive','exact-quote-in curve buy with a native quote is not yet supported')
+        pays=[e for e in effects if e['kind']=='native_transfer' and e['id'] in direct and e['participants']['source']==user]
+        need(pays and all(e['participants']['destination'] in sinks|{curve} for e in pays),'curve buy native flows leave the trade accounts')
+        paid=lambda to:sum(int(e['amount_atomic']) for e in pays if e['participants']['destination']==to)
+        quote=paid(curve);charges=sum(paid(sink) for sink in sinks)
+        need(quote>0 and quote+charges<=threshold,'curve buy cost above the instruction maximum or absent')
+        need(delta(curve)==quote,'curve lamport delta does not match the buy payment')
+        residual=delta(user)-(-(quote+charges)-fee+other)
+        need(residual==0,'buyer native delta does not reconcile curve payment, fees and other flows (residual '+str(residual)+' lamports; a trader cashback rebate or another program-internal lamport move is not itemized)')
+        fees=[{'effect_id':e['id'],'mint':None,'amount_atomic':e['amount_atomic'],'destination':e['participants']['destination']} for e in pays if e['participants']['destination']!=curve]
+        row.update(status='verified_rebuy',seller=user,input_atomic=str(quote),output_atomic=str(amount),counter_mint=None,quote='native_sol',
+            effect_ids=[trade['id'],leg['id'],*[e['id'] for e in pays]],transaction_evidence_id=execution['transaction_evidence_id'],block_evidence_id=execution['block_evidence_id'],slot=execution['slot'],
+            route=route,protocol_fees_atomic=fees,counter_asset_realization='retained_in_recipient_account',token_programs=[leg['program']],
+            evidence_scope='one Pump curve buy with native quote reconciled from explicit lamport transfers; beneficial ownership/profit unknown')
 
 
 def verify_sales(target,candidates):return _verify_trades(target,candidates)

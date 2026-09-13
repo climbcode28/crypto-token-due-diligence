@@ -44,8 +44,8 @@ def fixture(*,complete=False,non_native=False,virtual=0):
     return target,addresses,values
 
 
-def receipt(target,outer,inner,*,slot=95,balances=None):
-    """Compile arbitrary exact instructions to a historical raw JSON receipt."""
+def receipt(target,outer,inner,*,slot=95,balances=None,native=None):
+    """Compile arbitrary exact instructions to a historical raw JSON receipt; `native` maps an address to its (pre, post) lamports."""
     payer=key(70);keys=[payer]
     for program,a,raw in [outer,*inner]:
         for k in [program,*a]:
@@ -58,7 +58,9 @@ def receipt(target,outer,inner,*,slot=95,balances=None):
     for address,m,owner,x,y in balances or []:
         for out,amount in ((pre,x),(post,y)):
             out.append({'accountIndex':keys.index(address),'mint':m,'owner':owner,'programId':TOKEN_PROGRAM,'uiTokenAmount':{'amount':str(amount),'decimals':6}})
-    native=[1000000]*len(keys);after=native.copy();after[0]-=5000
+    lamports=[1000000]*len(keys);after=lamports.copy();after[0]-=5000
+    for address,(x,y) in (native or {}).items():lamports[keys.index(address)]=x;after[keys.index(address)]=y
+    native=lamports
     tx={'slot':slot,'blockTime':1000,'version':'legacy','transaction':{'signatures':[sig],'message':{'accountKeys':keys,'header':{'numRequiredSignatures':1,'numReadonlySignedAccounts':0,'numReadonlyUnsignedAccounts':0},'recentBlockhash':key(72),'instructions':[ix(outer)]}},
         'meta':{'err':None,'fee':5000,'preBalances':native,'postBalances':after,'preTokenBalances':pre,'postTokenBalances':post,'innerInstructions':[{'index':0,'instructions':[ix(i) for i in inner]}]}}
     packet={'status':'ok','request':req,'response':response(req,tx)}

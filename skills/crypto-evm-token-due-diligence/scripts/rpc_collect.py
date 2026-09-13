@@ -269,13 +269,18 @@ def provider_availability(args):
         if drpc and not os.environ.get("DRPC_API_KEY", "").strip():
             reason = "drpc_key_missing"
         elif not url.strip():
-            reason = "rpc_endpoint_unconfigured"
+            # A private env still exporting the pre-rename name yields no endpoint under the current variable; name that
+            # so the fix (rename to the current variable) is clear instead of a bare "unconfigured".
+            reason = "rpc_url_env_renamed" if os.environ.get("CRYPTO_RPC_URL", "").strip() else "rpc_endpoint_unconfigured"
         elif not drpc and args.auth_env and not os.environ.get(args.auth_env, "").strip():
             reason = "rpc_authentication_missing"
         else:
             configuration_settings(args)
             blockers = invocation_blockers(args, drpc)
-    except (ValueError, TypeError):
+    except ValueError as exc:
+        # A key inside the URL is the one misconfiguration worth naming: the fix is to move it to DRPC_API_KEY.
+        reason = "rpc_url_carries_credential" if "credential-free" in str(exc) else "rpc_configuration_invalid"
+    except TypeError:
         reason = "rpc_configuration_invalid"
     # Configuration absence can select alternatives. Omitted flags first require the
     # agent to consult trusted context; Python cannot infer approval from a saved key.
@@ -767,7 +772,7 @@ class Collector:
 
 
 def add_provider_arguments(p):
-    p.add_argument("--rpc-url-env", default="CRYPTO_RPC_URL")
+    p.add_argument("--rpc-url-env", default="ROBINHOOD_DRPC_URL")
     p.add_argument("--endpoint-label", default="research-rpc")
     p.add_argument("--provider", choices=("generic", "drpc"), default="generic")
     p.add_argument("--auth-env")

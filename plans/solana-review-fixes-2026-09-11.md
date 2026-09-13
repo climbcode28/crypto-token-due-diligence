@@ -806,3 +806,95 @@ late in all three because `start` takes 30 to 45 s and the lane cutoff counts 24
 Recommendation, not applied here because it changes the workflow limits the profile enforces:
 give lanes min(receipt + 300, deadline − 120) or count their 240 s from dispatch, and treat a
 lane that returns valid but incomplete as the normal case for the coordinator to finish locally.
+
+### Open items closed: lanes, versions, custody legs, curve trades, dRPC (2026-09-12, late night)
+
+Applied with the implement-review-improve loop (an independent reviewer read each round's
+diff, ran the suites and returned numbered findings; everything must-fix and should-fix was
+applied, nits included). Engine changes: lanes now stop at min(receipt + 300, deadline − 120)
+(`solana_session.LANE_SECONDS`, repeated by `assets/release.json` and checked by a test);
+`solana_derivations` is 1.3.0 (sales, rebuys and transaction engines 1.3.0, pool 1.2.0), older
+bundles keep their frozen engines; reads that the importer retained but could not use are
+`missing_reads` with a reason, surfaced as a `degraded_reads` diagnostic and named in the unusable
+fact's limitations; pool leads rank across DEX Screener and GeckoTerminal only when every pool
+both list agrees within a factor of two, otherwise primary-listed pools first (the DLMM run's
+larger GeckoTerminal-only pool is kept, the earlier mis-scaled case is not compared); a router
+custody leg verifies when its input account is filled by one transfer before the leg or its
+output drained by one transfer after it (each at the leg's amount, the other side a custody
+transfer of the same wallet or a hop into another decoded leg) — if the leg's own accounts are
+router-owned the beneficial far-end wallet must have signed (seller, with the router as
+`spending_owner`), and if the trader owns and signed for the leg accounts they stay the seller
+with the funding/forwarding accounts recorded under `custody` (the live PUMP shape: both
+PumpSwap receipts verify with the signer as seller, while a router-supplied leg whose
+beneficiary did not sign is refused); pump.fun curve trades verify: a v2 token-quote trade as an ordinary leg through
+`_curve_leg`, and a SOL-quote trade (every legacy trade, a v2 trade quoted in wrapped SOL) from
+the lamport deltas of the curve, fee recipients and trader with the trader's own wraps,
+closures and rent netted, the base leg checked against both accounts' historical balances,
+proceeds re-wrapped into a later leg reported as `converted_within_route`, and any residual the
+reconciliation cannot itemize refusing the receipt with the residual named (legacy layouts
+name no rebate account, so a cashback trade stays unverified rather than mis-stated); both live
+bALLs curve sells verify offline.
+
+dRPC support. `public_config` selects the endpoint without a network request: `DRPC_API_KEY`
+(shared with the EVM skill) plus an optional credential-free `SOLANA_DRPC_URL` (default
+`https://lb.drpc.org/solana`); `--provider auto` (default) uses dRPC when the run authorizes
+paid use (`--cost-policy paid --allow-paid`), otherwise the public root with a
+`provider_fallback` diagnostic when a dRPC URL is configured explicitly; `--provider drpc`
+requires it, `--provider public` never uses it; `SOLANA_RPC_URL` only overrides the public
+root. A URL that carries the key (a `dkey` parameter or a key path segment) is refused before
+any request with a message naming `DRPC_API_KEY`, and both skills' zero-request preflight
+reports it as `rpc_url_carries_credential`. A run records `provider.json` (provider name and
+endpoint namespace hash, never a URL or key) and every later `collect` must use the same
+provider, so tiers never mix in one session. A keyed session drops the public tier's per-method
+windows and keeps the default 40-per-10-s pacing; `getTokenLargestAccounts` and
+`getProgramAccounts` get a 20-second request timeout. `capture` (web only) accepts the run's
+paid flags. The EVM variable was renamed `CRYPTO_RPC_URL` → `ROBINHOOD_DRPC_URL` in both
+tracked EVM skill copies, README and `env.example`.
+
+Node lag. dRPC's load balancer answers the slow census read on one backend and later reads on
+others 15 to 30 slots behind the pinned `minContextSlot`; the first keyed runs (`drpc-jup2`
+to `drpc-jup4`) lost identity to `-32016` errors, four quick attempts per family not being
+enough. The error names the backend's `contextSlot`, so `solana_collect_v2.lag_delay` now waits
+the slot gap (0.4 s per slot plus one second, at most 20 s, 2 s when no slot is named) before
+each of up to three retries, and the session's retry rule allows those attempts.
+
+| Run | Provider | Start wall time | Node lag | Identity | Holders | Facts |
+| --- | --- | --- | --- | --- | --- | --- |
+| `drpc-jup4` (before) | dRPC | 26 s | 8 refusals in two families, then failed | unresolved | none | 4 |
+| `drpc-jup5` (after) | dRPC | 49 s | 1 refusal, retried after the computed wait, then `ok` | resolved | usable (`getTokenLargestAccounts`, 18.5 s) | 14 |
+
+`drpc-jup5` reported `activity_signatures_all_failed`: every listed recent signature at the two
+JUP pools had failed on chain at sampling time, so that run verified no sale; this is the
+diagnostic doing its job, not a verifier regression (the offline suites cover the verifier).
+
+Reviewer findings applied in this round (beyond the above): `capture` no longer refuses the
+run's paid flags; provider mixing between `start` and `collect` is refused; the keyed-session
+comment and runbook no longer overclaim the lifted windows; a router-owned custody leg's
+beneficial wallet must be a signer (and a signer that owns the leg accounts stays the seller); the curve base leg is reconciled against balances; converted curve proceeds are
+labelled; `bundle-v2.md` says +300; `lane_seconds` is tied to the session constant;
+`blocking_reasons` is read instead of a missing key; the fallback diagnostic fires only for an
+explicit dRPC URL; `start`'s configuration check, `provider.json`, `degraded_reads` and the
+request timeouts have tests; the runbook documents the timeouts and the wait.
+
+A second review round (independent reviewer, no must-fix) added: the collector no longer
+extends the node-lag retry budget when a non-lag transient precedes the lag and caps a
+`final`-owner recheck at the one retry `ensure_final_reserve` covers; an exact-quote-in Pump
+curve buy with a native quote is refused with an accurate message rather than the base-amount
+one (a v2-only shape, doc qualified); `check_config` rejects a key-bearing dRPC URL for
+non-CLI callers; the Solana refusal names the `rpc_url_carries_credential` token; `HANDOFF.md`
+(the trusted policy excerpt) states the dRPC policy instead of "deferred"; the EVM adapter
+reports `rpc_url_env_renamed` when a private env still exports the pre-rename `CRYPTO_RPC_URL`;
+`candidates()` reads the market documents once; and tests were added for the bounded retry
+budget, the transient-then-lag guard, the endpoint-namespace comparison, the curve refusal and
+the rename hint. Accepted as documented boundaries (nits): an older run without `provider.json`
+still accepts any provider on `collect`; router custody wallet-side token counter-assets are
+not balance-reconciled (WSOL is, via `_native_proceeds`); `--provider public` silently ignores
+a dRPC `SOLANA_RPC_URL`.
+
+Final suites: router 30, EVM 429, Solana 417.
+
+Suites after this round: router 30, EVM 429, Solana 417. User env: keep
+`ROBINHOOD_DRPC_URL='https://lb.drpc.live/robinhood'` and `SOLANA_DRPC_URL='https://lb.drpc.org/solana'`
+(or `lb.drpc.live/solana`) credential-free, the key only in `DRPC_API_KEY`; the skills send it as a
+`Drpc-Key` header. `plans/drpc-local-setup-and-live-test.md` still shows the old EVM variable
+name as a historical record.

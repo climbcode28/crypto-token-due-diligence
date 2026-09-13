@@ -327,8 +327,8 @@ class Importer:
                 sig=self.objects[name].get('signature')
                 if sig in seen_signatures:continue  # The same receipt read twice is one execution.
                 seen_signatures.add(sig)
-                swaps=[e for e in self.objects[name].get('effects',[]) if e['kind']=='swap_instruction' and e['pool'] in known_pools]
-                if len(swaps)==1:candidates.append({'pool':swaps[0]['pool'],'execution':name})
+                swaps=[e for e in self.objects[name].get('effects',[]) if (e['kind']=='swap_instruction' and e['pool'] in known_pools) or (e['kind']=='protocol_trade_instruction' and e.get('curve') in known_pools)]
+                if len(swaps)==1:candidates.append({'pool':swaps[0].get('pool') or swaps[0]['curve'],'execution':name})
             sales=rebuys=None
             if candidates:
                 # Both directions are derived from the same receipts; a buy is never a failed sale.

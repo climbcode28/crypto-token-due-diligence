@@ -56,15 +56,19 @@ def decode(program,raw,a):
         need(len(raw)==8 and len(a)==8,'unsupported PumpSwap fee claim')
         e.update(kind='creator_fee_claim',mint=a[0],participants={'creator':a[2],'vault':a[4],'destination':a[5]})
     elif program==CURVE_PROGRAM and raw[:8] in (tag('sell'),tag('buy'),tag('sell_v2'),tag('buy_v2'),tag('buy_exact_quote_in_v2')):
-        legacy=raw[:8] in (tag('sell'),tag('buy'));sell=raw[:8] in (tag('sell'),tag('sell_v2'))
-        if raw[:8]==tag('buy'):
-            # Legacy curve buy: amount, max_sol_cost and a one-byte OptionBool track_volume flag.
-            need(len(raw)==25 and raw[24] in (0,1) and len(a)==16,'unsupported Pump trade layout')
-        else:need(len(raw)==24 and len(a)==(14 if legacy else 26 if sell else 27),'unsupported Pump trade layout')
+        legacy=raw[:8] in (tag('sell'),tag('buy'));sell=raw[:8] in (tag('sell'),tag('sell_v2'));exact_quote=raw[:8]==tag('buy_exact_quote_in_v2')
+        # Named roles are positional; routers may append remaining accounts. A legacy buy carries its one-byte track_volume flag.
+        if raw[:8]==tag('buy'):need(len(raw)==25 and raw[24] in (0,1) and len(a)>=16,'unsupported Pump trade layout')
+        else:need(len(raw)==24 and len(a)>=(14 if legacy else 26 if sell else 27),'unsupported Pump trade layout')
         mint=a[2] if legacy else a[1];curve=a[3] if legacy else a[10];need(curve==curve_address(mint),'Pump trade curve mismatch')
-        e.update(kind='protocol_trade_instruction',mint=mint,curve=curve,quote_mint=WSOL if legacy else a[2],
-            direction='sell_base' if sell else 'buy_base',participants={'user':a[6] if legacy else a[13],
-            'base_account':a[5] if legacy else a[14]},specified_atomic=str(int.from_bytes(raw[8:16],'little')),
+        quote_mint=WSOL if legacy else a[2]
+        if legacy:participants={'user':a[6],'base_account':a[5],'curve_holding':a[4],'fee_recipient':a[1],'creator_vault':a[8] if sell else a[9]}
+        else:participants={'user':a[13],'base_account':a[14],'quote_account':a[15],'curve_holding':a[11],'quote_holding':a[12],'fee_recipient':a[6],'quote_fee_account':a[7],
+            'buyback':a[8],'quote_buyback_account':a[9],'creator_vault':a[16],'quote_creator_account':a[17],'rebate':a[20] if sell else a[21]}
+        # A SOL quote is paid and received as lamports even on v2 (the quote ATAs exist but the program moves lamports).
+        e.update(kind='protocol_trade_instruction',mint=mint,curve=curve,quote_mint=quote_mint,quote_native=legacy or quote_mint==WSOL,
+            direction='sell_base' if sell else 'buy_base',mode='exact_in' if sell else 'exact_in_fee_inclusive' if exact_quote else 'exact_out',
+            participants=participants,specified_atomic=str(int.from_bytes(raw[8:16],'little')),
             threshold_atomic=str(int.from_bytes(raw[16:24],'little')),sale_verified=False)
     else:return None
     return e

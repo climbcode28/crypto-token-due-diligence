@@ -26,6 +26,9 @@ def findings(facts):
               'support':[{'evidence_id':fact['evidence_id'],'subject':fact['subject'],'role':'derivation' if usable else 'context'}],
               'counterevidence':[],'time_basis':{'kind':'mixed','sample_ids':fact['sample_ids'],'stability':'not_asserted'},
               'limitations':[str(r['path'])+': '+str(r['value']) for r in fact['limits']],'concern':None,'assertion':'observation'}
+        if not usable:
+            # The unusable inputs and why: a refused method, an unpinned recheck, a header outside the verified interval.
+            base['limitations']+=[r['id']+': '+str(r.get('reason') or r['status']) for r in facts.get('missing_reads',[]) if r['id'] in fact['dependencies']]
         rows.append(base)
         # Split top-level typed fields into bounded precise restatements. No downstream
         # source text is promoted into executable instructions or assessment signals.
