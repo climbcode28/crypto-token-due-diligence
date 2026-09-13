@@ -17,7 +17,7 @@ Reports label each finding as **✅ Good**, **🟡 Potential Risk**, **🔴 Bad*
 what could not be verified, and save the full supporting evidence under `research/`.
 Research is read-only: no wallet connection, signing or trading.
 
-**THIS SKILL IS FOR INFORMATIONAL AND EDUCATIONAL PURPOSES ONLY - <u>NOT FINANCIAL OR INVESTMENT ADVICE</u>.**
+**THIS SKILL IS FOR INFORMATIONAL AND EDUCATIONAL PURPOSES ONLY - <ins>NOT FINANCIAL OR INVESTMENT ADVICE</ins>.**
 Findings may be incomplete or incorrect and do not constitute a recommendation to buy,
 sell, or hold any asset. Independently verify key information before making financial decisions. AI can miss things or get them wrong, so verify important findings yourself. A positive report doesn’t guarantee a token is safe.
 
