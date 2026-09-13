@@ -176,10 +176,15 @@ command once, same `RUN`** (the directory accepts a restart because no block was
 failed artifacts are kept under `failed-attempt-1/`, while the same session retains all
 attempts, limits and deadlines). Apply the Network execution context rule before this retry;
 a declared restriction with omitted execution permission calls for a permission request,
-not a second restricted call. DNS failures alone do not prove a sandbox denial. Only
-`chain_mismatch` means the URL serves another chain; fix the URL in the private env. Never
-debug by trying other environment-variable names, curling the endpoint or reading helper
-source: the pipeline already retried transient failures once and the diagnostic is exact.
+not a second restricted call. `network_unavailable` means nothing answered at all: every web
+discovery host that was captured and the RPC chain check failed before any response
+(`transport_category` and `discovery` record the exact categories), which is the host denying
+outbound network to this command; request network permission for the start command itself,
+then re-run the identical command once, same `RUN`. A DNS failure on the RPC endpoint alone
+does not prove a sandbox denial. Only `chain_mismatch` means the URL serves another chain; fix
+the URL in the private env. Never debug by trying other environment-variable names, curling
+the endpoint or reading helper source: the pipeline already retried transient failures once
+and the diagnostic is exact.
 Exit 2 after `facts.json` exists means a later phase was partial; continue.
 
 What the pipeline reads, all at one pinned block (three blocks behind the reported head, so a

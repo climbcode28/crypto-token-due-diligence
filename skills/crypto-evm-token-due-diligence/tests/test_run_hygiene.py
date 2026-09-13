@@ -135,19 +135,24 @@ class FailingRpc:
 
     def __call__(self, request):
         self.calls += 1
-        if self.mode == "dns":
+        if self.mode == "dns" or (self.mode == "head" and request["method"] == "eth_blockNumber"):
             raise urllib.error.URLError(socket.gaierror(8, "nodename nor servname provided"))
+        if self.mode == "sandbox":
+            raise urllib.error.URLError(OSError(1, "Operation not permitted"))
         if self.mode == "mismatch" and request["method"] == "eth_chainId":
             return {"jsonrpc": "2.0", "id": request["id"], "result": hex(CHAIN + 1)}
+        if self.mode == "head" and request["method"] == "eth_chainId":
+            return {"jsonrpc": "2.0", "id": request["id"], "result": hex(CHAIN)}
         return {"jsonrpc": "2.0", "id": request["id"], "result": "0x64"}
 
 
 class StartDiagnosticsTests(unittest.TestCase):
-    def head(self, root, rpc):
+    def head(self, root, rpc, discovery=None, web=True):
         session = Investigation.create(root / "session.sqlite", 50, 120, request_ceiling=100, timeout_ceiling=300, limit_basis="analyst_safety")
         cache = Cache(root / "cache.sqlite")
         try:
-            pipeline = Pipeline(root, {"chain_id": CHAIN, "address": TOKEN}, "q", "m", rpc, session, cache, "synthetic", synthetic=True, registry=REGISTRY)
+            pipeline = Pipeline(root, {"chain_id": CHAIN, "address": TOKEN}, "q", "m", rpc, session, cache, "synthetic", web=web, synthetic=True, registry=REGISTRY)
+            pipeline.discovery.update(discovery or {})
             with self.assertRaises(StartFailure) as ctx:
                 pipeline.head()
         finally:
@@ -163,6 +168,34 @@ class StartDiagnosticsTests(unittest.TestCase):
         self.assertIn("not a chain mismatch", info["message"])
         self.assertIn("identical start command", info["next_step"])
         self.assertNotIn("chain does not match", info["message"])
+
+    def test_whole_host_denial_is_named_only_when_discovery_also_got_no_response(self):
+        hosts = ("dexscreener", "sourcify", "explorer")
+        denied = {k: {"status": "dns_resolution", "url": f"https://{k}.example/x"} for k in hosts}
+        denied["budget"] = "exhausted before discovery of explorer-holders"  # a string entry the diagnosis must tolerate
+        for rpc, transport in (("dns", "dns_resolution"), ("sandbox", "transport_error")):
+            with tempfile.TemporaryDirectory() as tmp:
+                info = self.head(Path(tmp) / "run", FailingRpc(rpc), discovery=denied)
+            self.assertEqual((info["stage"], info["category"], info["transport_category"]), ("chain_check", "network_unavailable", transport))
+            self.assertEqual(info["discovery"], {k: "dns_resolution" for k in hosts})
+            self.assertIn("(dexscreener, explorer, sourcify)", info["message"])
+            self.assertIn("network permission for the start command itself", info["next_step"])
+            self.assertIn("same run directory", info["next_step"])
+        # Registry gaps never reach the network, so they neither prove nor disprove a denial.
+        with tempfile.TemporaryDirectory() as tmp:
+            info = self.head(Path(tmp) / "run", FailingRpc("dns"), discovery={**denied, "dexscreener": {"status": "unsupported_chain_slug"},
+                                                                                   "explorer": {"status": "no_json_explorer_in_registry", "alternates": []}})
+        self.assertEqual((info["category"], info["discovery"]["sourcify"]), ("network_unavailable", "dns_resolution"))
+        self.assertIn("(sourcify)", info["message"])
+        # A web host that answered (any HTTP status), a skipped discovery, no capture at all, or an RPC endpoint that
+        # answered eth_chainId and then failed on eth_blockNumber cannot prove a host-wide denial.
+        cases = (({**denied, "explorer": {"status": "http_403", "url": "https://explorer.example/x"}}, True, "dns"),
+                 ({k: {"status": "skipped"} for k in hosts}, False, "dns"), ({}, True, "dns"), (denied, True, "head"))
+        for discovery, web, rpc in cases:
+            with tempfile.TemporaryDirectory() as tmp:
+                info = self.head(Path(tmp) / "run", FailingRpc(rpc), discovery=discovery, web=web)
+            self.assertEqual((info["category"], info["stage"]), ("dns_resolution", "head_block" if rpc == "head" else "chain_check"))
+            self.assertNotIn("transport_category", info)
 
     def test_chain_mismatch_names_both_chains(self):
         with tempfile.TemporaryDirectory() as tmp:

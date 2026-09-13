@@ -10,6 +10,11 @@ from adapters import meteora_common as common
 PROGRAM = 'LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo'
 REVISION = '576919e3e4368e542c402f000b4264724f7f23ec'
 BIN_ARRAY_MAX_VERSION = 3
+# LbPair/PositionV2 carry a tombstone-reset marker the 0.12.0 IDL names `version` (`_reserved` in ce0e6afe);
+# only 0 and 1 are documented. Raise a bound only after comparing the account's field list and offsets in a
+# newly pinned IDL with the pinned revision and re-pinning layout-sources.
+PAIR_MAX_VERSION = 1
+POSITION_MAX_VERSION = 1
 CAPABILITY = capability('meteora_dlmm', PROGRAM, REVISION, model='per_bin_position_shares',
     dependencies=['pair_with_embedded_fees', 'mints', 'vaults', 'PositionV2', 'covered_bin_arrays'])
 CAPABILITY.update(position_variants=['fixed_PositionV2_70_bins'],
@@ -43,8 +48,9 @@ def decode_pool(address, value):
         ('index_reference',48,4,True), ('last_update_timestamp',56,8,True)]}
     step, active, gaps = number(raw,80,2), number(raw,76,4,True), []
     # Principal MM balances precede the reward/limit-order union in both known versions.
-    if not (raw[882] in (0,1) and not any(raw[883:]) and raw[75] < 4 and raw[82] < 2 and raw[86] < 2 and raw[87] < 2):
-        gaps.append('unsupported_DLMM_version_or_control_configuration')
+    if raw[882] > PAIR_MAX_VERSION: gaps.append('unsupported_DLMM_pair_version_'+str(raw[882]))
+    if any(raw[883:]): gaps.append('DLMM_pair_reserved_bytes_set')
+    if not (raw[75] < 4 and raw[82] < 2 and raw[86] < 2 and raw[87] < 2): gaps.append('unsupported_DLMM_control_configuration')
     if not (1 <= step <= 400 and cfg['min_bin_id'] <= active <= cfg['max_bin_id'] and
             cfg['function_type'] <= 2 and cfg['collect_fee_mode'] <= 1 and cfg['reduction_factor'] <= 10000 and
             cfg['protocol_share_bps'] <= 10000 and cfg['base_fee_power_factor'] <= 10 and
@@ -68,7 +74,9 @@ def decode_position(address, value, pool, lead=None):
     raw = layout(value, 'PositionV2', 8120)
     need(b58encode(raw[8:40]) == pool, 'DLMM position belongs to another pair')
     lower, upper = number(raw,7912,4,True), number(raw,7916,4,True)
-    need(0 <= upper-lower < 70 and raw[8033] in (0,1) and not any(raw[8035:]), 'expanded/future DLMM position unsupported')
+    need(0 <= upper-lower < 70, 'expanded DLMM position unsupported')
+    need(raw[8033] <= POSITION_MAX_VERSION, 'unsupported DLMM position version '+str(raw[8033]))
+    need(not any(raw[8035:]), 'DLMM position reserved bytes set')
     shares = [number(raw,72+16*i,16) for i in range(70)]
     need(not any(shares[upper-lower+1:]), 'nonzero shares outside position range')
     return {'pool': pool, 'spending_owner': b58encode(raw[40:72]), 'lower_bin_id': lower, 'upper_bin_id': upper,

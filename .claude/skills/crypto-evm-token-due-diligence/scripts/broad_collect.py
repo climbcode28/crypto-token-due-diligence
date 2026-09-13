@@ -35,6 +35,7 @@ class StartFailure(Invalid):
 LANE_MINUTES = 4
 LANE_CHARGE = 20
 PIN_LAG = 3  # blocks behind the reported head: load-balanced public RPCs lag by a block or two
+NO_RESPONSE = ("dns_resolution", "timeout", "transport_error")  # failure categories recorded before any host answered
 
 
 def spawn_prompt(run, lane):
@@ -586,6 +587,19 @@ class Pipeline:
                     "next_step": f"Point the RPC URL variable (ROBINHOOD_DRPC_URL or --rpc-url-env) at an endpoint for chain {self.target['chain_id']} "
                                  "and re-run the identical start command; this run directory accepts the restart."}
         category = acquisition.get("failure_category") or row.get("observation_status") or "unknown"
+        statuses = {k: v.get("status") for k, v in self.discovery.items() if isinstance(v, dict)}
+        # Only a capture that was actually sent records its url; registry gaps (no slug, no JSON explorer) never reach the network.
+        attempted = {k: statuses[k] for k, v in self.discovery.items() if isinstance(v, dict) and v.get("url")}
+        if stage == "chain_check" and self.web and attempted and category in NO_RESPONSE and all(v in NO_RESPONSE for v in attempted.values()):
+            # Nothing answered anywhere: web discovery hosts and the RPC endpoint all failed before any response.
+            # That is the host denying outbound network to this command, not a provider or chain problem.
+            return {"stage": stage, "category": "network_unavailable", "transport_category": category, "discovery": statuses,
+                    "http_status": acquisition.get("http_status"), "rpc_error_code": acquisition.get("rpc_error_code"), "evidence": row.get("artifact"),
+                    "message": "No host answered: web discovery (" + ", ".join(sorted(attempted)) + ") and the RPC endpoint all failed before any response "
+                               + f"({category}). The host denied outbound network to this command; the endpoint and the chain were not verified.",
+                    "next_step": "Request network permission for the start command itself, then re-run the identical start command once in the same run "
+                                 "directory (it accepts the restart and keeps its session ledger). Do not switch providers, try other environment "
+                                 "variable names or read helper source."}
         return {"stage": stage, "category": category, "http_status": acquisition.get("http_status"), "rpc_error_code": acquisition.get("rpc_error_code"),
                 "evidence": row.get("artifact"),
                 "message": "The RPC endpoint could not be reached or did not answer " + ("eth_chainId" if stage == "chain_check" else "eth_blockNumber")

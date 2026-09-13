@@ -44,8 +44,20 @@ class DlmmTests(unittest.TestCase):
             if kind=='expanded':v[a['position']]=mutate(v[a['position']],7916,(70).to_bytes(4,'little'))
             p=dlmm.analyze(target,a['pool'],batch(v),positions=[a['lead']])['positions'][0]
             self.assertIsNone(p['principal']);self.assertTrue(p['gaps'])
+            expected={'version':'unsupported DLMM position version 2','expanded':'expanded DLMM position unsupported'}.get(kind)
+            if expected:self.assertIn(expected,p['gaps'])
         target,a,v=fixture();v[a['pool']]['owner']=damm.PROGRAM
         with self.assertRaises(ValueError):dlmm.analyze(target,a['pool'],batch(v))
+
+    def test_pair_version_bump_and_reserved_bytes_are_named_gaps(self):
+        for offset,data,gap in [(882,b'\2','unsupported_DLMM_pair_version_2'),(890,b'\1','DLMM_pair_reserved_bytes_set'),(75,b'\4','unsupported_DLMM_control_configuration')]:
+            _,a,v=self.analyze();v[a['pool']]=mutate(v[a['pool']],offset,data)
+            result=self.analyze(v)[0]
+            self.assertIsNone(result['positions'][0]['principal']);self.assertEqual(len(result['vaults']),2)
+            self.assertIn(gap,result['gaps'])
+        for offset in (882,8033):  # version 1 (live pairs and positions) is accepted on both accounts
+            _,a,v=self.analyze();key=a['pool'] if offset==882 else a['position'];v[key]=mutate(v[key],offset,b'\1')
+            self.assertEqual(self.analyze(v)[0]['positions'][0]['principal']['amounts_atomic'],['750','1000'])
 
     def test_known_bin_array_versions_decode_and_future_or_padded_arrays_refuse(self):
         # Live arrays carried version 2 on 2026-09-13; the SDK default is 3 (limit orders). Principal offsets are unchanged.

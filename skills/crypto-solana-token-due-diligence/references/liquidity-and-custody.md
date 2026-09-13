@@ -123,7 +123,15 @@ Expanded positions and unknown layout versions refuse principal calculation. Bin
 version bytes 0-3 are accepted: the two pinned IDL revisions (`ce0e6afe` and `576919e3`) keep
 the principal fields (amounts, price, liquidity supply) at the same offsets, and the pinned SDK
 tags version 3 as the limit-order release while reading those fields the same way for every
-version.
+version. LbPair and PositionV2 carry a tombstone-reset version byte that the 0.12.0 IDL names
+(`_reserved` in ce0e6afe); values 0-1 are accepted, and a higher value is reported as a named
+gap (`unsupported_DLMM_pair_version_N`, `unsupported DLMM position version N`) so a Meteora
+bump is attributable at once. Set reserved bytes are `DLMM_pair_reserved_bytes_set` or `DLMM
+position reserved bytes set`; an out-of-range pair type, status, activation type or creator
+control is `unsupported_DLMM_control_configuration`; a range wider than 70 bins is `expanded
+DLMM position unsupported`. Before raising any of these bounds, compare the account's field
+list and offsets in the newly pinned IDL with the pinned revision, re-pin the sources, and add
+the new version to the fixture test.
 
 DAMM v2 uses its actual 1,112-byte Pool and 408-byte Position. Current fee configuration
 is embedded in Pool; it does not contain the initialization configuration address.

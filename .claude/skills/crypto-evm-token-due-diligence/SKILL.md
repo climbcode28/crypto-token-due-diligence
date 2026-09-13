@@ -109,9 +109,11 @@ Follow [runbook.md](references/runbook.md); the commands are exact. In order:
    admin authority, dependencies, maturity), pre-charges both lanes, writes
    `lanes/<lane>/brief.md` and prints two one-line spawn prompts. Typical wall clock is
    under two minutes; network time is seconds.
-   If it prints `"status": "start_failed"`, read `category` and `next_step`: a transport
-   failure means check the declared host network policy before retrying the identical
-   command once (same `RUN`; preserve budgets). If required execution permission was
+   If it prints `"status": "start_failed"`, read `category` and `next_step`:
+   `network_unavailable` means nothing answered (web discovery and RPC), so request network
+   permission for the start command itself and retry the identical command once (same
+   `RUN`; preserve budgets); any other transport failure means check the declared host
+   network policy before that same single retry. If required execution permission was
    omitted, request it on that retry instead of repeating the restricted invocation.
    Only `chain_mismatch` means the URL serves the wrong chain. Never debug by trying other
    variable names or reading helper source.
