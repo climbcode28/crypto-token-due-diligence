@@ -8,6 +8,7 @@ This is a personal, project-agnostic skill. Keep project-specific stacks, paths,
 
 - Implement, review, and improve the requested phase; when all phases are requested, repeat that cycle in dependency order until all remaining phases pass or progress is blocked.
 - Read the whole plan for shared context and dependencies; execute only the selected phase or explicitly requested all-phase scope.
+- Spawn one fresh, read-only reviewer subagent per phase when supported. Give it primary artifacts and scope boundaries, keep fixes with the main agent, and wait for its findings before completion. Use a focused follow-up for substantive fixes; disclose unavailable/failed delegation and never describe fallback self-review as independent review.
 - Discover applicable instructions, current toolchain, maintained patterns, and proportionate verification each run.
 - Protect pre-existing work and respect the user's commit/push preference.
 - Apply routine in-scope fixes without unnecessary approval pauses; ask only about material ambiguity or missing authorization.

@@ -1,6 +1,6 @@
 ---
 name: implement-review-improve
-description: Implement a specified phase or all remaining phases of a saved Markdown plan, reviewing, improving, and verifying each phase using the current project's conventions and commands. Use when the user explicitly invokes implement-review-improve for a phased execution and review cycle, including deep-plan outputs.
+description: Implement a specified phase or all remaining phases of a saved Markdown plan, using an independent reviewer subagent to review each phase before improving and verifying it. Use when the user explicitly invokes implement-review-improve for a phased execution and review cycle, including deep-plan outputs.
 disable-model-invocation: true
 ---
 
@@ -11,7 +11,7 @@ disable-model-invocation: true
 Run this cycle for the requested phase, or for each remaining phase when the user requests all phases:
 
 1. Implement the requested plan phase.
-2. Review the actual changes for defects and worthwhile improvements.
+2. Spawn an independent reviewer subagent to review the actual changes for defects and worthwhile improvements.
 3. Apply in-scope fixes and re-verify. In all-phase mode, continue to the next phase only after the current phase passes its acceptance checks.
 
 Discover the project's stack, rules, patterns, and commands each run. Prefer the simplest implementation that meets the phase's requirements and the project's quality standards. Avoid speculative abstractions and unrelated cleanup. No findings is a valid review result; do not invent refactors to fill a stage.
@@ -63,9 +63,17 @@ Use the execution permissions and tools actually available in the session. A ski
 
 ## Stage 2 — Review
 
-Review the final file contents, relevant callers, and the actual diff attributable to this phase, including new untracked files. Review changed behavior in context rather than only reviewing your implementation summary. Account for overlapping pre-existing edits without treating unrelated work as part of your assignment.
+After implementing each phase, spawn one independent reviewer subagent using the host's available subagent tool. Use a fresh reviewer for each phase, with minimal inherited conversation when supported. Do not substitute a second self-review when delegation is available. In all-phase mode, complete this review and the resulting fixes before advancing to the next dependent phase.
 
-Apply the project's rules first, then the applicable checks below. Drop irrelevant items. Perform this review directly unless the user or applicable instructions request delegated review.
+Give the reviewer the absolute project and plan paths, the selected phase and acceptance criteria, applicable project guidance, changed-file scope, and the pre-phase baseline or diff needed to distinguish your changes from existing user work. Include untracked files. Supply actual verification commands/results, not a favorable interpretation or a list of defects you expect it to find. Ask it to inspect the final files, diff and relevant callers independently; your implementation summary is not the evidence.
+
+The reviewer owns analysis only: it must not edit files, revert others' changes, commit, push, spawn additional agents, or perform live/external actions. It may run safe local checks within the task's existing permissions. Request concrete findings with severity, file/line, failure case, and suggested remedy, or an explicit statement that no actionable findings were found. Require it to name checks it could not complete.
+
+Wait for the review result before declaring the phase complete. While it runs, perform independent local verification without changing the files under review. The main agent assesses each finding against the plan and evidence, applies justified fixes in Stage 3, and explains any rejected or deferred finding. Do not accept a suggestion merely because a reviewer proposed it.
+
+If subagents are unavailable or forbidden by the host/user, disclose that limitation and perform a direct review using the same criteria; label it as a fallback, never as independent review. If a reviewer fails or times out, retry once when feasible, then disclose the failure and use that fallback. If the user explicitly requires independent review as a completion gate, keep the gate blocked instead of substituting self-review.
+
+The reviewer applies project rules first, then the applicable checks below. Drop irrelevant items.
 
 **Correctness and behavior**
 
@@ -105,6 +113,7 @@ Record concrete findings by severity with file/line references where useful, the
 2. Defer unrelated improvements and speculative redesigns. If a finding needs a consequential product decision or additional authorization, explain the concrete issue and ask only for the missing decision while continuing independent work.
 3. Re-run checks affected by the fixes, plus any required project gates not yet completed. Do not repeat unchanged passing checks without a dependency, failure, or unresolved risk that warrants it.
 4. Inspect the final diff for accidental scope expansion and confirm that fixes addressed the findings without introducing a new problem. Continue repairing failures attributable to this phase until it is verified or a concrete blocker prevents progress; do not stop on a fixable failure merely because the first review pass finished.
+   Return substantive behavior/security fixes or disputed unresolved findings to the same reviewer for a focused follow-up. Do not rerun a full review for cosmetic edits or invent issues to force another iteration. Disclose a failed follow-up as a review gap; apply the same fallback/completion-gate rule as Stage 2.
 5. Reconcile every acceptance criterion with its evidence. Update a plan's completion markers only if the user requested progress tracking or the project workflow requires it; preserve the plan's design and future phases.
 
 ## Completion And Final Report
@@ -116,6 +125,7 @@ Report concisely:
 - Phase(s) completed, or partial/blocked status with exactly what remains
 - What changed and why, with links to changed files
 - Review findings fixed, remaining actionable findings, and relevant deferrals; “no actionable findings” is acceptable
+- Whether review was performed by an independent subagent or the disclosed direct-review fallback
 - Checks actually run and their results, including failures, unavailable checks, and residual uncertainty
 - Any material deviation from the plan and the handoff state for the next phase
 - A suggested commit message when files changed

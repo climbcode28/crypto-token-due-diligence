@@ -1,6 +1,6 @@
 ---
 name: implement-review-improve
-description: Cursor entry point for implement-review-improve. Implements one specified phase from a saved Markdown plan, reviews the resulting changes, applies in-scope fixes and verifies acceptance criteria with the project's own conventions and commands, then stops before the next phase. Invoke explicitly with /implement-review-improve.
+description: Cursor entry point for implement-review-improve. Implements a specified phase or all remaining phases of a saved Markdown plan, with an independent reviewer subagent, in-scope improvements and verification for each phase. Invoke explicitly with /implement-review-improve.
 disable-model-invocation: true
 ---
 
