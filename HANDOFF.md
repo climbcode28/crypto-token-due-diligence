@@ -39,5 +39,5 @@ validation and delivery checks. Preserve evidence bytes and frozen replay engine
 
 See the [EVM runbook](skills/crypto-evm-token-due-diligence/references/runbook.md),
 [Solana runbook](skills/crypto-solana-token-due-diligence/references/runbook.md), and
-[project guidance](AGENTS.md). Maintained review records are in [plans/](plans/);
+[project guidance](AGENTS.md). Maintained review records are in [docs/reviews/](docs/reviews/);
 older setup records are described in the [provenance index](docs/development-history.md).

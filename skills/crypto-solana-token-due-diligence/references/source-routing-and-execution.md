@@ -1,7 +1,7 @@
 # Public sources, capture ownership and execution
 
 Version 1.0.0, checked 2026-09-11. See the dated
-[tooling review](../../../plans/solana-evm-parity-2026-09-11/tooling-research.md)
+[tooling review](../../../docs/reviews/solana-evm-parity-2026-09-11/tooling-research.md)
 and [source registry](../assets/protocol-registry.json) for capability boundaries.
 
 Every public HTTP read uses the original durable session. Register each supplied URL

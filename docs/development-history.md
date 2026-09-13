@@ -1,7 +1,7 @@
 # Development provenance
 
 Current release manifests link to the implementation and acceptance records retained
-under `plans/`. Those records describe their original releases, not current setup or
+under `docs/reviews/`. Those records describe their original releases, not current setup or
 provider authorization. Use README and HANDOFF for current operation.
 
 The publication cleanup removed the following completed setup and retired-workflow
@@ -26,3 +26,8 @@ A second pass on 2026-09-12 removed the remaining development records under `pla
 release manifest, document or test referenced, together with the diagram prompt note and the
 standalone diagram viewer. The eight records that release manifests cite remain. The removed files
 are unchanged in Git history at commit `190f40f`.
+
+The eight retained records were subsequently moved from `plans/` to `docs/reviews/`,
+with maintained links updated. Historical paths and captured baseline metadata within
+the records describe their original execution context. `/plans/` is now ignored for
+future local development drafts.

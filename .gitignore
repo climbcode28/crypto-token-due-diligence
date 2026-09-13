@@ -15,3 +15,6 @@ HANDOFF.local.md
 .claude/settings.local.json
 # Frozen development provenance lives on the local archive/pre-publish branch, not in the published tree.
 /history/
+
+# Local development drafts; published review records live in docs/reviews/.
+/plans/

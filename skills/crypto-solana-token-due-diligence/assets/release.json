@@ -17,7 +17,7 @@
     "delivery_reserve_seconds": 120
   },
   "provider_workflow_version": "1.1.0",
-  "review_record": "../../../plans/solana-evm-parity-2026-09-11/implementation.md",
+  "review_record": "../../../docs/reviews/solana-evm-parity-2026-09-11/implementation.md",
   "reporting_version": "2.0.0",
   "default_profile": "solana-evidence-v2",
   "supported_read_profiles": [
@@ -43,7 +43,7 @@
   "discovery_version": "1.4.0",
   "session_runtime_version": "1.2.0",
   "v2_packet_schema_version": 2,
-  "tooling_review": "../../../plans/solana-evm-parity-2026-09-11/tooling-research.md",
+  "tooling_review": "../../../docs/reviews/solana-evm-parity-2026-09-11/tooling-research.md",
   "pool_adapters_version": "1.1.0",
   "concentrated_adapters_version": "1.0.0",
   "meteora_adapters_version": "1.1.0",
@@ -72,5 +72,5 @@
   },
   "legacy_workflow_version": "1.0.1",
   "functional_acceptance": "passed",
-  "live_rich_case_parity": "live end-to-end run with two lanes, a preset, compose and checkpoint completed on the public endpoint on 2026-09-12 (plans/solana-review-fixes-2026-09-11.md); completed broad delivery still depends on lane time and provider limits per run"
+  "live_rich_case_parity": "live end-to-end run with two lanes, a preset, compose and checkpoint completed on the public endpoint on 2026-09-12 (docs/reviews/solana-review-fixes-2026-09-11.md); completed broad delivery still depends on lane time and provider limits per run"
 }

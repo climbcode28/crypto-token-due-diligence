@@ -28,7 +28,7 @@
   "reasoning_scenarios": "references/reporting-scenarios.md",
   "validation_scope": "Offline citation routing and safety regressions; all four README suites and mirrored Claude EVM suite. Research call sequence and budgets unchanged; no live latency guarantee.",
   "previous_reporting_engine_version": "2.6.1",
-  "review_record": "../../../plans/evm-citation-presentation-2026-09-11.md",
+  "review_record": "../../../docs/reviews/evm-citation-presentation-2026-09-11.md",
   "validation_profile": "evm-evidence-v2",
   "legacy_profile": "legacy-v1",
   "reporting_snapshot_schema_version": 1,

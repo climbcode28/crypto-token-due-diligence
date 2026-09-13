@@ -55,10 +55,10 @@ read, and nothing was committed or pushed.
   URL arrays and verify registered evidence integrity.
 
 Independent review artifacts remain in ignored maintenance directories:
-[controls stage 2](../../research/2026-09-08-evm-stage2-independent-controls/review.md),
-[controls stage 3](../../research/2026-09-08-evm-stage3-independent-controls/review.md),
-[memory stage 4](../../research/2026-09-08-stage4-memory-audit/review.md), and
-[report replay stage 4](../../research/2026-09-08-stage4-report-replay-review/review.md).
+[controls stage 2](../../../research/2026-09-08-evm-stage2-independent-controls/review.md),
+[controls stage 3](../../../research/2026-09-08-evm-stage3-independent-controls/review.md),
+[memory stage 4](../../../research/2026-09-08-stage4-memory-audit/review.md), and
+[report replay stage 4](../../../research/2026-09-08-stage4-report-replay-review/review.md).
 The memory review includes independent before/after concurrent-write probes; the
 report review includes a harmless unlisted-import reproduction and original report
 comparisons. These are maintenance probes, not live token evidence.
@@ -108,12 +108,12 @@ mechanical validation cannot certify arbitrary financial prose or hidden tool be
 
 ## Changed files and handoff
 
-Canonical [SKILL.md](../../skills/crypto-evm-token-due-diligence/SKILL.md) now routes the
-common path to [supported research flow](../../skills/crypto-evm-token-due-diligence/references/supported-research-flow.md),
-[strict report profile](../../skills/crypto-evm-token-due-diligence/references/strict-report-profile.md),
-[improvement lifecycle](../../skills/crypto-evm-token-due-diligence/references/improvement-loop.md)
-and [replay](../../skills/crypto-evm-token-due-diligence/references/report-replay.md).
-[Memories](../../skills/crypto-evm-token-due-diligence/memories.md), templates, release
+Canonical [SKILL.md](../../../skills/crypto-evm-token-due-diligence/SKILL.md) now routes the
+common path to [supported research flow](../../../skills/crypto-evm-token-due-diligence/references/supported-research-flow.md),
+[strict report profile](../../../skills/crypto-evm-token-due-diligence/references/strict-report-profile.md),
+[improvement lifecycle](../../../skills/crypto-evm-token-due-diligence/references/improvement-loop.md)
+and [replay](../../../skills/crypto-evm-token-due-diligence/references/report-replay.md).
+[Memories](../../../skills/crypto-evm-token-due-diligence/memories.md), templates, release
 metadata, source-routing, evidence/output, bundle/backend references and README are updated.
 
 New scripts: `rpc_wire.py`, `report_profile.py`, `bootstrap.py`, `evm_decode.py`,
