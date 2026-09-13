@@ -33,7 +33,7 @@ remaining actionable findings from the independent reviews.
 Original GAGE/OURO manifests, report sources and outputs validate in explicit legacy
 mode and render byte-for-byte identically. All 99 report evidence records, seven
 original collections and 35 frozen collector source files retain their registered
-hashes. See [release-verification.json](release-verification.json). Frozen history and
+hashes. See `release-verification.json`. Frozen history and
 original research were not modified. No provider/RPC/token research was rerun; only
 public technical documentation was fetched during maintenance. No credentials were
 read, and nothing was committed or pushed.
@@ -65,7 +65,7 @@ comparisons. These are maintenance probes, not live token evidence.
 
 ## Acceptance reconciliation
 
-Rows follow the original [34-row checklist](acceptance.md), which is preserved as the
+Rows follow the original 34-row checklist (`acceptance.md`), which is preserved as the
 pre-implementation test plan. “Guidance” below identifies a human/coordinator boundary;
 mechanical validation cannot certify arbitrary financial prose or hidden tool behavior.
 

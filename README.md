@@ -17,7 +17,7 @@ additional_context: Questions, links, or specific requirements (optional)
 **Output:** A source-linked assessment of token controls, liquidity, project
 credibility, creator history and token economics.
 
-Reports label each finding as **🟢 Good**, **🟡 Potential Risk**, **🔴 Bad** or **⚪️ Unverified**, explain
+Reports label each finding as **✅ Good**, **🟡 Potential Risk**, **🔴 Bad** or **⚪️ Unverified**, explain
 what could not be verified, and save the full supporting evidence under `research/`.
 Research is read-only: no wallet connection, signing or trading.
 

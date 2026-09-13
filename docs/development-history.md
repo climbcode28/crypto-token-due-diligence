@@ -21,3 +21,8 @@ branch. These records are historical evidence; do not rerun their installers.
 
 The superseded `sharing/` export system and ignored `share-export/` snapshot were removed.
 Install from the repository using `install.sh`; no separate sanitized export is needed.
+
+A second pass on 2026-09-12 removed the remaining development records under `plans/` that no
+release manifest, document or test referenced, together with the diagram prompt note and the
+standalone diagram viewer. The eight records that release manifests cite remain. The removed files
+are unchanged in Git history at commit `190f40f`.

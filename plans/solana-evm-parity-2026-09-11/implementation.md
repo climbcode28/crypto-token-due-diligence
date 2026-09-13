@@ -1,6 +1,6 @@
 # Solana/EVM parity implementation record
 
-Plan: [solana-evm-parity-plan-2026-09-11.md](../solana-evm-parity-plan-2026-09-11.md).
+Plan: `solana-evm-parity-plan-2026-09-11.md`.
 The user authorized all phases sequentially, with implement → review → improve →
 verify and this record updated before advancing. No commits or pushes.
 
@@ -890,7 +890,7 @@ functional success into an unmeasured live-parity claim.
 
 Implemented the independent expected-material-facts corpus, eight acceptance tests,
 maintained seven-repetition scheduler benchmark and an offline live-ledger audit.
-The [acceptance matrix](acceptance.md) covers all eight protocol adapters and all
+The acceptance matrix (`acceptance.md`) covers all eight protocol adapters and all
 22 positive/adverse/unknown scenarios. Independent constants cover quantities,
 ownership denominators, control alternatives, actual sale effects, bounded rights,
 audit versions and severe-concern visibility. Reports were reviewed for factual
@@ -900,8 +900,8 @@ assessment axes; untouched/budget-only work remains an undeliverable checkpoint.
 
 The single preregistered public round is complete: USDC, PYUSD and a recent Pump
 launch. Original clocks, two bounded research lanes and at most two coordinator
-presets were used for each case. See [live-results.md](live-results.md) and
-[live-metrics.json](live-metrics.json). All **102** started network attempts have
+presets were used for each case. See `live-results.md` and
+`live-metrics.json`. All **102** started network attempts have
 completion records, all cases fit the 120-attempt/64-MiB envelope, and all frozen
 inventories still verify. No extra cases, repeat round, paid access or real trades.
 Model: gpt-6-astra (OpenAI); macOS 26.6.2 arm64, Python 3.14.7. Exact per-case clocks,
@@ -951,7 +951,7 @@ the plan; a final guidance assertion prevents conflating it with the v2 versions
 Updated canonical
 skill, runbook, compose/evidence guidance, README and current project HANDOFF section.
 Release metadata explicitly records functional acceptance passed and live parity
-unmet. Rollback instructions are in [acceptance.md](acceptance.md).
+unmet. Rollback instructions are in `acceptance.md`.
 
 Remaining gate: completed broad live parity is **unmet**, owing to incomplete
 critical consistency, custody, actual sale receipts and research coverage. Known
@@ -972,13 +972,13 @@ attempted account read and RPC. Every started attempt completed; reports passed.
 All automatic-facts helpers met the 90s synthetic responsive target. These are
 injected-latency offline measurements, not model/provider or completed-research
 speed claims. Runtime/fixture SHA-256 values and all CPU/elapsed rows are in
-[benchmark.json](benchmark.json).
+`benchmark.json`.
 
 Final review corrected a P2 metadata conflict with the plan: `engine_version`
 had been conflated with v2 release versions. Restored the legacy compatibility
 label and added an assertion against `solana_common.ENGINE_VERSION`; guidance
 **4 passed in 0.378s** afterward. The benchmark's exact pre-correction metadata is
-retained in [benchmark-release.json](benchmark-release.json); only the label changed,
+retained in `benchmark-release.json`; only the label changed,
 so no runtime benchmark repeat was needed. All benchmark runtime source hashes
 still match the final code.
 
@@ -989,7 +989,7 @@ targets); all 50 benchmark runtime and three fixture source hashes match. Canoni
 skill links, frontmatter,
 CLI help, exact provider-policy hash, import isolation and symlink targets passed
 their suites. Final `git diff --check` passed. Full changed-file inventory:
-[changed-files.txt](changed-files.txt), including new fixtures and references.
+`changed-files.txt`, including new fixtures and references.
 
 Suggested commit message: `feat(solana): add evidence-v2 diligence workflow and parity acceptance`.
 No commit, push, package install, personal registration change or further live work.
