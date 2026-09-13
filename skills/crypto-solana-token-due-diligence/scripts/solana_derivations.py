@@ -3,7 +3,7 @@ import re
 from solana_common import need,target_identity,pubkey
 from solana_programs import observed_account
 
-VERSION='1.4.0'  # Persisted derivation contract; bumped whenever any operation's output shape changes.
+VERSION='1.5.0'  # Persisted derivation contract; bumped whenever any operation's output shape or input binding changes.
 RUNTIME_VERSION='1.7.0'
 # The contract version in which each operation's output last changed. A derivation recorded
 # before its operation last changed cannot be recomputed by this engine: read or replay it
@@ -20,7 +20,11 @@ RUNTIME_VERSION='1.7.0'
 # beneficial wallet as seller) and curve trades verify through native or token quote legs.
 # 1.4.0 (2026-09-13): pool facts may carry an optional position_census (counted positions, ranking basis, sampled share) bound to
 # the census read; a pool derivation recorded without it still recomputes, so its entry stays at 1.2.0.
-CHANGED_IN={**{op:'1.1.0' for op in ('controllers','discovery_pools','holders','mint','controls','history')},'pool':'1.2.0','transaction':'1.3.0','sales':'1.3.0','rebuys':'1.3.0'}
+# 1.5.0 (2026-09-13, later): the pool census note carries a scope line and is no longer bound to the census read (one unpinned
+# program scan made every censused pool fact unusable); a resolved concentrated sample with observed positions reports status
+# observed (reserves are never inferred there). A pool derivation recorded at 1.4.0 with a bound census read neither
+# recomputes nor shares the output: read or replay it with its frozen engine, so the pool entry moves to 1.5.0.
+CHANGED_IN={**{op:'1.1.0' for op in ('controllers','discovery_pools','holders','mint','controls','history')},'pool':'1.5.0','transaction':'1.3.0','sales':'1.3.0','rebuys':'1.3.0'}
 
 
 def version_tuple(value):
@@ -118,8 +122,10 @@ def compute(operation,parameters,target,resolve):
         result=module.analyze(target,p['pool'],packets(),**kwargs)
         census=p.get('census')
         if isinstance(census,dict):
-            if census.get('status') in ('sampled','empty','partial') and census.get('read'):resolve(census['read'])  # the census read is a declared input
-            result['position_census']=census
+            # The census read (one unpinned program scan) only ranks leads; it is recorded by id inside the note, never
+            # bound as an input, so the pool fact stays usable on its pinned batches. Principal and custody come from the
+            # sampled positions, which are pinned inputs.
+            result['position_census']={**census,'scope':'unpinned ranking read; counts are not principal or custody evidence'}
         return result
     if operation=='transaction':
         from solana_transactions import decode_transaction

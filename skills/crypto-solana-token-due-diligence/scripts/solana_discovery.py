@@ -6,7 +6,7 @@ import re
 
 from urllib.parse import urlsplit
 
-from solana_common import need, pubkey, target_identity, sha
+from solana_common import need, pubkey, target_identity, sha, signature
 from solana_transport import unique_object, invalid_constant
 from solana_web_capture import clean_url
 
@@ -145,6 +145,35 @@ def pools(record, raw, target, *, source="dexscreener"):
             "candidates": candidates, "rejected": rejected, "duplicates": duplicates,
             "project_links": list({r["url"]: r for r in links}.values()), "evidence": [record["id"]],
             "scope": "one bounded indexer response; not exhaustive pool or custody verification"}
+
+
+def trades_url(pool):
+    return "https://api.geckoterminal.com/api/v2/networks/solana/pools/"+pubkey(pool)+"/trades"
+
+
+def trades(record, raw, pool):
+    """Indexer-listed recent trades at one exact pool: candidate signatures only, each still verified on chain."""
+    pool = pubkey(pool)
+    value = captured_json(record, raw, expected_url=trades_url(pool))
+    need(isinstance(value, dict), "JSON API object required")
+    rows = value.get("data")
+    need(isinstance(rows, list) and len(rows) <= 500, "invalid or oversized trade listing")
+    out, seen = [], set()
+    for row in rows:
+        try:
+            need(isinstance(row, dict) and row.get("type") == "trade", "invalid trade row")
+            a = row["attributes"]
+            sig = signature(a["tx_hash"]); kind = a.get("kind")
+            need(kind in ("buy", "sell") and type(a.get("block_number")) is int and a["block_number"] >= 0, "invalid trade attributes")
+            if sig in seen:
+                continue
+            seen.add(sig)
+            out.append({"signature": sig, "kind": kind, "block_number": a["block_number"], "trader": pubkey(a["tx_from_address"]) if a.get("tx_from_address") else None})
+        except (ValueError, KeyError, TypeError):
+            continue
+    out.sort(key=lambda r: -r["block_number"])
+    return {"pool": pool, "source": "geckoterminal", "evidence": [record["id"]], "captured_at": record["captured_at"], "trades": out,
+            "scope": "indexer-listed candidates; a receipt establishes the swap, never this listing"}
 
 
 def link_identity(url):

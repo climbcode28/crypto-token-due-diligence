@@ -100,10 +100,10 @@ analyst arithmetic. Use compact facts and named presets; raw evidence is for dis
 3. **Facts/presets:** judge from the printed summary; run `solana_facts.py --category`
    only for an omitted material detail. Exact holder aggregates, pool reserves,
    position principal, custody controls and execution reconciliation are computed
-   from typed evidence. Order up to four sequential named presets against the same
-   run while the cutoff and grant allow, custody first (pool, positions, transactions,
-   creator_history, programs, quote, holders, pool_activity). Lane self-checks import own
-   captures; run `refresh` only after captures made outside a lane check.
+   from typed evidence. Run the printed `recommended_presets` in order (request files
+   under `$RUN/recommended-presets/`; up to four presets per run) while the cutoff and
+   grant allow; add a preset only for a hash or address the user or a lane named, never a
+   bare `pool` re-read. Lane self-checks import own captures; `refresh` only after outside captures.
 4. **Note:** edit the scaffolded `$RUN/draft/notes/coordinator.json`: assign a signal
    to each pipeline finding, add your own findings for adverse concerns and lane
    conclusions, replace every `TODO`, resolve cross-lane conflicts, fill the eleven
@@ -169,7 +169,7 @@ token economics, real work vs marketing, creator trading and proceeds, prior lau
 and identity; group pure gaps (`unverified`) separately as **⚪ Unverified**. Good
 needs affirmative evidence; Potential Risk needs an observed concern or adverse
 inference; Bad needs a supported material adverse condition; Unverified is missing
-research or an informational note, never a pass or an allegation; state its `gap_basis`. Use short bullets with **signal icon + label —
+research or an informational note, never a pass or an allegation; state its `gap_basis`; apply the [rating rules](references/reporting-scenarios.md#rating-rules). Use short bullets with **signal icon + label —
 descriptive finding title**, selective bolding of key numbers, and an adjacent native
 Markdown source link on **every finding**: the report's own citation or `answer_link`,
 otherwise the absolute frozen report path as Evidence report. No emoji on source links,

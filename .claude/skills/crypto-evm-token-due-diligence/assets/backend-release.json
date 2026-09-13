@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "engine_version": "3.5.1",
-  "previous_engine_version": "3.5.0",
+  "engine_version": "3.6.0",
+  "previous_engine_version": "3.5.1",
   "rule_versions": {
     "launch_recipients": "1.0.1",
     "fee_predicate": "1.0.1"
@@ -40,6 +40,8 @@
   "fixture": "tests/backend_fixtures.py",
   "validation_scope": "Offline public-selection and clean-install tests plus specialist regression suites; live fresh-host acceptance outcomes and limitations are recorded separately in the review record.",
   "changes": [
+    "Custody reads move into the pipeline: every probed owner's Safe module page (getModulesPaginated from the sentinel, with a truncation flag) and guard slot are read and decoded (owners[*].safe_modules, safe_modules_truncated, safe_guard, safe_guard_read); a position custodian with code, matched by address even when a receipt or the token names it first, answers its withdrawal getters (owner, beneficiary, unlock/lock/release times, token, nft, positionManager, paused) in a second bounded collection phase4b (actors[*].role position_custodian with getters and reverted; EOA owners are position_owner_without_code); log rows decode IncreaseLiquidity token ids; facts.json and recommended-presets.json carry recommended_presets derived from the facts (a launch-window IncreaseLiquidity log scan from the creation block, then a recent window only when disjoint, when identified positions cover under 80% of active liquidity; then positions for the printed ids) and the start summary prints them; work-plan.json keeps the validator's shape. Motivated by the PONS run whose coordinator spent presets on the dead address and never on the Safe or the locker.",
+    "Indexer-listed sale candidates: discovery captures GeckoTerminal's recent trades for the canonical pool (registry geckoterminal network ids) and fills the remaining sale-candidate slots with listed sells (one slot always goes to the most recent listed sell when the explorer named two, since a wallet-to-pool transfer can be a liquidity add); facts.indexed carries indexed_trades_captured and indexed_sells, and recommended_presets names a receipts preset for unprobed listed sells when no sale verified. The receipt, never the listing, establishes the sale.",
     "Start names a whole-host network denial: when every web discovery host and the RPC chain check fail before any response, start-failed.json carries category network_unavailable with transport_category and the discovery statuses, and its next step asks for network permission for the start command itself before the identical in-place restart; a single-host transport failure keeps its exact category. Motivated by the Solana sandbox-denial live failure; synthetic regression coverage plus a sandbox-exec reproduction on macOS.",
     "Chain-specific built-in public RPC defaults for seven registered mainnets, explicit credential-free public selection, unchanged configured-provider authorization gates, and target-derived selection for presets and low-level collections. Separate per-command paid flags from repeat consent; exercise clean link/copy installation and report delivery.",
     "Publication hardening: anonymous EVM web captures reject private destinations and connected peers, validate redirects, and ignore environment proxies. Claude uses ordinary host tool permissions without shipped auto-allow wildcards.",

@@ -57,7 +57,7 @@ request coordinator import/targeted presets where needed.
 
 Do not run RPC, read credentials, create scripts, spawn agents, change settings or
 registrations, compose/finalize, buy service access, or mutate another lane. Only the
-coordinator executes the two bounded follow-up preset calls. A tool limitation,
+coordinator executes the bounded follow-up presets (the printed queue, at most four). A tool limitation,
 cutoff or missing lane does not count as completed standard research.
 
 Write only the assigned `notes/project.json` and your owned lane files. Preserve its

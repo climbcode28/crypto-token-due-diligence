@@ -339,7 +339,10 @@ def aggregate_holders(discovery, sample, target, *, custody_exclusions=None):
             "custody_exclusion": custody_exclusions.get(address), **holding})
     need(observed_total+withheld_total <= supply, "sample amounts exceed same-context supply")
     # Only holding-side unknowns can hide balances; an unknown mint extension is a control gap, not a quantity gap.
-    return {"target": target, "status": "partial" if missing or withheld_unknown or not mint["extensions_valid"] else "sampled",
+    # The largest-accounts read returns the exact top 20 token accounts, so a complete sample is an observation of
+    # account concentration (beneficial ownership stays a stated limit); a bounded program scan stays a sample.
+    complete = not missing and not withheld_unknown and mint["extensions_valid"]
+    return {"target": target, "status": ("observed" if method == "getTokenLargestAccounts" else "sampled") if complete else "partial",
         "discovery_slot": d["context_slot"], "sample_slot": s["context_slot"],
         "discovery": {"method": method, "leads": len(leads),
             "accounts_scanned": len(scanned) if method == "getProgramAccounts" else None,

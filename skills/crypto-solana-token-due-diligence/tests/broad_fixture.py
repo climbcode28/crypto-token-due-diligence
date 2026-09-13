@@ -7,6 +7,19 @@ from adapters.meteora_common import CLOCK
 from meteora_fixture import clock
 
 
+def program_accounts(program,authority=None,slot=50):
+    """An upgradeable program account plus its ProgramData PDA (metadata: slot and an upgrade authority)."""
+    from solana_fixture import account
+    from solana_common import base58_bytes
+    from solana_addresses import find_program_address
+    from solana_programs import UPGRADEABLE
+    pd=find_program_address([base58_bytes(program,32)],UPGRADEABLE)[0]
+    prog={**account(bytes([2,0,0,0])+base58_bytes(pd,32)),'owner':UPGRADEABLE,'executable':True}
+    auth=authority or key(93)
+    data={**account(bytes([3,0,0,0])+slot.to_bytes(8,'little')+b'\1'+base58_bytes(auth,32)),'owner':UPGRADEABLE}
+    return {program:prog,pd:data}
+
+
 class RichRpc(Rpc):
     values={};pool=None;target=None;largest={}
     @classmethod
@@ -15,7 +28,7 @@ class RichRpc(Rpc):
         cls.values[key(7)]=holding(target['mint'],key(8),10000);cls.largest={target['mint']:[key(7)],a['lp']:[a['holder']]}
         from metadata_fixture import metadata_account
         cls.metadata=metadata_account(target['mint'],update_authority=key(90),creators=[(key(91),True,60),(key(92),False,40)]);cls.values[cls.metadata['address']]=cls.metadata['account']
-        cls.calls=[];cls.active=cls.peak=0;cls.mode='normal';cls.stamp=int(time.time());cls.receipt=None;cls.receipts={};Web.token_info=True;Web.pairs=None;return target
+        cls.calls=[];cls.active=cls.peak=0;cls.mode='normal';cls.stamp=int(time.time());cls.receipt=None;cls.receipts={};Web.token_info=True;Web.pairs=None;Web.trades=None;return target
     def __call__(self,req):
         cls=type(self)
         with cls.lock:cls.calls.append(copy.deepcopy(req));cls.active+=1;cls.peak=max(cls.peak,cls.active)
@@ -56,7 +69,7 @@ class RichRpc(Rpc):
 
 
 class Web:
-    calls=[];blocked=False;token_info=True;pairs=None  # pairs overrides the single default DEX Screener pair
+    calls=[];blocked=False;token_info=True;pairs=None;trades=None  # pairs overrides the single default DEX Screener pair; trades feeds every pool's trade listing
     def open(self,request,timeout):
         cls=type(self);cls.calls.append(request.full_url);url=request.full_url
         if cls.blocked:return Response(b'Unavailable',403,{'Content-Type':'text/plain'})
@@ -65,6 +78,7 @@ class Web:
               'liquidity':{'usd':'1000000'},'priceUsd':'2','volume':{'h24':'500000'},'info':{'websites':[{'url':'https://project.example/token'}]}}]
         elif 'geckoterminal' in url and url.endswith('/info'):
             value={'data':{'id':'solana_'+RichRpc.target['mint'],'type':'token','attributes':{'address':RichRpc.target['mint'],'name':'Coin','symbol':'COIN','websites':['https://project.example/'],'twitter_handle':None,'telegram_handle':None,'discord_url':None}}} if cls.token_info else {'data':{}}
+        elif 'geckoterminal' in url and url.endswith('/trades'):value={'data':cls.trades or []}
         elif 'geckoterminal' in url:value={'data':[]}
         elif 'lite-api.jup.ag' in url:
             from urllib.parse import urlsplit,parse_qsl

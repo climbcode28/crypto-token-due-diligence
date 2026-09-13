@@ -5,7 +5,7 @@ import sys
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]/"scripts"))
-from solana_discovery import MAINNET, pools, source_plan, repository_urls, repository_metadata, repository_revision, repository_tree, registry
+from solana_discovery import MAINNET, pools, source_plan, repository_urls, repository_metadata, repository_revision, repository_tree, registry, trades, trades_url
 from solana_common import sha, target_identity
 from solana_fixture import TARGET, KEY, OTHER, GENESIS
 
@@ -22,6 +22,35 @@ def dex_pair():
     return {"chainId": "solana", "pairAddress": GENESIS, "baseToken": {"address": KEY},
             "quoteToken": {"address": OTHER}, "dexId": "raydium", "liquidity": {"usd": 1234.56},
             "priceUsd": "0.00000123456789", "info": {"websites": [{"url": "https://project.example/"}]}}
+
+
+def trade(sig, kind, block, trader=KEY):
+    return {"id": "solana_" + str(block), "type": "trade", "attributes": {"tx_hash": sig, "kind": kind, "block_number": block, "tx_from_address": trader}}
+
+
+class TradeFeedTests(unittest.TestCase):
+    def test_trade_feed_binds_route_drops_malformed_rows_and_orders_recent_first(self):
+        from solana_common import b58encode
+        sigs = [b58encode(bytes([n]) * 64) for n in (1, 2, 3, 4)]
+        rows = [trade(sigs[0], "buy", 10), trade(sigs[1], "sell", 30), trade(sigs[1], "sell", 30),  # duplicate signature counts once
+                trade("not-base58!", "sell", 40), trade(sigs[2], "hold", 50), {"type": "swap"},  # dropped rows
+                {"id": "x", "type": "trade", "attributes": {"tx_hash": sigs[3], "kind": "sell", "block_number": "20"}}, trade(sigs[2], "sell", 20, trader=None)]
+        record, raw = capture({"data": rows}, trades_url(GENESIS))
+        result = trades(record, raw, GENESIS)
+        self.assertEqual([(r["signature"], r["kind"], r["block_number"], r["trader"]) for r in result["trades"]],
+                         [(sigs[1], "sell", 30, KEY), (sigs[2], "sell", 20, None), (sigs[0], "buy", 10, KEY)])
+        self.assertEqual((result["pool"], result["source"], result["evidence"]), (GENESIS, "geckoterminal", ["capture"]))
+        self.assertIn("receipt establishes the swap", result["scope"])
+        # Another pool's feed, a non-object body, an oversized listing and a degraded capture are refused.
+        with self.assertRaises(ValueError):
+            trades(record, raw, KEY)
+        for body in ([], {"data": {}}, {"data": [trade(sigs[0], "buy", 1)] * 501}):
+            other, other_raw = capture(body, trades_url(GENESIS))
+            with self.assertRaises(ValueError):
+                trades(other, other_raw, GENESIS)
+        for change in ({"status": "http_403"}, {"shell_suspected": True}, {"final_url": "https://api.geckoterminal.com/other"}):
+            with self.assertRaises(ValueError):
+                trades({**record, **change}, raw, GENESIS)
 
 
 class DiscoveryTests(unittest.TestCase):

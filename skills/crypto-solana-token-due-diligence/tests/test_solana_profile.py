@@ -106,6 +106,8 @@ class ProfileTests(unittest.TestCase):
         with self.assertRaisesRegex(ProfileError,'operation version differs'):validate(b.root,True)  # controls output changed in 1.1.0
         self.assertEqual(derivations.recomputable('quote_sizes','1.0.0'),'ok');self.assertEqual(derivations.recomputable('controls',derivations.VERSION),'ok')
         self.assertIn('differs',derivations.recomputable('controllers','1.0.0'))
+        # A pool derivation recorded with a bound census read (contract 1.4.0) is refused; the 1.5.0 shape recomputes.
+        self.assertIn('differs',derivations.recomputable('pool','1.4.0'));self.assertEqual(derivations.recomputable('pool','1.5.0'),'ok')
 
     def test_supply_tick_between_rechecks_keeps_stability_with_changed_fields(self):
         import base64

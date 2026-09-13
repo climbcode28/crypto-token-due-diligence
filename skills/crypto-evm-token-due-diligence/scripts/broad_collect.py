@@ -231,13 +231,13 @@ class Pipeline:
         self.quote_sizes, self.extra_pools, self.holders = list(quote_sizes), [address(p) for p in pools], holders or {}
         self.explorer, self.web, self.synthetic = explorer, web, synthetic
         self.registry = registry if registry is not None else presets.registry(self.target["chain_id"])
-        self.discovery = {"dexscreener": {"status": "not_attempted"}, "sourcify": {"status": "not_attempted"}, "explorer": {"status": "not_attempted"}}
+        self.discovery = {"dexscreener": {"status": "not_attempted"}, "sourcify": {"status": "not_attempted"}, "explorer": {"status": "not_attempted"}, "geckoterminal": {"status": "not_attempted"}}
         self.pairs, self.links, self.abi, self.source_body = [], {"websites": [], "socials": []}, None, None
         self.collections, self.names, self.log = [], {}, []
         self.decoded = {}  # alias -> (row, decoded dict)
         self.pin = None
         self.creation = {}
-        self.indexed_holders, self.indexed_transfers, self.sell_candidates = [], [], []
+        self.indexed_holders, self.indexed_transfers, self.sell_candidates, self.indexed_trades = [], [], [], []
         self.counters, self.creator_activity, self.pins_seen = {}, {}, {}
         self.explorer_base = None
 
@@ -391,9 +391,64 @@ class Pipeline:
             except (ValueError, OSError):
                 pass
         self.parse_explorer_extras(by_id, out)
+        self.capture_indexed_trades(out)
         write_new(self.run / "discovery.json", {"schema_version": 1, "target": self.target, "captured_at_utc": stamp(),
                                                  "discovery": self.discovery, "pairs": self.pairs, "links": self.links,
                                                  "abi_getters": self.abi_getters()})
+
+    def capture_indexed_trades(self, out):
+        """Indexer-listed recent trades at the canonical pool (GeckoTerminal) name sale candidates when the explorer's
+        recent-transfer page holds no wallet-to-pool transfer; the receipt, never the listing, establishes the sale."""
+        network = self.registry.get("geckoterminal")
+        pool = next((p["pair"] for p in self.pairs if not p.get("is_pool_id")), None)
+        self.indexed_trades = []
+        if not network or not pool:
+            self.discovery["geckoterminal"] = {"status": "no_geckoterminal_network_in_registry" if not network else "no_address_pool_indexed"}
+            return
+        item = {"id": "geckoterminal-trades", "url": f"https://api.geckoterminal.com/api/v2/networks/{network}/pools/{pool}/trades",
+                "purpose": "Indexer-listed recent trades at the canonical pool (sale candidates)"}
+        if self.session is not None and self.fetch is not None and not self.session.acquire("discovery_web"):
+            self.discovery["geckoterminal"] = {"status": "budget_exhausted", "url": item["url"]}
+            return
+        if self.fetch is None:
+            from web_capture import capture
+            records = capture([item], out, timeout=15, session=self.session, operation="discovery_web")
+        else:
+            records = self.fetch([item], out)
+        record = next((r for r in records if r["id"] == item["id"]), None)
+        if record is None:
+            self.discovery["geckoterminal"] = {"status": "not_captured", "url": item["url"]}
+            return
+        ok = record.get("http_status") == 200 and not record.get("failure_category")
+        self.discovery["geckoterminal"] = {"status": "ok" if ok else (record.get("failure_category") or "http_" + str(record.get("http_status"))),
+                                           "url": record["url"], "captured_at_utc": record.get("captured_at_utc"), "bytes": record.get("bytes", 0), "pool": pool}
+        if not ok or not record.get("raw"):
+            return
+        try:
+            body = json.loads((out / record["raw"]).read_bytes().decode("utf-8"))
+        except (ValueError, OSError):
+            self.discovery["geckoterminal"]["status"] = "unparseable"
+            return
+        rows = mapping(body).get("data")
+        for row in (rows if isinstance(rows, list) else [])[:300]:
+            a = mapping(mapping(row).get("attributes"))
+            tx = str(a.get("tx_hash") or "").lower()
+            kind = a.get("kind")
+            if not re.fullmatch(r"0x[0-9a-f]{64}", tx) or kind not in ("buy", "sell") or any(t["tx"] == tx for t in self.indexed_trades):
+                continue
+            trader = str(a.get("tx_from_address") or "").lower()
+            self.indexed_trades.append({"tx": tx, "kind": kind, "block": a.get("block_number") if isinstance(a.get("block_number"), int) else None,
+                                        "trader": trader if re.fullmatch(r"0x[0-9a-f]{40}", trader) else None})
+        self.indexed_trades.sort(key=lambda t: -(t["block"] or 0))
+        sells = [t["tx"] for t in self.indexed_trades if t["kind"] == "sell"]
+        # Listed sells fill the remaining candidate slots; when the explorer filled both, its second (smaller) transfer
+        # yields to the most recent listed sell, because a wallet-to-pool transfer can also be a liquidity add.
+        for tx in sells:
+            if tx not in self.sell_candidates and len(self.sell_candidates) < 2:
+                self.sell_candidates.append(tx)
+        if sells and not any(tx in sells for tx in self.sell_candidates) and len(self.sell_candidates) == 2:
+            self.sell_candidates[1] = sells[0]
+        self.discovery["geckoterminal"].update(trades=len(self.indexed_trades), sells=len(sells), sale_candidates=list(self.sell_candidates))
 
     def explorer_json(self, by_id, out, rid):
         record = by_id.get(rid)
@@ -961,12 +1016,18 @@ class Pipeline:
             base = presets.label("owner-" + name)
             code = self.value(base + "-runtime")
             owners_raw = self.value(base + "-getOwners")
+            modules_page = decode_module_page(self.value(base + "-getModulesPaginated"))
             owner_details[name] = {"address": owner, "code_bytes": len(bytes.fromhex(code[2:])) if isinstance(code, str) else None,
                                    "safe_owners": decode_result("a0e67e2b", owners_raw).get("addresses") if owners_raw else None,
                                    "safe_owner_count": decode_result("a0e67e2b", owners_raw).get("count") if owners_raw else None,
                                    "safe_threshold": self.word_value(base + "-getThreshold"), "owner": self.address_value(base + "-owner"),
-                                   "reverted": self.reverted(base, ("getOwners", "getThreshold", "owner")),
-                                   "evidence": {"runtime": base + "-runtime", "getOwners": base + "-getOwners", "getThreshold": base + "-getThreshold", "owner": base + "-owner"}}
+                                   # Modules and the guard are the Safe powers a signer count does not show: a module moves assets without signatures.
+                                   "safe_modules": modules_page["modules"] if modules_page else None,
+                                   "safe_modules_truncated": bool(modules_page and modules_page["next"] != presets.SAFE_SENTINEL),
+                                   "safe_guard": self.address_value(base + "-guard"), "safe_guard_read": self.status(base + "-guard") == "ok",
+                                   "reverted": self.reverted(base, ("getOwners", "getThreshold", "owner", "getModulesPaginated")),
+                                   "evidence": {"runtime": base + "-runtime", "getOwners": base + "-getOwners", "getThreshold": base + "-getThreshold", "owner": base + "-owner",
+                                                "getModulesPaginated": base + "-getModulesPaginated", "guard": base + "-guard"}}
         return quotes, positions, owner_details
 
     def phase4(self, head, receipts, positions, owner_details, architecture_addresses):
@@ -990,7 +1051,13 @@ class Pipeline:
             for owner in detail.get("safe_owners") or []:
                 if owner:
                     actors[presets.label("signer-" + owner[2:8])] = owner
-        known = {self.target["address"], DEAD, *architecture_addresses}
+        # A position custodian keeps its actor row even when the token also names it as an architecture contract:
+        # its withdrawal terms are read here, not left to a coordinator preset.
+        custodians = {}
+        for position in positions:
+            if position.get("owner") and position["owner"] not in (self.target["address"], DEAD):
+                custodians.setdefault(presets.label("pos-owner-" + position["owner"][2:8]), position["owner"])
+        known = {self.target["address"], DEAD, *architecture_addresses} - set(custodians.values())
         actors = {k: v for k, v in actors.items() if v not in known}
         seen = set()
         unique = {}
@@ -1010,6 +1077,31 @@ class Pipeline:
             code = self.value("actor-" + presets.label(name))
             details[name] = {"address": addr, "code_bytes": len(bytes.fromhex(code[2:])) if isinstance(code, str) else None,
                              "evidence": "actor-" + presets.label(name)}
+        # A position custodian is matched by address (its actor row may carry a receipt or transfer label); one with code
+        # answers its withdrawal getters in a second bounded collection, an EOA owner has none to answer.
+        custodian_addrs = set(custodians.values())
+        probe = {name: addr for name, addr in unique.items() if addr in custodian_addrs and (details[name]["code_bytes"] or 0) > 0}
+        for name, addr in unique.items():
+            if addr in custodian_addrs:
+                details[name]["role"] = "position_custodian" if name in probe else "position_owner_without_code"
+        if probe:
+            getter_ids, queries = {}, []
+            for name, addr in probe.items():
+                rows = presets.getter_queries("actor-" + presets.label(name), "current", addr, presets.LOCKER_GETTERS)
+                getter_ids[name] = {sig.split("(")[0]: row["id"] for sig, row in zip(presets.LOCKER_GETTERS, rows)}
+                queries += rows
+            plan = presets.plan(self.target, {"current": head}, queries)
+            write_new(self.run / "phase4b-plan.json", plan)
+            getters_result = self.collect("phase4b", plan, max_requests=len(queries) + 4)
+            for name in probe:
+                details[name]["getters_read"] = getters_result["status"] in ("complete", "partial")
+                getters = {}
+                for sig in presets.LOCKER_GETTERS:
+                    label = sig.split("(")[0]
+                    raw = self.value(getter_ids[name][label])
+                    if raw is not None:
+                        getters[label] = {"decoded": decode_result(selector(sig), raw), "evidence": getter_ids[name][label]}
+                details[name].update(getters=getters, reverted=[label for label, alias in getter_ids[name].items() if self.status(alias) == "reverted"])
         return result, details
 
     def pool_destinations(self, pools):
@@ -1156,14 +1248,18 @@ class Pipeline:
                  "holder_selection": {"limit": TOP_HOLDER_READS, "excluded_addresses": getattr(self, "holder_exclusions", []),
                                       "basis": "First indexed page, excluding target, dead and separately requested balances; no global or beneficial-owner ranking"},
                  "indexed": {"counters": self.counters, "top_holders_captured": len(self.indexed_holders), "recent_transfers_captured": len(self.indexed_transfers),
-                             "sale_candidates": list(self.sell_candidates)},
+                             "sale_candidates": list(self.sell_candidates), "indexed_trades_captured": len(self.indexed_trades),
+                             "indexed_sells": [t["tx"] for t in self.indexed_trades if t["kind"] == "sell"][:10],
+                             "indexed_trades_sample": self.indexed_trades[:10]},
                  "coverage_hint": hints, "collections": self.collections, "imported": imported, "document_evidence": registered_docs,
                  "session": self.session.status() if self.session is not None else None,
                  "elapsed_seconds": round(time.monotonic() - started, 3), "phases": self.log,
                  "limits": ["Decoded values are display help bound to the linked evidence; semantics, source correspondence and economic meaning require review.",
                             "Registry addresses are candidates verified only by the code reads recorded here."]}
+        facts["recommended_presets"] = recommended_presets(facts)
         write_new(self.run / "facts.json", facts)
-        write_new(self.run / "work-plan.json", self.work_plan(hints))
+        write_new(self.run / "work-plan.json", self.work_plan(hints))  # the validator's plan shape, nothing else
+        write_new(self.run / "recommended-presets.json", facts["recommended_presets"])
         if self.session is not None:
             try:
                 plan = self.work_plan(hints)
@@ -1180,6 +1276,52 @@ class Pipeline:
                 facts["review"] = {"action": "unavailable", "reason": str(exc)[:120]}
         self.mark("facts")
         return facts
+
+
+def decode_module_page(raw):
+    """(address[] modules, address next) from Safe.getModulesPaginated; None unless the ABI shape is exact."""
+    if not isinstance(raw, str) or not re.fullmatch(r"0x(?:[0-9a-fA-F]{64})+", raw):
+        return None
+    words = [int(raw[2 + 64 * i:66 + 64 * i], 16) for i in range((len(raw) - 2) // 64)]
+    if len(words) < 3 or words[0] != 64 or words[1] >= 2 ** 160:
+        return None
+    count = words[2]
+    if count > 10 or len(words) != 3 + count or any(w == 0 or w >= 2 ** 160 for w in words[3:]):
+        return None
+    return {"modules": ["0x" + format(w, "040x") for w in words[3:]], "next": "0x" + format(words[1], "040x")}
+
+
+def recommended_presets(facts):
+    """Presets the coordinator should run next, derived from the facts. Empty when the standard reads covered the routes:
+    Safe modules and guard, locker getters, position custody and sale receipts are read by the pipeline itself."""
+    out = []
+    pin = (facts.get("pin") or {}).get("number")
+    pools = facts.get("pools") or []
+    canonical = next((p for p in pools if p.get("read") == "v3" and p.get("target_in_pool")), None)
+    nfpm = next((a["address"] for a in facts.get("architecture") or [] if a.get("label") == "nfpm"), None)
+    positions = [p for p in facts.get("positions") or [] if canonical and p.get("pool") == canonical["pair"]]
+    covered = round(sum(p.get("pct_of_pool_active_liquidity") or 0 for p in positions), 4)
+    if canonical and nfpm and pin and covered < 80:
+        span = 9999
+        creation_block = (facts.get("creation") or {}).get("block")
+        windows = []
+        if isinstance(creation_block, int) and creation_block <= pin:
+            windows.append(("launch window", creation_block, min(pin, creation_block + span)))  # launch-locked positions are added near launch
+        if not windows or windows[0][2] < max(0, pin - span):
+            windows.append(("recent window", max(0, pin - span), pin))
+        for label, frm, to in windows[:2]:
+            out.append({"preset": "logs", "dimension": "canonical_lp_principal_custody",
+                        "command": f'collect --run "$RUN" --preset logs --contract {nfpm} --topic {topic("IncreaseLiquidity(uint256,uint128,uint256,uint256)")} --from-block {frm} --to-block {to}',
+                        "then": 'collect --run "$RUN" --preset positions --ids <the token_ids the logs rows print; keep the ids whose positions read back at the canonical pool>',
+                        "reason": f"identified positions cover {covered}% of the canonical pool's active liquidity; {label} of {to - frm + 1} blocks (eth_getLogs ranges are capped at {span + 1}), a sample of liquidity adds, never an enumeration"})
+    verified = any(s.get("verified") for s in facts.get("sales") or [])
+    probed = {r.get("tx") for r in facts.get("receipts") or []} | set((facts.get("indexed") or {}).get("sale_candidates") or [])
+    pending = [tx for tx in (facts.get("indexed") or {}).get("indexed_sells") or [] if tx not in probed][:2]
+    if not verified and pending:
+        out.append({"preset": "receipts", "dimension": "sellability_exit_depth",
+                    "command": f'collect --run "$RUN" --preset receipts --tx {",".join(pending)}',
+                    "reason": "no sale verified yet; these indexer-listed sells at the canonical pool were not probed"})
+    return out[:4]
 
 
 def summary_lines(facts):
@@ -1218,7 +1360,12 @@ def summary_lines(facts):
         rev = o.get("reverted") or []
         safe_note = "reverted (signers unresolved)" if "getOwners" in rev else o.get("safe_owners")
         owner_note = "reverted (owner unresolved)" if "owner" in rev else o.get("owner")
-        lines.append(f"owner-of [{ev.get('runtime')}, {ev.get('getOwners')}, {ev.get('getThreshold')}] {name}: {o['address']} code={o['code_bytes']} safe_owners={safe_note} threshold={o.get('safe_threshold')} owner={owner_note}")
+        if o.get("safe_owners"):
+            modules_note = "reverted" if "getModulesPaginated" in rev else (str(o.get("safe_modules")) + ("+more" if o.get("safe_modules_truncated") else ""))
+            guard_note = (o.get("safe_guard") or "zero (no guard)") if o.get("safe_guard_read") else "unread"
+        else:
+            modules_note = guard_note = "n/a (not a resolved Safe)"
+        lines.append(f"owner-of [{ev.get('runtime')}, {ev.get('getOwners')}, {ev.get('getThreshold')}, {ev.get('getModulesPaginated')}, {ev.get('guard')}] {name}: {o['address']} code={o['code_bytes']} safe_owners={safe_note} threshold={o.get('safe_threshold')} owner={owner_note} modules={modules_note} guard={guard_note}")
     for r in facts["receipts"]:
         lines.append(f"receipt [{r.get('evidence')}] {r['tx'][:14]} status={r['status']} block={r['block']} from={r['from']} transfers={len(r['transfers'])} nfpm_positions={r.get('nfpm_position_ids')}")
     for p in facts["positions"]:
@@ -1226,6 +1373,9 @@ def summary_lines(facts):
         lines.append(f"position [{ev.get('positions')}, {ev.get('owner')}, {ev.get('approved')}] {p['id']} owner={p.get('owner')} approved={p.get('approved')} liquidity={p.get('liquidity')} range=[{p.get('tickLower')},{p.get('tickUpper')}] in_range={p.get('in_range')} pct_active={p.get('pct_of_pool_active_liquidity')}")
     for name, a in facts.get("actors", {}).items():
         lines.append(f"actor {name} {a['address']} code_bytes={a['code_bytes']} evidence={a['evidence']}")
+        if a.get("role") == "position_custodian":
+            answered = {k: v["decoded"] for k, v in (a.get("getters") or {}).items()}
+            lines.append(f"custodian-getters [{', '.join(v['evidence'] for v in (a.get('getters') or {}).values()) or 'none answered'}] {a['address']} answered={json.dumps(answered, default=str)[:600]} reverted={a.get('reverted')}")
     for p in facts.get("pools", []):
         if p.get("counter_balance") is not None:
             lines.append(f"pool-depth [{p['evidence'].get('counter_balance')}] {p.get('prefix')} holds {p.get('counter_balance')} {p.get('counter_symbol')} and {p.get('target_balance')} target at the pin")
@@ -1246,6 +1396,11 @@ def summary_lines(facts):
     if facts.get("document_evidence"):
         lines.append("document evidence: " + ", ".join(facts["document_evidence"]))
     lines.append("coverage_hint: " + ", ".join(f"{k}={v}" for k, v in facts["coverage_hint"].items()))
+    recommended = facts.get("recommended_presets") or []
+    for n, r in enumerate(recommended, 1):
+        lines.append(f"recommended preset {n} [{r['dimension']}]: {r['command']} | {r['reason']}" + (f" | then: {r['then']}" if r.get("then") else ""))
+    if not recommended:
+        lines.append("recommended presets: none; the standard reads covered custody, Safe modules/guard, custodian getters and sale receipts")
     if facts.get("review"):
         lines.append("budget review: " + json.dumps(facts["review"]))
     return lines

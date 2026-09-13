@@ -12,7 +12,7 @@ is a new dated directory under the project's ignored `research/` folder.
 | 0 | 0:00 | Read the provider policy excerpt (injected at load in Claude Code; `python3 "$SKILL_DIR/scripts/provider_context.py" --policy` in Codex). | Which RPC to use and with which flags. |
 | 1 | 0:10 | `broad_collect.py start` (below). It runs discovery (Dexscreener, Sourcify, explorer creation/holders/transfers/counters), four pinned phases, the source match, the launch signer's explorer activity, writes `facts.json`, composes the **pipeline note** (its own factual findings), pre-charges both lanes, writes both briefs and prints two spawn prompts. | The whole standard collection and the factual half of the report in one process, usually 20–90 s. |
 | 2 | 0:30–1:30 | Spawn **both** lanes in **one** message with the two printed one-line prompts (`Read the file …/lanes/<lane>/brief.md and follow it exactly …`). Do not paste or retype the brief and do not read the facts first; every minute the lanes start late is a minute added to the run. | Two lanes working from a self-contained brief; they self-validate their notes with `compose --check` before returning. |
-| 3 | 1:30–3:30 | Read the printed summary (or `bundle_assemble.py facts "$RUN/draft"`). Decide the presets (up to four while at least 150 s remain before the deadline, custody first) and run them **in one shell call, sequentially** (they share the run's session and draft files; parallel processes would race). If the creation transaction is unknown and a lane reports it, the first preset is `receipts --tx`, the second `positions --ids` from that receipt. | Decoded controls, pools, quotes, balances, positions, receipts, actors with evidence aliases. |
+| 3 | 1:30–3:30 | Read the printed summary (or `bundle_assemble.py facts "$RUN/draft"`). Run the printed recommended presets (usually none or one; at most four while at least 150 s remain before the deadline) **in one shell call, sequentially** (they share the run's session and draft files; parallel processes would race). If the creation transaction is unknown and a lane reports it, the first preset is `receipts --tx`, the second `positions --ids` from that receipt. | Decoded controls, pools, quotes, balances, positions, receipts, actors with evidence aliases. |
 | 4 | 4:00–4:30 | Lane notes land in `$RUN/notes/`. Compose **both** in one shell call, sequentially (joined with `;`, never as parallel tool calls: the notes share one draft file): `bundle_assemble.py compose "$RUN/draft" "$RUN/notes/liquidity.json" --lane liquidity` and the same for project. If a lane is absent at 4:30, run its minimum checklist yourself in one `web_capture.py --out "$RUN/lanes/<lane>"` batch, write `$RUN/notes/<lane>.json` with `"lane": "<lane>"` and compose it `--lane <lane>`. | Findings, coverage and scope merged; capture files registered as evidence. |
 | 5 | 4:30–6:00 | `bundle_assemble.py scaffold "$RUN/draft"` writes `$RUN/notes/coordinator.json` with scope entries, a `signals` skeleton for every pipeline finding, all eleven coverage keys (lane results prefilled), the decision and text skeleton, alias hints and `TODO` markers. Edit it: give each pipeline finding its topic and signal, add your own findings (adverse concerns, lane conclusions), replace every `TODO`. Then `bundle_assemble.py finalize "$RUN/draft" --out "$RUN/report" --note "$RUN/notes/coordinator.json"`. | Compose → check → freeze → deliver in one process, or every note-level error at once. |
 | 6 | 6:00–7:00 | Fix note errors once if needed (the error text names the field and the allowed values; it is the specification, never read `compose.py`); write the chat answer from `report.md`. `finalize` marks `composed` and `delivered` for you. | Completed report and a 300–600-word answer. |
@@ -255,6 +255,23 @@ python3 "$SKILL_DIR/scripts/broad_collect.py" collect --run "$RUN" --preset logs
 python3 "$SKILL_DIR/scripts/broad_collect.py" collect --run "$RUN" --preset pool --contract 0x… --version v3
 ```
 
+`facts.json` and `recommended-presets.json` carry `recommended_presets` (`work-plan.json` keeps the
+validator's plan shape), and `start` prints them as `recommended preset N [dimension]: collect … |
+reason` lines: when the identified positions cover less than 80% of the canonical pool's active
+liquidity, a bounded `logs` scan of the position manager's IncreaseLiquidity events over the
+10,000 blocks from the token's creation block (launch-locked positions are added near launch)
+and, only when that window is disjoint from it, a second scan of the 10,000 blocks before the pin
+(`eth_getLogs` ranges are capped at 10,000 blocks, so each is a sample of liquidity adds, never an
+enumeration); the logs rows print `token_ids`, which feed `positions --ids` for the ids that read
+back at the canonical pool; and `receipts` for indexer-listed sells at the canonical pool that were
+not probed when no sale verified (discovery captures GeckoTerminal's recent trades for the canonical
+pool; listed sells fill the remaining sale-candidate slots, and one slot always goes to the most
+recent listed sell when the explorer named two, since a wallet-to-pool transfer can be a liquidity add). Run them in order; the pipeline itself already reads every owner's
+Safe signers, threshold, module page and guard slot (`owners[*].safe_modules`, `safe_guard`,
+`safe_guard_read`, `safe_modules_truncated`) and, in a second bounded collection (`phase4b`), the
+withdrawal getters of every position custodian with code (`actors[*].role == "position_custodian"`
+with `getters` and `reverted`), so a bare `architecture` or `getters` preset for those is redundant.
+
 Each `collect` call is a fresh shell: source the private env and pass the same provider
 flags as `start`; every `collect` recomposes the pipeline note with new receipts. Other preset results
 are printed and imported into the draft; use those aliases in coordinator findings to update the initial observations. Several presets go
@@ -262,8 +279,9 @@ in one shell call joined with `;`, never as parallel tool calls: they share the 
 ledger and the draft. Each preset is one pinned collection at the
 run's pin (receipts at their own historical pins), imported into the draft, with decoded rows
 printed. Getter signatures must come from a verified ABI or specification; the selector is
-derived deterministically. Use presets for conclusion-changing checks (a locker's withdrawal
-path, a sale receipt a lane found, a second position), not for a second contextual sweep.
+derived deterministically. Use presets only from the printed recommended queue, or for a receipt hash a lane found or a
+contract the user named; the pipeline itself reads a locker's withdrawal getters and a Safe's
+modules and guard, never for a second contextual sweep.
 
 ## Notes (steps 4–5)
 

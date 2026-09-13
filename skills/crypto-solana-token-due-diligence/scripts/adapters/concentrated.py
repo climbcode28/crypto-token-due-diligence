@@ -106,6 +106,8 @@ def analyze(module, target, pool, observations, positions):
     state['liquidity'], state['sqrt_price_x64'] = str(state['liquidity']), str(state['sqrt_price_x64'])
     result = sample.finish()
     result['position_coverage'] = 'sampled' if positions and all(p['status'] == 'observed' for p in result['positions']) else 'partial'
+    # A resolved sample with observed positions is observed; reserves are never inferred here, so they cannot gate it.
+    result['status'] = 'observed' if not result['gaps'] and result['position_coverage'] == 'sampled' else 'partial'
     result['controller_roots'] += [{'address': p['custody'][role], 'role': role, 'position': p['address'], 'evidence': p['evidence']}
         for p in result['positions'] if p['custody'] for role in ('spending_owner','delegate','close_authority') if p['custody'][role] is not None]
     return result

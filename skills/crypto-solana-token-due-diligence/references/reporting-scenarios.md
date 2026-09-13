@@ -27,6 +27,31 @@
   Explain what the available evidence answers and what remains unverified. Do not
   fabricate a four-axis verdict solely to make the delivery schema pass.
 
+## Rating rules
+
+Rows with a verified observation are rated; `Unverified` is reserved for a route that was not
+run or whose sources answered nothing (its `gap_basis` says which).
+
+- **Concentration (current_concentration):** the holders fact is `observed` when the exact
+  largest-20 read succeeded; rate it from the custody-adjusted figures. `good` when the top 20
+  hold at most 30% of supply and the largest spending owner at most 5%; `potential_risk` above
+  either bound; `bad` when one non-custody owner holds 50% or more. Beneficial ownership and
+  linked wallets stay a stated limit in the text, never the reason for `unverified`.
+- **Custody (canonical_lp_principal_custody):** an `observed` pool fact with sampled positions
+  and named custodians is rated from what they show: `good` when the sampled principal sits
+  under a lock or program custody with no reachable withdrawal path; `potential_risk` when
+  identified custody covers a minority of active liquidity or a custodian can withdraw, stating
+  the covered share; `bad` when a single unlocked owner can remove most of it.
+- **Policies (utility_redemption_rights, token economics):** a published discretionary buyback,
+  burn or revenue policy without on-chain execution evidence is `potential_risk` (discretion is
+  the observed concern); with verified rebuys or burns it may be `good` for the executed part.
+  It is `unverified` only when the policy page was never captured.
+- **Assurance (development_disclosure):** audit or repository absence after the project's
+  docs, site and repository links were checked is `potential_risk`; a matched audit of the
+  deployed revision is `good`. Only an uncaptured site or refused repository is `unverified`.
+- **Confidence axis, not rows:** team accountability, organic adoption, beneficial ownership and
+  future price impact are inherently unverifiable; state them under Research confidence.
+
 Review rendered reports for factual calibration as well as structural validity.
 Use [decision review](decision-review.md), [strict profile](strict-report-profile.md)
 and [completion](completion-and-delivery.md) when a judgment changes scope or strength.

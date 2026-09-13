@@ -1,6 +1,7 @@
 from pathlib import Path
 import sys,os,tempfile,unittest,unittest.mock,time,json,copy
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'scripts'))
+from pool_fixture import key
 from broad_fixture import RichRpc,Web
 import solana_session
 from solana_broad_collect import start,collect,status,STAGES
@@ -543,6 +544,93 @@ class ImporterBoundaryTests(unittest.TestCase):
         with unittest.mock.patch.object(module,'market_documents',lambda root,target:docs):self.assertEqual([(r['pool'],r['liquidity_usd']) for r in module.candidates('.',{'mint':'x'})],[('Z','4614790'),('GT','3698062')])
         docs[0]['candidates'][0]['liquidity_usd']='45990510'  # one shared pool ten times apart: different scales again
         with unittest.mock.patch.object(module,'market_documents',lambda root,target:docs):self.assertEqual([r['pool'] for r in module.candidates('.',{'mint':'x'})],['Z','D'])
+
+    def test_indexer_listed_trades_are_probed_before_a_bot_dominated_chain_listing(self):
+        from transaction_fixture import fixture
+        from solana_common import b58encode
+        from solana_transactions import SYSTEM
+        def seed():
+            root,target,opts=self.setup_run();_,a,packet,_=fixture();tx=packet['response']['result']
+            tx['transaction']['message']['accountKeys']=[RichRpc.pool['pool'] if k==a['pool'] else k for k in tx['transaction']['message']['accountKeys']]
+            tx['blockTime']=RichRpc.stamp;RichRpc.receipt=tx
+            # Seven newer receipts touch the pool without a supported swap: the chain listing alone exhausts the probe window.
+            bots={}
+            for n in range(7):
+                other=copy.deepcopy(tx);sig=b58encode(bytes([60+n])*64);other['transaction']['signatures'][0]=sig
+                keys=other['transaction']['message']['accountKeys'];other['transaction']['message']['instructions'][a['swap_index']]['programIdIndex']=keys.index(SYSTEM);bots[sig]=other
+            RichRpc.receipts=bots;return root,target,opts,tx['transaction']['signatures'][0]
+        root,target,opts,swap=seed();result=start(root,target,**opts);self.assertFalse(result['diagnostics'],result['diagnostics'])
+        classification=json.loads((root/'receipt-classification.json').read_text())
+        self.assertEqual((classification['probed'],classification['selected'],classification['listings'][0]['listed'],classification['listings'][0]['indexed_candidates']),(6,0,8,0))
+        self.assertEqual(json.loads((root/'automatic-receipts.json').read_text()),[])
+        # The indexer lists the swap as a sell: it is probed first and the receipt verifies it, one probe instead of a missed window.
+        root,target,opts,swap=seed()
+        Web.trades=[{'id':'t1','type':'trade','attributes':{'tx_hash':swap,'kind':'sell','block_number':100,'tx_from_address':key(8)}},
+                    {'id':'t2','type':'trade','attributes':{'tx_hash':swap,'kind':'sell','block_number':100,'tx_from_address':key(8)}}]  # a duplicate row is one candidate
+        result=start(root,target,**opts);self.assertFalse(result['diagnostics'],result['diagnostics']);validate(root/'draft',True)
+        classification=json.loads((root/'receipt-classification.json').read_text())
+        # The first probe is the indexed sell; the remaining probes keep looking for a second receipt among the bots.
+        self.assertEqual((classification['probed'],classification['selected'],classification['listings'][0]['indexed_candidates']),(6,1,1))
+        self.assertEqual([r['swap'] for r in classification['rows']],[True]+[False]*5);self.assertIn(swap,[r['signature'] for r in json.loads((root/'automatic-receipts.json').read_text())])
+        self.assertTrue(any(u.endswith('/pools/'+RichRpc.pool['pool']+'/trades') for u in Web.calls))
+
+    def test_pipeline_captures_never_consume_the_lane_capture_allowance(self):
+        from solana_broad_collect import capture
+        root,target,opts=self.setup_run();start(root,target,**opts)
+        import solana_session
+        s=solana_session.Session(root)
+        try:
+            pipeline=s.db.execute("SELECT count(*) FROM web_sources WHERE owner='ordinary' AND status='pending'").fetchone()[0]
+        finally:s.close()
+        self.assertGreaterEqual(pipeline,4)  # discovery pages, the project link and the leading pool's trade feed
+        urls=['https://lane.example/page'+str(n) for n in range(12)]
+        result=capture(root,urls,'project',opener_factory=Web)
+        self.assertEqual(len(result['captures']),12);self.assertEqual(result['unattempted'],[])
+        self.assertEqual(capture(root,['https://lane.example/extra'],'liquidity',opener_factory=Web)['unattempted'][0]['status'],'unattempted_cap')
+
+    def test_recommended_presets_follow_the_facts_and_shrink_as_presets_run(self):
+        from solana_broad_collect import collect
+        root,target,opts=self.setup_run();result=start(root,target,**opts)
+        queue=result['recommended_presets'];kinds=[q['kind'] for q in queue]
+        # No receipt verified a sale, the metadata authority has no history page and the pool program was never read.
+        self.assertEqual(kinds,['pool_activity','creator_history','programs'])
+        self.assertEqual(queue[0]['parameters'],{'pool':RichRpc.pool['pool'],'limit':25,'receipts':2,'probes':6})
+        self.assertEqual(queue[1]['parameters'],{'keys':[key(90),key(91)]});self.assertEqual(queue[2]['dimension'],'external_dependencies')  # update authority and verified creator
+        self.assertIn('recommended presets in order',result['next'])
+        for q in queue:
+            spec=json.loads(Path(q['request']).read_text());self.assertEqual(set(spec),{'id','kind','parameters'});self.assertIn('recommended-presets',q['request'])
+        self.assertFalse(list((root/'preset-requests').glob('*.json')) if (root/'preset-requests').exists() else [],'recommended requests are not leads until they run')
+        # Running the history recommendation from its request file removes it from the queue.
+        spec=json.loads(Path(queue[1]['request']).read_text());after=collect(root,spec,opts['config'],factory=RichRpc)
+        self.assertIsNone(after['preset_error']);self.assertEqual([q['kind'] for q in after['recommended_presets']],['pool_activity','programs'])
+        # A row whose preset ran without closing its gap leaves the queue: the open gap is the named limit, not a loop.
+        spec=json.loads(Path(after['recommended_presets'][0]['request']).read_text());self.assertEqual(spec['kind'],'pool_activity')
+        again=collect(root,spec,opts['config'],factory=RichRpc);self.assertIsNone(again['preset_error'])
+        self.assertEqual([q['kind'] for q in again['recommended_presets']],['programs'])
+        # The cap counts presets already run: four request files leave nothing to recommend.
+        from solana_broad_collect import recommended_presets
+        for n in range(2):(root/'preset-requests'/('pad'+str(n)+'.json')).write_text('{}')
+        self.assertEqual(recommended_presets(root),[])
+        # A verified sale removes the sellability recommendation.
+        from transaction_fixture import fixture
+        root,target,opts=self.setup_run();_,a,packet,_=fixture();tx=packet['response']['result']
+        tx['transaction']['message']['accountKeys']=[RichRpc.pool['pool'] if k==a['pool'] else k for k in tx['transaction']['message']['accountKeys']]
+        tx['blockTime']=RichRpc.stamp;RichRpc.receipt=tx
+        self.assertNotIn('pool_activity',[q['kind'] for q in start(root,target,**opts)['recommended_presets']])
+        # A focused run gets no queue and no request folder.
+        root,target,opts=self.setup_run();focused=start(root,target,**{**opts,'scope':'focused','surfaces':['token_controls']})
+        self.assertEqual(focused['recommended_presets'],[]);self.assertFalse((root/'recommended-presets').exists())
+
+    def test_creator_history_for_an_attributed_wallet_is_bound_to_the_wallet_subject(self):
+        from solana_broad_collect import collect
+        root,target,opts=self.setup_run();start(root,target,**opts)
+        from pool_fixture import key
+        wallet=key(90)  # the fixture metadata update authority: an attributed key that is not the mint
+        result=collect(root,{'id':'history','kind':'creator_history','parameters':{'keys':[wallet]}},opts['config'],factory=RichRpc)
+        self.assertIsNone(result.get('preset_error'),result.get('preset_error'))
+        manifest=json.loads((root/'draft/manifest.json').read_text())
+        rows=[d for d in manifest['derivations'] if d['operation']=='history']
+        self.assertEqual(len(rows),1);self.assertEqual((rows[0]['subject']['kind'],rows[0]['subject']['address'],rows[0]['parameters']['address']),('wallet',wallet,wallet))
 
     def test_run_keeps_its_provider_and_degraded_reads_are_diagnosed(self):
         from solana_broad_collect import run_provider,check_config,provider_diagnostics,collect

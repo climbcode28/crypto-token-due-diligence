@@ -10,7 +10,7 @@ from validate_bundle import (Invalid, address, digest, file_in, integer, need,
                              quantity, read_json, sha)
 from rpc_wire import validate_response
 
-ENGINE_VERSION = "3.5.1"
+ENGINE_VERSION = "3.6.0"
 # Public explorers and RPC front doors (Cloudflare) challenge generic client signatures and
 # Chrome-style agents that lack Chrome's client hints; a Safari-style agent is answered normally.
 BROWSER_USER_AGENT = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) "

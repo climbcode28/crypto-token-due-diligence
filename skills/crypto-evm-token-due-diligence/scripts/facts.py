@@ -9,6 +9,9 @@ import re
 from pathlib import Path
 
 from validate_bundle import read_json
+from keccak import topic
+
+INCREASE_LIQUIDITY_TOPIC = topic("IncreaseLiquidity(uint256,uint128,uint256,uint256)")
 
 TRANSFER = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
 DEAD = "0x000000000000000000000000000000000000dead"
@@ -247,7 +250,16 @@ def summarize_row(root, ev, names=None, decimals=None):
         item["decoded"] = {"block": int(result["blockNumber"], 16), "from": result.get("from"), "to": result.get("to"),
                            "value": int(result.get("value", "0x0"), 16), "input_selector": (result.get("input") or "")[:10]}
     elif method == "eth_getLogs":
-        item["decoded"] = {"logs": len(result)}
+        ids = []
+        for log in result or []:
+            topics = (log.get("topics") or []) if isinstance(log, dict) else []
+            if topics and str(topics[0]).lower() == INCREASE_LIQUIDITY_TOPIC and len(topics) > 1:
+                try:
+                    ids.append(int(topics[1], 16))
+                except (TypeError, ValueError):
+                    pass
+        # Position ids from IncreaseLiquidity events are the input of the positions preset the queue names next.
+        item["decoded"] = {"logs": len(result or []), "token_ids": sorted(set(ids))[:20], "token_ids_total": len(set(ids))}
     elif method == "eth_chainId":
         item["decoded"] = {"chain_id": int(result, 16)}
     elif method == "eth_getBalance":

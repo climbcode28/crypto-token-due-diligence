@@ -106,7 +106,7 @@ limit or stay `pending`; a completed report allows only `resolved` or
 `evidenced_external_limit` boundaries and no `pending_work`. Finding and support
 subjects are `{genesis_hash, kind, address}` with `kind` one of `mint`, `holding`,
 `program`, `controller`, `pool`, `position`, `wallet` or `document` (a document
-subject's address is the target mint).
+subject's address is the target mint). A surface is `checked` when its standard route ran and answered, even with a stated limit: current_concentration with an `observed` holders fact (exact largest-20, custody exclusions applied), canonical_lp_principal_custody with an `observed` pool fact whose sampled positions name their custodians, utility_redemption_rights with the policy captured and its execution route attempted. Rate such rows by the [rating rules](reporting-scenarios.md#rating-rules); do not leave them `partial` for a limit the text already states.
 
 The coordinator copies the scaffold's `decision_template` into `decision` and completes
 it: `verdict_kind` (`insufficient_evidence`, `conditional`, `favorable`, `adverse`),

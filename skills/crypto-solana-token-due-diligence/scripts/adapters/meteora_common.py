@@ -73,6 +73,8 @@ def finish(sample):
             if address:
                 result['controller_roots'].append({'address': address, 'role': role, 'position': p['address'], 'evidence': p['evidence']})
     result['position_coverage'] = 'sampled' if result['positions'] and all(p['status'] == 'observed' for p in result['positions']) else 'partial'
+    # A resolved sample with observed positions is observed; depth limits are scope, not a missing dependency.
+    result['status'] = 'observed' if not result['gaps'] and (result['reserves_atomic'] is not None or result['position_coverage'] == 'sampled') else 'partial'
     return result
 
 

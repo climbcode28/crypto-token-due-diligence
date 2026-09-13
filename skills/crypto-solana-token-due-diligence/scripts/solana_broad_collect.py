@@ -17,10 +17,11 @@ from solana_facts import encoded,atomic,build,compact
 from solana_profile import regular,strict_json,PROFILE,DIMENSIONS,Evidence,validate_report
 from solana_compose import CHECKLISTS,empty_coverage,expand_finding,note_header,validate_imports,ComposeError,preflight
 
-VERSION='1.6.0'
+VERSION='1.8.0'
 ASSETS=Path(__file__).resolve().parents[1]/'assets'
 STAGES=('identity_discovery','related_accounts_controllers','pool_transaction_quote_dependencies','final_consistency_checks')
 PRESET_CAP=4  # named coordinator presets per run; the collection cutoff and request grants gate each one before this count does
+RECEIPT_PROBES=6  # recent signatures classified per run before the receipt budget is spent; indexer-listed trades go first
 
 
 PUBLIC_ROOT='https://api.mainnet-beta.solana.com'
@@ -416,12 +417,26 @@ def record_probes(root,sample,rows,selected,*,probes,receipts,listings=None):
     atomic(receipts_path,encoded(known+[{'pool':r['pool'],'signature':r['signature'],'direction':r['direction'],'route':r['route'],'sample':sample} for r in selected]))
 
 
+def trade_candidates(root,pool,*,sells=3,buys=1):
+    """Indexer-listed recent trades at the exact pool as probe candidates: most recent sells first, then a buy."""
+    from solana_discovery import trades,trades_url
+    expected=clean_url(trades_url(pool))
+    for path in sorted((Path(root)/'web-captures').glob('*.json')):
+        record=json.loads(path.read_text())
+        try:
+            if record.get('status')!='ok' or not record.get('raw') or clean_url(record.get('url',''))!=expected:continue
+            rows=trades(record,(Path(root)/record['raw']).read_bytes(),pool)['trades']
+        except (ValueError,KeyError,TypeError):continue
+        return [r for r in rows if r['kind']=='sell'][:sells]+[r for r in rows if r['kind']=='buy'][:buys]
+    return []
+
+
 def ordered_leads(selected,ranked):
     """Decodable pools in exact-mint discovery liquidity order; pools absent from discovery keep their observation order, last."""
     rank={pool:i for i,pool in enumerate(ranked)};return sorted(selected,key=lambda item:rank.get(item[0],len(rank)))
 
 
-def automatic_dependencies(root,config,factory):
+def automatic_dependencies(root,config,factory,*,opener_factory=None):
     from adapters import pool_adapter
     from solana_programs import observed_account,decode_program
     accounts,objects,checked=importer_view(root);by_program={pool_adapter(k).PROGRAM:k for k in ADAPTERS};selected=[]
@@ -451,19 +466,33 @@ def automatic_dependencies(root,config,factory):
     # A small recent candidate sample is not archive coverage or proof of selling.
     # Recent pool signatures are probed one at a time and classified before the receipt budget
     # is spent on headers: only receipts carrying a supported swap at the exact pool are sampled
-    # (at most two, from at most four probes). Historical effects still verify the actual flow.
+    # (at most two, from at most six probes). Historical effects still verify the actual flow.
+    # A pool's recent chain listing is often dominated by bot transactions that touch the pool
+    # without swapping, so indexer-listed trades (sells first) are probed before the chain listing;
+    # the receipt, never the indexer, establishes the swap.
+    from solana_discovery import trades_url
+    def trades_capture(lead):
+        # Indexer trade feeds exist for pools, not launch curves; the capture is filed under sellability, never as pool discovery.
+        if lead['adapter'] in ('pump_curve',):return
+        try:capture(root,[trades_url(lead['pool'])],dimension='sellability_exit_depth',opener_factory=opener_factory)
+        except (ValueError,OSError,KeyError,TypeError):pass
     receipts=[];classified=[];probed=set();listings=[]
     for n,lead in enumerate(automatic):
-        if len(receipts)==2 or len(probed)==4:break
+        if len(receipts)==2 or len(probed)==RECEIPT_PROBES:break
+        trades_capture(lead)  # the second pool's feed is fetched only when probes remain for it
         packet=execute(root,config,'activity'+str(n),read('history','getSignaturesForAddress',
-            [lead['pool'],{'commitment':'finalized','limit':10}]),factory=factory)
+            [lead['pool'],{'commitment':'finalized','limit':25}]),factory=factory)
         if packet.get('status')!='ok':continue
-        listed=packet['response']['result'];signatures=[r['signature'] for r in listed if r['err'] is None and r['signature'] not in probed]
-        listings.append({'pool':lead['pool'],'sample':'activity'+str(n),'listed':len(listed),'failed':sum(1 for r in listed if r['err'] is not None),'unseen':len(signatures)})
+        listed=packet['response']['result'];failed={r['signature'] for r in listed if r['err'] is not None}
+        indexed=[r['signature'] for r in trade_candidates(root,lead['pool']) if r['signature'] not in failed]
+        signatures=list(dict.fromkeys(indexed+[r['signature'] for r in listed if r['err'] is None]))
+        signatures=[sig for sig in signatures if sig not in probed]
+        listings.append({'pool':lead['pool'],'sample':'activity'+str(n),'listed':len(listed),'failed':len(failed),'unseen':len(signatures),'indexed_candidates':len(indexed)})
         # The probe shares the receipts sample's read name, so the later sample resumes it without a second send.
-        rows,selected=classify_probes(root,config,'receipts',lead['pool'],signatures,probes=4-len(probed),receipts=2-len(receipts),factory=factory)
+        rows,selected=classify_probes(root,config,'receipts',lead['pool'],signatures,probes=RECEIPT_PROBES-len(probed),receipts=2-len(receipts),factory=factory)
+        for r in rows:r['source']='indexed' if r['signature'] in indexed else 'listing'
         probed.update(r['signature'] for r in rows);classified+=rows;receipts+=selected
-    record_probes(root,'receipts',classified,receipts,probes=4,receipts=2,listings=listings)
+    record_probes(root,'receipts',classified,receipts,probes=RECEIPT_PROBES,receipts=2,listings=listings)
     if automatic:
         collect_sample(root,root,config,'receipts',mint_baseline(target['mint'],largest=False)+[receipt_read(r['signature']) for r in receipts],factory=factory)
     # Capture known ProgramData authority metadata without pretending the slice is a
@@ -490,6 +519,54 @@ def automatic_dependencies(root,config,factory):
             except (ValueError,KeyError,TypeError) as exc:lead['positions'],lead['census']=[],{'status':'partial','reason':str(exc) if isinstance(exc,ValueError) else type(exc).__name__}
     atomic(Path(root)/'automatic-leads.json',encoded(automatic))
     return results
+
+
+def recommended_presets(root):
+    """Presets the coordinator should run next, derived from the run's facts and leads: sellability when no sale verified,
+    creator history for attributed keys without a history page, program control for pools whose program stayed unread.
+    Request files are written under recommended-presets/ (never preset-requests/, which the importer reads as leads)."""
+    root=Path(root).resolve();out=[]
+    if not (root/'draft/facts.json').exists():return out
+    s=Session(root)
+    try:scope=s.meta['scope'];remaining=s.status()['remaining_requests'];seconds=s.remaining_seconds()
+    finally:s.close()
+    if scope!='broad' or seconds<=0:return out  # a focused run answers its question; past the cutoff no preset is accepted
+    try:facts=strict_json((root/'draft/facts.json').read_bytes(),'facts.json')['facts']
+    except (ValueError,KeyError,TypeError):return out
+    leads=json.loads((root/'automatic-leads.json').read_text()) if (root/'automatic-leads.json').exists() else []
+    ran={p.stem for p in (root/'preset-requests').glob('*.json')} if (root/'preset-requests').exists() else set()
+    by_op={}
+    for f in facts:by_op.setdefault(f['operation'],[]).append(f['data'])
+    verified=sum(d.get('verified_receipts',0) for d in by_op.get('sales',[]))
+    lead=next((l for l in leads if l.get('adapter')!='pump_curve'),None)
+    if not verified and lead:
+        out.append({'id':'rec-activity','kind':'pool_activity','parameters':{'pool':lead['pool'],'limit':25,'receipts':2,'probes':6},'dimension':'sellability_exit_depth','sends':13,
+                    'reason':'no sale verified by the automatic receipt sample; indexer-listed trades at the leading pool are probed first, then the chain listing'})
+    seen_history={d.get('address') for d in by_op.get('history',[])}
+    keys=[k['address'] for d in by_op.get('creator_activity',[]) for k in d.get('keys',[]) if k.get('address') and k['address'] not in seen_history]
+    keys=list(dict.fromkeys(keys))[:2]
+    if keys:
+        out.append({'id':'rec-history','kind':'creator_history','parameters':{'keys':keys},'dimension':'historical_launch_integrity','sends':6,
+                    'reason':'attributed creator key(s) without a signature history page: prior launches and proceeds derive from it'})
+    from adapters import pool_adapter
+    programs=[]
+    for d in by_op.get('pool',[]):
+        if any(g in ('program_control_not_observed','program_upgrade_authority_unresolved') for g in d.get('gaps',[])):
+            try:programs.append(pool_adapter(d['adapter']['id']).PROGRAM)
+            except (ValueError,KeyError,TypeError):continue
+    programs=list(dict.fromkeys(programs))[:4]
+    if programs:
+        out.append({'id':'rec-programs','kind':'programs','parameters':{'addresses':programs},'dimension':'external_dependencies','sends':6,
+                    'reason':'a pool program or its ProgramData was not read, so upgrade authority is unresolved; the preset reads the program and its ProgramData metadata slice'})
+    # A row whose preset already ran is not repeated: what it left open is the named limit (gap_basis), not a queue item.
+    # Rows the leftover grant cannot pay for (two sends stay free) are dropped rather than refused turn by turn.
+    out=[r for r in out if r['id'] not in ran and r['sends']<=remaining-2]
+    out=out[:max(0,PRESET_CAP-len(ran))]
+    folder=root/'recommended-presets';folder.mkdir(exist_ok=True)
+    for row in out:
+        atomic(folder/(row['id']+'.json'),encoded({'id':row['id'],'kind':row['kind'],'parameters':row['parameters']}))
+        row['request']=str(folder/(row['id']+'.json'))
+    return out
 
 
 def write_briefs(root):
@@ -616,7 +693,7 @@ def start(root,target,*,question,received_at,deadline_at,focus=None,urls=None,sc
     market_needed=scope=='broad' or bool(set(surfaces)&{'canonical_lp_principal_custody','side_pool_removal_risk','sellability_exit_depth','historical_launch_integrity'})
     related_needed=market_needed or bool(set(surfaces)&{'token_controls','external_dependencies','admin_treasury_reward_custody'})
     if have_identity and related_needed:
-        for name,fn in ((STAGES[1],lambda:initial_related(root,config,factory,include_market=market_needed)),(STAGES[2],lambda:automatic_dependencies(root,config,factory))):
+        for name,fn in ((STAGES[1],lambda:initial_related(root,config,factory,include_market=market_needed)),(STAGES[2],lambda:automatic_dependencies(root,config,factory,opener_factory=opener_factory))):
             _,error=stage(root,name,fn)
             if error:diagnostics.append(error)
     else:
@@ -637,7 +714,9 @@ def start(root,target,*,question,received_at,deadline_at,focus=None,urls=None,sc
         except (ValueError,KeyError,TypeError):summary=None
     # The two lane pointers lead the output so a coordinator dispatches them before reading the long facts summary,
     # which comes last; a truncated display still shows what must happen first.
-    output={'lane_pointers':pointers,'next':'Dispatch both pointers before a separate facts-reading step; then complete notes and compose.' if scope=='broad' else 'Answer the focused request with its dependencies and limits; no final broad delivery.',
+    recommended=recommended_presets(root)
+    output={'lane_pointers':pointers,'next':('Dispatch both pointers before a separate facts-reading step; then run the recommended presets in order with `collect <root> --request <file>` and the same provider flags, complete notes and compose.' if recommended else 'Dispatch both pointers before a separate facts-reading step; no preset is recommended; then complete notes and compose.') if scope=='broad' else 'Answer the focused request with its dependencies and limits; no final broad delivery.',
+      'recommended_presets':recommended,
       'run':str(root),'draft':str(root/'draft'),'profile':PROFILE,'investigation_id':meta['investigation_id'],'research_status':'partial',
       'provider':provider,'diagnostics':diagnostics,'session':status(root),'collection':result or first,'facts_summary':summary}
     atomic(root/'start-result.json',encoded(output));return output
@@ -650,7 +729,7 @@ def collect(root,spec,config,*,factory=HttpTransport):
 
 
 def _collect(root,spec,config,*,factory=HttpTransport):
-    """At most two distinct coordinator follow-up presets, serialized by the session."""
+    """A coordinator follow-up preset (at most PRESET_CAP per run, usually from the recommended queue), serialized by the session."""
     from solana_presets import position_sample,historical_sample,creator_history,quote_sample
     root=Path(root).resolve();ident=label(spec['id']);need(len(ident)<=12,'Preset ID at most 12 characters.');s=Session(root)
     try:
@@ -673,7 +752,14 @@ def _collect(root,spec,config,*,factory=HttpTransport):
         else:rows=dependency_rows(root,pool,args['adapter'],lp_accounts=args.get('lp_accounts'),positions=args.get('positions'))
     elif kind=='transactions':rows=historical_sample(args['signatures'])
     elif kind=='creator_history':rows=creator_history(args['keys'],before=args.get('before'))
-    elif kind=='programs':rows=account_batches([target['mint']]+[pubkey(a) for a in args['addresses']],prefix='programs',critical=True)
+    elif kind=='programs':
+        # The program account alone never resolves upgradeability: the 45-byte ProgramData metadata slice carries the
+        # authority, so it is planned here exactly as start's programs stage plans it (an unsliced read would carry the ELF).
+        from solana_programs import UPGRADEABLE
+        from solana_addresses import find_program_address
+        from solana_common import base58_bytes
+        addresses=[pubkey(a) for a in args['addresses']];pdas=[find_program_address([base58_bytes(a,32)],UPGRADEABLE)[0] for a in addresses]
+        rows=account_batches([target['mint']]+addresses,prefix='programs',critical=True)+[read('programdata'+str(i//4),'getMultipleAccounts',[pdas[i:i+4],{**settings(),'dataSlice':{'offset':0,'length':45}}]) for i in range(0,len(pdas),4)]
     elif kind=='quote':rows=quote_sample(args['adapter'],args['pool'],objects[accounts[args['pool']]])
     elif kind=='holders':rows=mint_baseline(target['mint'],largest=True)
     elif kind=='pool_activity':
@@ -718,14 +804,17 @@ def _collect(root,spec,config,*,factory=HttpTransport):
                 # A signature already sampled or classified is never fetched twice: it would duplicate the receipt and waste
                 # the window. A probe with any status other than ok (budget, timeout, provider error, empty result) keeps that
                 # status and may be probed again here under this preset's own read family.
-                listed=packet['response']['result'];signatures=[r['signature'] for r in listed if r['err'] is None and r['signature'] not in seen]
+                listed=packet['response']['result'];failed={r['signature'] for r in listed if r['err'] is not None}
+                indexed=[r['signature'] for r in trade_candidates(root,pool,sells=6,buys=2) if r['signature'] not in failed]
+                signatures=[sig for sig in dict.fromkeys(indexed+[r['signature'] for r in listed if r['err'] is None]) if sig not in seen]
                 classified,selected=classify_probes(root,config,ident,pool,signatures,probes=probes,receipts=receipts,factory=factory)
-                record_probes(root,ident,classified,selected,probes=probes,receipts=receipts,listings=[{'pool':pool,'sample':ident,'listed':len(listed),'failed':sum(1 for r in listed if r['err'] is not None),'unseen':len(signatures)}])
+                for r in classified:r['source']='indexed' if r['signature'] in indexed else 'listing'
+                record_probes(root,ident,classified,selected,probes=probes,receipts=receipts,listings=[{'pool':pool,'sample':ident,'listed':len(listed),'failed':len(failed),'unseen':len(signatures),'indexed_candidates':len(indexed)}])
             if not selected:return None
             planned=mint_baseline(target['mint'],largest=False)+[receipt_read(r['signature']) for r in selected]
         return collect_sample(root,root,config,ident,planned,factory=factory,expand_largest=kind=='holders')
     _,error=stage(root,'preset_'+ident,run_preset)
-    result=refresh(root);result['preset_error']=error
+    result=refresh(root);result['preset_error']=error;result['recommended_presets']=recommended_presets(root)
     from solana_scaffold import sync_assignments
     result['assignments_synced']=sync_assignments(root/'draft');return result
 
@@ -786,8 +875,8 @@ def main():
         elif a.action=='lane-check':result=lane_check(a.root,a.owner,allow_synthetic=a.allow_synthetic)
         elif a.action=='refresh':
             from solana_scaffold import sync_assignments
-            result=refresh(a.root);result['assignments_synced']=sync_assignments(Path(a.root).resolve()/'draft')
-        else:result=status(a.root)
+            result=refresh(a.root);result['assignments_synced']=sync_assignments(Path(a.root).resolve()/'draft');result['recommended_presets']=recommended_presets(a.root)
+        else:result={**status(a.root),'recommended_presets':recommended_presets(a.root)}
         print(json.dumps(result,ensure_ascii=False));return 0
     except (ValueError,OSError,KeyError,TypeError,IndexError) as exc:
         print(json.dumps({'valid':False,'errors':getattr(exc,'errors',[{'path':'workflow','message':str(exc) if isinstance(exc,ValueError) else type(exc).__name__}])}));return 2

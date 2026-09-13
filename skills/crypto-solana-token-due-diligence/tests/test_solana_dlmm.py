@@ -70,6 +70,14 @@ class DlmmTests(unittest.TestCase):
             p=self.analyze(v)[0]['positions'][0]
             self.assertIsNone(p['principal']);self.assertIn('unsupported bin array version',p['gaps'])
 
+    def test_resolved_sample_with_program_control_is_observed_without_reserves(self):
+        from broad_fixture import program_accounts
+        target,a,v=fixture();v.update(program_accounts(dlmm.PROGRAM))
+        result=dlmm.analyze(target,a['pool'],batch(v),positions=[a['lead']])
+        self.assertEqual((result['status'],result['position_coverage'],result['reserves_atomic'],result['gaps']),('observed','sampled',None,[]))
+        self.assertEqual(result['program_control']['upgradeability'],'authority_present')
+        self.assertEqual(dlmm.analyze(target,a['pool'],batch(v),positions=[])['status'],'partial')  # no sampled positions: custody unresolved
+
     def test_fee_configuration_boundary_and_future_modes(self):
         for offset,data in [(36,b'\2'),(35,b'\3'),(80,(401).to_bytes(2,'little')),(32,(10001).to_bytes(2,'little')),(40,(10001).to_bytes(4,'little')),(8,(65535).to_bytes(2,'little'))]:
             _,a,v=self.analyze();v[a['pool']]=mutate(v[a['pool']],offset,data)

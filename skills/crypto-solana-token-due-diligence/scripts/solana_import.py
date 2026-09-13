@@ -136,6 +136,7 @@ class Importer:
         pool pages and Solana Explorer are the alternates. None for every other capture."""
         parts=urlsplit(record['url']);host=parts.hostname or '';gecko=host=='geckoterminal.com' or host.endswith('.geckoterminal.com')
         if host=='api.dexscreener.com' or (gecko and parts.path.endswith('/info')):return 'primary'
+        if gecko and 'trades' in parts.path.split('/'):return 'follow_up'  # a pool's trade feed feeds receipt probes, never discovery
         if gecko or host=='explorer.solana.com':return 'alternate'
         return None
 
@@ -210,12 +211,13 @@ class Importer:
         target=self.m['target'];raw_evidence=Evidence(self.root,self.m,self.m['synthetic'])
         # Pool and program facts prefer the latest pinned read per address; the newest read decides only whether the
         # mint's controls fact must fall back to an earlier pinned snapshot.
-        latest=self.latest_accounts();accounts={**latest,**self.latest_accounts(raw_evidence.usable)};mint=latest.get(target['mint'])
+        latest=self.latest_accounts();usable_accounts=self.latest_accounts(raw_evidence.usable);accounts={**latest,**usable_accounts};mint=latest.get(target['mint'])
         prices=[]
         for eid,o in list(self.obs.items()):
             if o['kind']!='document' or o['status']!='ok':continue
             host=urlsplit(o['source']['capture']['url']).hostname
-            if host in ('api.dexscreener.com','api.geckoterminal.com') and not (host=='api.geckoterminal.com' and '/pools' not in urlsplit(o['source']['capture']['url']).path):
+            path=urlsplit(o['source']['capture']['url']).path
+            if host in ('api.dexscreener.com','api.geckoterminal.com') and not (host=='api.geckoterminal.com' and ('/pools' not in path or 'trades' in path.split('/'))):
                 did='market-'+sha(eid.encode())[:16]
                 result=self.derive(did,'discovery_pools',{'capture':eid,'source':'geckoterminal' if host=='api.geckoterminal.com' else 'dexscreener'})
                 if result:
@@ -268,24 +270,38 @@ class Importer:
         for address,eid in accounts.items():
             value,_=observed_account(address,self.objects[eid])
             if not value:continue
+            from solana_programs import decode_program
             if value.get('executable'):
-                from solana_programs import decode_program
                 try:
                     initial=decode_program(address,self.objects[eid]);pd=initial.get('programdata_address')
                     self.derive('program-'+sha(address.encode())[:16],'program',{'address':address,'observation':eid,**({'programdata':accounts[pd]} if pd in accounts else {})},self.subject('program',address))
                 except ValueError:pass
             kind=by_program.get(value['owner'])
             if kind:
-                # Prefer the actual pool packet for same-bank arithmetic, adding separately
-                # observed program control only; no mixing fresh vaults into an old pool.
-                c=self.checked[eid];mapping={a:eid for a in c['addresses']}
-                module=pool_adapter(kind)
-                if module.PROGRAM in accounts:mapping[module.PROGRAM]=accounts[module.PROGRAM]
-                params={'adapter':kind,'pool':address,'observations':mapping}
+                module=pool_adapter(kind);extra={}
                 for lead in leads:
                     if lead.get('pool')==address and lead.get('adapter')==kind:
                         for k in ('lp_accounts','positions','census'):
-                            if k in lead:params[k]=lead[k]
+                            if k in lead:extra[k]=lead[k]
+                # The adapter's arithmetic needs one atomic batch, so the pool packet is the latest usable read that
+                # also carries every lead position or LP account; a later bare re-read of the pool (a coordinator
+                # `pool` preset) must not erase positions the census already sampled. Program control is added from
+                # its own reads (program and ProgramData); no mixing fresh vaults into an old pool.
+                required={row['position'] for row in extra.get('positions',[]) if isinstance(row,dict) and row.get('position')}|set(extra.get('lp_accounts') or [])
+                if required:
+                    covering=[i for i,c in self.checked.items() if c['status']=='ok' and i in raw_evidence.usable and self.objects[i]['request']['method'] in ('getAccountInfo','getMultipleAccounts')
+                              and address in c.get('addresses',[]) and required<=set(c['addresses'])]
+                    if covering:
+                        best=max(covering,key=lambda i:self.objects[i]['completed_at']);candidate,_=observed_account(address,self.objects[best])
+                        if candidate:eid,value=best,candidate
+                c=self.checked[eid];mapping={a:eid for a in c['addresses']}
+                if module.PROGRAM in usable_accounts:
+                    # Program control only from usable reads: an unusable program packet would make the whole pool fact unusable.
+                    mapping[module.PROGRAM]=usable_accounts[module.PROGRAM]
+                    try:pd=decode_program(module.PROGRAM,self.objects[usable_accounts[module.PROGRAM]]).get('programdata_address')
+                    except ValueError:pd=None
+                    if pd in usable_accounts:mapping[pd]=usable_accounts[pd]
+                params={'adapter':kind,'pool':address,'observations':mapping,**extra}
                 try:
                     state=module.decode_pool(address,value) if kind in ('raydium_clmm','orca_whirlpool','meteora_dlmm','meteora_damm_v2') else module.decode_pool(value)
                 except ValueError:continue
@@ -337,7 +353,7 @@ class Importer:
             req=self.objects[eid]['request']
             if c['status']=='ok' and req['method']=='getSignaturesForAddress' and 'creator_history' in eid:pages.setdefault(req['params'][0],[]).append(eid)
         for address,ids in pages.items():
-            if latest_slot>0 and self.derive('history-'+sha(address.encode())[:12],'history',{'address':address,'pages':ids[:2],'start_slot':0,'end_slot':latest_slot}):histories[address]='history-'+sha(address.encode())[:12]
+            if latest_slot>0 and self.derive('history-'+sha(address.encode())[:12],'history',{'address':address,'pages':ids[:2],'start_slot':0,'end_slot':latest_slot},self.subject('wallet',address)):histories[address]='history-'+sha(address.encode())[:12]
         launch=None;sales=rebuys=None
         if txs:
             launch=self.derive('auto-launch','launch',{'executions':txs[:4]})

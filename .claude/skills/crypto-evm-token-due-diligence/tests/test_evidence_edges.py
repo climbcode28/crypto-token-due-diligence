@@ -120,7 +120,7 @@ class FactSemanticsTests(unittest.TestCase):
                 factory = next(s for s in note["scope"] if s["address"] == FACTORY)
                 self.assertNotEqual(factory.get("proxy", {}).get("status"), "none_found")
                 self.assertEqual(write_and_compose(root)["errors"], [])
-                self.assertEqual(len(rpc.calls), 78, "semantic corrections add no requests")
+                self.assertEqual(len(rpc.calls), 102, "semantic corrections add no requests (102: the pipeline's standard reads including Safe module/guard, custodian getters and the second phase-4 collection)")
             finally:
                 cache.close()
                 session.close()

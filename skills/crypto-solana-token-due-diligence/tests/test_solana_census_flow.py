@@ -34,6 +34,68 @@ class CensusFlowTests(unittest.TestCase):
         census_reads=[q for q in RichRpc.calls if q['method']=='getProgramAccounts' and q['params'][1]['filters'][0]['dataSize']==281];self.assertEqual(len(census_reads),1)
         self.assertFalse([q for q in RichRpc.calls if str(q['id']).startswith('census0l_')],'a CLMM census plans its batch from the slice and needs no lead sample')
 
+    def test_program_control_resolves_and_a_later_bare_pool_preset_keeps_census_positions(self):
+        from broad_fixture import program_accounts
+        from solana_broad_collect import collect
+        from adapters import raydium_clmm
+        root,target,c,opts=self.setup_run();RichRpc.values.update(program_accounts(raydium_clmm.PROGRAM,authority=key(93)))
+        r=start(root,target,**opts);self.assertFalse(r['diagnostics'],r['diagnostics'])
+        def pool_fact():
+            facts=json.loads((root/'draft/facts.json').read_text())['facts'];return next(f['data'] for f in facts if f['operation']=='pool' and f['data']['pool']==c['pool'])
+        pool=pool_fact()
+        # ProgramData read by the programs stage reaches the pool derivation: upgradeability is observed, not a gap.
+        self.assertEqual((pool['program_control']['upgradeability'],pool['program_control']['upgrade_authority']),('authority_present',key(93)))
+        self.assertNotIn('program_upgrade_authority_unresolved',pool['gaps']);self.assertEqual(pool['positions'][0]['status'],'observed')
+        self.assertEqual((pool['status'],pool['position_coverage']),('observed','sampled'))
+        facts=json.loads((root/'draft/facts.json').read_text())['facts'];self.assertTrue(next(f['usable'] for f in facts if f['operation']=='pool' and f['data']['pool']==c['pool']),'a censused pool fact must stay usable')
+        # A coordinator re-read of the pool without positions must not replace the census batch the positions came from.
+        collect(root,{'id':'custody','kind':'pool','parameters':{'adapter':'raydium_clmm','pool':c['pool']}},opts['config'],factory=RichRpc)
+        pool=pool_fact();row=pool['positions'][0]
+        self.assertEqual((row['status'],row['gaps']),('observed',[]));self.assertEqual(row['custody']['spending_owner'],c['owner'])
+        self.assertEqual(pool['position_census']['positions_counted'],1);self.assertNotIn('program_upgrade_authority_unresolved',pool['gaps']);self.assertEqual(pool['status'],'observed')
+
+    def test_unpinned_census_scan_keeps_the_pool_fact_usable(self):
+        from broad_fixture import program_accounts
+        from adapters import raydium_clmm
+        root,target,c,opts=self.setup_run();original=RichRpc.__call__;RichRpc.values.update(program_accounts(raydium_clmm.PROGRAM))
+        def drifting(rpc,request):
+            response=original(rpc,request)
+            if request['method']=='getProgramAccounts' and request['params'][1]['filters'][0]['dataSize']==281 and isinstance(response.get('result'),dict):
+                response['result']['context']['slot']=101  # the scan answers at its own slot: no header pair pins it
+            return response
+        with unittest.mock.patch.object(RichRpc,'__call__',drifting):r=start(root,target,**opts)
+        self.assertFalse(r['diagnostics'],r['diagnostics'])
+        m=json.loads((root/'draft/manifest.json').read_text());scan=next(o for o in m['observations'] if o['id'].startswith('census0_positions'))
+        self.assertIsNone(scan.get('block_evidence_id'))
+        facts=json.loads((root/'draft/facts.json').read_text())['facts'];row=next(f for f in facts if f['operation']=='pool' and f['data']['pool']==c['pool'])
+        self.assertTrue(row['usable']);self.assertEqual(row['data']['status'],'observed');self.assertEqual(row['data']['position_census']['positions_counted'],1)
+        self.assertNotIn(scan['id'],[i['id'] for d in m['derivations'] if d['id']==row['evidence_id'] for i in d['inputs']])
+
+    def test_recommended_programs_preset_reads_programdata_and_closes_the_upgrade_gap(self):
+        from broad_fixture import program_accounts
+        from solana_broad_collect import collect
+        from adapters import raydium_clmm
+        accounts=program_accounts(raydium_clmm.PROGRAM,authority=key(93));program_only={raydium_clmm.PROGRAM:accounts[raydium_clmm.PROGRAM]}
+        root,target,c,opts=self.setup_run();RichRpc.values.update(program_only)  # the program answers, its ProgramData does not exist yet
+        r=start(root,target,**opts)
+        def pool_fact():
+            facts=json.loads((root/'draft/facts.json').read_text())['facts'];return next(f['data'] for f in facts if f['operation']=='pool' and f['data']['pool']==c['pool'])
+        self.assertTrue({'program_upgrade_authority_unresolved','program_control_not_observed'}&set(pool_fact()['gaps']),pool_fact()['gaps'])
+        rec=next(q for q in r['recommended_presets'] if q['kind']=='programs');self.assertIn(raydium_clmm.PROGRAM,rec['parameters']['addresses'])  # the fixture's CPMM pool program is listed too
+        RichRpc.values.update(accounts)  # ProgramData becomes readable; the recommended preset plans its metadata slice
+        original=RichRpc.__call__
+        def later(rpc,request):  # the chain has moved on: the preset observes a later context than start did
+            response=original(rpc,request);r=response.get('result')
+            if isinstance(r,dict) and isinstance(r.get('context'),dict):r['context']['slot']=110
+            if request['method']=='getEpochInfo' and isinstance(r,dict):r['absoluteSlot']=110
+            return response
+        with unittest.mock.patch.object(RichRpc,'__call__',later):
+            after=collect(root,json.loads(Path(rec['request']).read_text()),opts['config'],factory=RichRpc)
+        self.assertIsNone(after['preset_error'],after['preset_error'])
+        pool=pool_fact();self.assertEqual((pool['gaps'],pool['status'],pool['program_control']['upgrade_authority']),([],'observed',key(93)))
+        self.assertNotIn('programs',[q['kind'] for q in after['recommended_presets']])
+        self.assertTrue(any(q['method']=='getMultipleAccounts' and q['params'][1].get('dataSlice')=={'offset':0,'length':45} and str(q['id']).startswith('rec-programs') for q in RichRpc.calls))
+
     def test_refused_census_is_a_named_diagnostic_and_the_pool_still_decodes(self):
         root,target,c,opts=self.setup_run();original=RichRpc.__call__
         def refusing(rpc,request):

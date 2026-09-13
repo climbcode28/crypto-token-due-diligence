@@ -44,6 +44,31 @@ The draft is unchanged when any error exists.
 | `basis`, `alternatives`, `coverage`, `time_basis`, `stale_when`, `discovery` | optional | Defaults are stated generically; override when the specific text matters. |
 | `execution` | `{receipt_evidence_id, result, effects}` for `historical_execution` | Optional in the note: compose fills `receipt_evidence_id` from the finding's single receipt alias, `result` (`success`/`reverted`, `status` is accepted as an alias) from the receipt status, and derives `effects` from the receipt's target-token `Transfer` logs whose parties are `target` or declared/known scopes. Give `effects` yourself only to narrow them: `[{"kind": "erc20_transfer", "log_index": N, "asset_scope_id": "target", "from_scope_id": "…", "to_scope_id": "…", "amount_raw": "…", "units": "raw_token_units"}]`. A party with no pinned evidence row is reported, never invented. |
 
+## Rating rules
+
+Rows with a verified observation are rated; `Unverified` is reserved for a `coverage_gap` whose
+route was not run or whose sources answered nothing.
+
+- **Concentration:** the pipeline's custody-adjusted holder figures are observations. `Good` when
+  the selected top holders hold at most 30% of supply and the largest non-custody address at most
+  5%; `Potential Risk` above either bound; `Bad` when one non-custody address holds 50% or more.
+  Beneficial ownership and wallet clusters stay a stated limit in the text.
+- **Custody:** rate from the identified positions, their custodians and the pipeline's Safe
+  (signers, threshold, modules, guard) and custodian getter reads. `Potential Risk` when
+  identified custody covers a minority of the canonical pool's active liquidity or a custodian
+  can withdraw, stating the covered share; `Good` when the sampled principal is locked with no
+  reachable withdrawal path; `Bad` when a single unlocked owner can remove most of it. A
+  custodian whose getters all reverted and whose source is unmatched keeps its withdrawal powers
+  as the specific gap, not the whole row.
+- **Policies:** a documented discretionary buyback, burn or fee policy without reconciled
+  execution is `Potential Risk` (discretion is the observed concern); verified receipts of the
+  executed part may be `Good` for that part. `Unverified` only when the policy page was never
+  captured.
+- **Assurance:** audit or repository absence after the project's docs, site and repository
+  links were checked is `Potential Risk`; a deployment-matched audit is `Good`.
+- **Confidence axis, not rows:** team accountability, organic adoption, beneficial ownership
+  and untested larger exits belong under Research confidence.
+
 Support roles are derived: successful RPC at the subject and pin → `direct`; source
 comparison → `source`; other derived → `calculation`; documents → `corroboration` (or
 `source` for source lookups); RPC at another address → `identity` for code reads, else

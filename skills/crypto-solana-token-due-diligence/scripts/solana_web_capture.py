@@ -108,7 +108,9 @@ def register_urls(session, urls, *, owners=None, dimensions=None, cap=12):
                 need(existing["owner"] == owner, "URL capture already assigned to another owner")
                 status = existing["status"]
             else:
-                selected = session.db.execute("SELECT count(*) FROM web_sources WHERE status='pending'").fetchone()[0]
+                # The cap bounds each class separately: the pipeline's own discovery and trade captures (owner ordinary)
+                # never consume the allowance the two lanes share.
+                selected = session.db.execute("SELECT count(*) FROM web_sources WHERE status='pending' AND (owner='ordinary')=?", (1 if owner == "ordinary" else 0,)).fetchone()[0]
                 if status == "pending" and selected >= cap:
                     status = "unattempted_cap"
                 session.db.execute("INSERT INTO web_sources VALUES(?,?,?,?,?)", (source_id, safe, owner, status, digest))

@@ -39,7 +39,24 @@ def _owners_text(owner):
     addresses = owner.get("safe_owners") or []
     count = owner.get("safe_owner_count")
     count_text = str(count) if type(count) is int else "at least " + str(len(addresses))
-    return f"getOwners() reports {count_text} owner addresses; getThreshold() value {_number(owner.get('safe_threshold'))}"
+    text = f"getOwners() reports {count_text} owner addresses; getThreshold() value {_number(owner.get('safe_threshold'))}"
+    modules = owner.get("safe_modules")
+    if "getModulesPaginated" in (owner.get("reverted") or []):
+        text += "; getModulesPaginated() reverts"
+    elif modules is not None:
+        text += f"; getModulesPaginated() lists {len(modules)} module" + ("" if len(modules) == 1 else "s") + (f" ({', '.join(modules)})" if modules else "")
+    if owner.get("safe_guard_read"):
+        text += "; guard slot " + (owner["safe_guard"] if owner.get("safe_guard") else "zero (no guard)")
+    return text
+
+
+def _getter_value(decoded):
+    if not isinstance(decoded, dict):
+        return "unavailable"
+    for key in ("address", "string", "int", "bool"):
+        if key in decoded:
+            return str(decoded[key])
+    return "empty" if decoded.get("empty") else str(decoded.get("raw", "unavailable"))[:40]
 
 
 def _finding(fid, dimension, text, evidence, claim="state_observation", subject=None, execution=None, dimensions=None):
@@ -199,10 +216,21 @@ def build_pipeline_note(facts, draft, run=None):
             owner_actor = next((a for a in actors.values() if a.get("address") == owner), None)
             if owner_actor:
                 evidence.append(owner_actor.get("evidence"))
+                answered = owner_actor.get("getters") or {}
+                reverted = owner_actor.get("reverted") or []
+                if answered:
+                    parts.append("Custodian getters answered: " + ", ".join(f"{k}() = {_getter_value(v.get('decoded'))}" for k, v in answered.items())
+                                 + (f"; reverted: {', '.join(reverted)}" if reverted else "") + ".")
+                    evidence += [v.get("evidence") for v in answered.values()]
+                elif reverted:
+                    parts.append(f"Every probed custodian getter reverted ({', '.join(reverted)}); withdrawal terms are not exposed under those names.")
+                elif owner_actor.get("role") == "position_custodian" and owner_actor.get("getters_read") is False:
+                    parts.append("The custodian's withdrawal getters were not read (the collection did not run); their terms are unread, not absent.")
         for name, o in owners.items():
             if o.get("safe_owners"):
                 parts.append(f"{name} is owned by {o['address']}; {_owners_text(o)}.")
-                evidence += [(o.get("evidence") or {}).get("getOwners"), (o.get("evidence") or {}).get("getThreshold")]
+                ev = o.get("evidence") or {}
+                evidence += [e for e in (ev.get("getOwners"), ev.get("getThreshold"), ev.get("getModulesPaginated"), ev.get("guard")) if e]
         first_owner = positions[0].get("owner")
         owner_actor = next((a for a in actors.values() if a.get("address") == first_owner), None)
         subject = first_owner if owner_actor else (positions[0].get("pool") or None)
@@ -332,7 +360,7 @@ def build_pipeline_note(facts, draft, run=None):
             ev = o.get("evidence") or {}
             if o.get("safe_owners"):
                 parts.append(f"The owner of {name}, {o['address']}: {_owners_text(o)}; sampled addresses: {', '.join(o['safe_owners'])}.")
-                evidence += [ev.get("runtime"), ev.get("getOwners"), ev.get("getThreshold")]
+                evidence += [e for e in (ev.get("runtime"), ev.get("getOwners"), ev.get("getThreshold"), ev.get("getModulesPaginated"), ev.get("guard")) if e]
             else:
                 parts.append(f"The owner of {name}, {o['address']}, has {o.get('code_bytes')} bytes of code" + ("; getOwners() reverts, so the signer set is not established." if "getOwners" in (o.get("reverted") or []) else "."))
                 evidence.append(ev.get("runtime"))

@@ -28,7 +28,7 @@ class HolderTests(unittest.TestCase):
         d, s = self.packets(values=values, program=TOKEN_2022)
         s["response"]["result"]["value"][0] = mint(extensions=tlv(60000, b"opaque"), program=TOKEN_2022)
         result = aggregate_holders(d, s, TARGET)
-        self.assertEqual(result["status"], "sampled")
+        self.assertEqual(result["status"], "observed")  # the largest-accounts read is the exact top 20; an unknown mint extension is recorded, not a demotion
         self.assertEqual(result["mint"]["unknown_extensions"], [60000])
         self.assertEqual((result["coverage_share"]["rounding"], result["coverage_share"]["places"]), ("half_up", 4))
         values = [holding(2**59, program=TOKEN_2022, extensions=tlv(60001, b"?")), holding(101, program=TOKEN_2022), holding(7, owner=KEY, program=TOKEN_2022)]

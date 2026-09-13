@@ -26,6 +26,12 @@ V3_POOL_GETTERS = ["token0()", "token1()", "fee()", "liquidity()", "slot0()", "f
 V2_POOL_GETTERS = ["token0()", "token1()", "getReserves()", "totalSupply()", "factory()"]
 NFPM_GETTERS = {"positions": "positions(uint256)", "ownerOf": "ownerOf(uint256)", "getApproved": "getApproved(uint256)"}
 SAFE_GETTERS = ["getOwners()", "getThreshold()", "masterCopy()"]
+SAFE_SENTINEL = "0x0000000000000000000000000000000000000001"  # Safe's linked-list sentinel for getModulesPaginated
+GUARD_SLOT = "0x4a204f620c8c5ccdca3fd54d003badd85ba500436a431f0cbda4f558c93c34c8"  # keccak256("guard_manager.guard.address")
+# Zero-argument getters a position custodian (locker, vesting or timelock contract) commonly exposes. A revert
+# is a recorded answer; a value is a lead until the custodian's source is matched.
+LOCKER_GETTERS = ["owner()", "beneficiary()", "unlockTime()", "unlockDate()", "lockDate()", "releaseTime()", "lockedUntil()",
+                  "token()", "nft()", "positionManager()", "paused()"]
 
 
 def registry(chain_id):
@@ -146,7 +152,10 @@ def architecture_queries(prefix, pin, contracts):
 
 
 def safe_queries(prefix, pin, safe):
-    return getter_queries(prefix, pin, safe, SAFE_GETTERS)
+    """Signer set and threshold, plus the module page and the guard slot: a module or guard can move a Safe's assets or veto its transactions."""
+    return getter_queries(prefix, pin, safe, SAFE_GETTERS) + [
+        call(label(prefix + "-getModulesPaginated"), pin, safe, encode("getModulesPaginated(address,uint256)", word_address(SAFE_SENTINEL), word_uint(10))),
+        storage(label(prefix + "-guard"), pin, safe, GUARD_SLOT)]
 
 
 def receipt_queries(transactions):

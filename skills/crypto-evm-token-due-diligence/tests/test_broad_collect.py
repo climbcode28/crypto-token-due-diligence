@@ -15,7 +15,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
-from backend_common import Cache, canonical, write_new
+from backend_common import Cache, read_json, canonical, write_new
 from backend_fixtures import CHAIN, TOKEN, ALICE, BOB, CAROL, hh, header, abi
 from broad_collect import Pipeline, brief, summary_lines
 from bundle_assemble import DIMENSIONS, deliver, freeze, intake, preflight, read_draft
@@ -30,12 +30,16 @@ NFPM = "0x7234567890abcdef1234567890abcdef12345678"
 QUOTER = "0x8234567890abcdef1234567890abcdef12345678"
 FACTORY = "0x9234567890abcdef1234567890abcdef12345678"
 LOCKER = "0xa234567890abcdef1234567890abcdef12345678"
+SAFE = "0xb234567890abcdef1234567890abcdef12345678"
+MODULE = "0xc234567890abcdef1234567890abcdef12345678"
+GUARD = "0xd234567890abcdef1234567890abcdef12345678"
+GUARD_SLOT = "0x4a204f620c8c5ccdca3fd54d003badd85ba500436a431f0cbda4f558c93c34c8"  # keccak256("guard_manager.guard.address")
 DEAD = "0x000000000000000000000000000000000000dead"
 CREATION_TX = hh("SYNTHETIC creation transaction")
 SELL_TX = hh("SYNTHETIC sale transaction")
 SWAP_V3 = "0xc42079f94a6350d7e6235f29174924f928cc2ac818eb64fed8004e115fbcca67"
 SUPPLY = 10 ** 27
-REGISTRY = {"dexscreener": "synthetic", "explorers": [{"name": "Synthetic explorer", "base": "https://explorer.invalid", "api_v2": True}],
+REGISTRY = {"dexscreener": "synthetic", "geckoterminal": "synthetic", "explorers": [{"name": "Synthetic explorer", "base": "https://explorer.invalid", "api_v2": True}],
             "uniswap_v3": {"nonfungible_position_manager": NFPM, "quoter_v2": QUOTER}}
 
 
@@ -78,7 +82,7 @@ class PipelineRpc:
         if to == TOKEN:
             table = {selector("name()"): string_abi("Synthetic Pipeline Token"), selector("symbol()"): string_abi("SYNP"),
                      selector("decimals()"): abi(18), selector("totalSupply()"): abi(SUPPLY), selector("owner()"): abi(0),
-                     selector("paused()"): abi(0), selector("launchFactory()"): word_address(FACTORY),
+                     selector("paused()"): abi(0), selector("launchFactory()"): word_address(FACTORY), selector("locker()"): word_address(LOCKER),
                      selector("maxTxAmount()"): abi(2 * 10 ** 25), selector("treasury()"): abi(2 ** 100 + 12345),
                      selector("balanceOf(address)"): None}
             if sel == selector("balanceOf(address)"):
@@ -96,6 +100,13 @@ class PipelineRpc:
             if sel == selector("balanceOf(address)"):
                 return abi(5 * 10 ** 18 if "0x" + data[-40:] == POOL else 0)
             return {selector("decimals()"): abi(18), selector("symbol()"): string_abi("WETH")}.get(sel, {"error": {"code": 3, "message": "execution reverted"}})
+        if to == LOCKER:
+            table = {selector("owner()"): word_address(SAFE), selector("unlockTime()"): abi(2000000000), selector("beneficiary()"): word_address(SAFE)}
+            return table.get(sel, {"error": {"code": 3, "message": "execution reverted"}})
+        if to == SAFE:
+            table = {selector("getOwners()"): abi(32) + abi(2)[2:] + word_address(ALICE)[2:] + word_address(BOB)[2:], selector("getThreshold()"): abi(2),
+                     selector("getModulesPaginated(address,uint256)"): abi(64) + abi(1)[2:] + abi(1)[2:] + word_address(MODULE)[2:]}
+            return table.get(sel, {"error": {"code": 3, "message": "execution reverted"}})
         if to == NFPM and sel == selector("positions(uint256)"):
             words = [0, 0, int(TOKEN, 16), int(QUOTE, 16), 3000, (-887220) % 2 ** 256, 887220, 4 * 10 ** 17, 0, 0, 0, 0]
             return "0x" + "".join(format(w, "064x") for w in words)
@@ -119,11 +130,11 @@ class PipelineRpc:
         elif method == "eth_getBlockByNumber":
             result = header(int(params[0], 16))
         elif method == "eth_getCode":
-            result = "0x60006000f3" if params[0] in (TOKEN, POOL, QUOTE, NFPM, QUOTER, FACTORY, LOCKER) else "0x"
+            result = "0x60006000f3" if params[0] in (TOKEN, POOL, QUOTE, NFPM, QUOTER, FACTORY, LOCKER, SAFE, MODULE, GUARD) else "0x"
         elif method == "eth_call":
             result = self.call(params[0]["to"], params[0]["data"])
         elif method == "eth_getStorageAt":
-            result = abi(0)
+            result = word_address(GUARD) if params[0] == SAFE and params[1].lower() == GUARD_SLOT else abi(0)
         elif method == "eth_getTransactionReceipt":
             result = self.receipt() if params[0] == CREATION_TX else self.sale_receipt() if params[0] == SELL_TX else None
         elif method == "eth_getTransactionByHash":
@@ -154,6 +165,7 @@ def fake_fetch(items, out):
                     "abi": [{"type": "function", "name": "launchFactory", "inputs": [], "outputs": [{"type": "address"}], "stateMutability": "view"},
                             {"type": "function", "name": "maxTxAmount", "inputs": [], "outputs": [{"type": "uint256"}], "stateMutability": "view"},
                             {"type": "function", "name": "treasury", "inputs": [], "outputs": [{"type": "address"}], "stateMutability": "view"},
+                            {"type": "function", "name": "locker", "inputs": [], "outputs": [{"type": "address"}], "stateMutability": "view"},
                             {"type": "function", "name": "owner", "inputs": [], "outputs": [{"type": "address"}], "stateMutability": "view"},
                             {"type": "function", "name": "paused", "inputs": [], "outputs": [{"type": "bool"}], "stateMutability": "view"},
                             {"type": "function", "name": "transfer", "inputs": [{"type": "address"}], "outputs": [], "stateMutability": "nonpayable"}]}
@@ -173,6 +185,9 @@ def fake_fetch(items, out):
                                "total": {"value": str(5 * 10 ** 21)}, "method": "swap", "timestamp": "2026-01-01T00:00:00Z"},
                               {"transaction_hash": hh("buy"), "block_number": 94, "from": {"hash": POOL, "is_contract": True}, "to": {"hash": BOB, "is_contract": False},
                                "total": {"value": str(10 ** 21)}, "method": "swap"}], "next_page_params": None}
+        elif item["id"] == "geckoterminal-trades":
+            body = {"data": [{"id": "t1", "type": "trade", "attributes": {"tx_hash": SELL_TX, "kind": "sell", "block_number": 95, "tx_from_address": ALICE}},
+                             {"id": "t2", "type": "trade", "attributes": {"tx_hash": "0x" + "ee" * 32, "kind": "buy", "block_number": 96, "tx_from_address": BOB}}]}
         elif item["id"] == "explorer-signer-transactions":
             body = {"items": [{"hash": CREATION_TX, "block_number": 90, "from": {"hash": CAROL}, "to": {"hash": FACTORY}, "method": "createToken", "created_contract": None},
                               {"hash": hh("other launch"), "block_number": 80, "from": {"hash": CAROL}, "to": {"hash": FACTORY}, "method": "createToken", "created_contract": None}], "next_page_params": None}
@@ -190,10 +205,10 @@ def fake_fetch(items, out):
 
 
 class BroadCollectTests(unittest.TestCase):
-    def run_pipeline(self, root):
+    def run_pipeline(self, root, rpc=None):
         session = Investigation.create(root / "session.sqlite", 200, 600, request_ceiling=300, timeout_ceiling=900, limit_basis="analyst_safety")
         cache = Cache(root / "cache.sqlite")
-        rpc = PipelineRpc()
+        rpc = rpc or PipelineRpc()
         try:
             intake(root / "draft", {"chain_id": CHAIN, "address": TOKEN}, "Synthetic pipeline question", "All authority material", True)
             pipeline = Pipeline(root, {"chain_id": CHAIN, "address": TOKEN}, "Synthetic pipeline question", "All authority material",
@@ -238,13 +253,13 @@ class BroadCollectTests(unittest.TestCase):
             self.assertEqual(facts["source"]["status"], "sources_unavailable")
             self.assertEqual(facts["discovery"]["explorer"]["holders"], "1234")
             names = {c["name"] for c in facts["collections"]}
-            self.assertEqual(names, {"phase1", "phase2", "phase3", "phase4"})
+            self.assertEqual(names, {"phase1", "phase2", "phase3", "phase4", "phase4b"})  # phase4b: custodian getters for owners with code
             statuses = {c["name"]: c["status"] for c in facts["collections"]}
             self.assertEqual(statuses["phase1"], "complete", "with a verified ABI only existing getters are probed")
-            self.assertEqual({statuses[n] for n in ("phase2", "phase3", "phase4")}, {"complete", "partial"})
+            self.assertTrue({statuses[n] for n in ("phase2", "phase3", "phase4")} <= {"complete", "partial"}, statuses)  # reverted probes keep a phase partial, never failed
             self.assertEqual([p["phase"] for p in status["phases"]], ["intake", "discovery", "phase1", "phase2", "phase3", "phase4", "facts"])
             headers = sum(1 for c in rpc.calls if c["method"] == "eth_getBlockByNumber")
-            self.assertLessEqual(headers, 12, "four phases share one pin plus two historical pins (creation, sale)")
+            self.assertLessEqual(headers, 14, "five collections share one pin plus two historical pins (creation, sale)")
             # Depth collected without any coordinator turn: reserves, top holders, a verified sale, creator activity, maturity.
             self.assertEqual(facts["pools"][0]["counter_balance_raw"], 5 * 10 ** 18)
             self.assertEqual(facts["pools"][0]["counter_balance"], "5")
@@ -255,8 +270,8 @@ class BroadCollectTests(unittest.TestCase):
             self.assertEqual(top[ALICE]["account_kind"], "no_code")
             self.assertEqual(facts["holder_summary"]["read_count"], len(top))
             self.assertIn(DEAD, facts["holder_selection"]["excluded_addresses"])
-            self.assertEqual(len(rpc.calls), 78, "holder arithmetic and delivery preservation add no RPC requests")
-            self.assertEqual(status["started_attempts"], 87, "no extra discovery requests or session charges")
+            self.assertEqual(len(rpc.calls), 102, "holder arithmetic and delivery preservation add no RPC requests (102 = 78 + locker() and its two architecture reads + seven Safe reads + eleven custodian getters + the second phase-4 collection's pin reads)")
+            self.assertEqual(status["started_attempts"], 112, "no extra discovery requests or session charges (112: the 102 pipeline reads plus nine discovery captures and pin charges)")
             self.assertNotIn(DEAD, top, "already-read balances are not re-read")
             self.assertEqual(facts["indexed"]["counters"], {"holders_count": 1234, "transfers_count": 98765})
             self.assertEqual(facts["indexed"]["sale_candidates"], [SELL_TX])
@@ -275,7 +290,7 @@ class BroadCollectTests(unittest.TestCase):
             self.assertIn("sale-verified", summary_lines(facts).__str__())
             self.assertIn("doc-explorer-signer-transactions", facts["document_evidence"])
             draft = read_draft(root / "draft")
-            self.assertEqual(len(draft["collections"]), 4)
+            self.assertEqual(len(draft["collections"]), 5)  # four phases plus the custodian-getter collection
             self.assertEqual(preflight(root / "draft")["errors"], [])
             summary = " ".join(summary_lines(facts))
             self.assertIn("[pool1-*]", summary)
@@ -285,6 +300,140 @@ class BroadCollectTests(unittest.TestCase):
             self.assertIn(TOKEN, text)
             self.assertIn("notes/liquidity.json", text)
             self.assertNotIn("{{", text)
+
+    def test_pipeline_reads_safe_modules_guard_and_custodian_getters_and_recommends_only_what_remains(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "run"
+            root.mkdir()
+            facts, rpc, status = self.run_pipeline(root)
+            # The locker named by the token is an architecture contract whose owner is a Safe: signers, threshold, module page and guard slot are read.
+            safe = facts["owners"]["locker"]
+            self.assertEqual((safe["address"], safe["safe_threshold"], safe["safe_owners"]), (SAFE, 2, [ALICE, BOB]))
+            self.assertEqual((safe["safe_modules"], safe["safe_guard"], safe["safe_guard_read"]), ([MODULE], GUARD, True))
+            self.assertNotIn("getModulesPaginated", safe["reverted"])
+            # The position custodian's withdrawal getters are read by the pipeline itself; reverts are recorded answers.
+            custodian = next(a for a in facts["actors"].values() if a.get("role") == "position_custodian")
+            self.assertEqual(custodian["address"], LOCKER)
+            self.assertEqual(custodian["getters"]["unlockTime"]["decoded"]["int"], 2000000000)
+            self.assertEqual(custodian["getters"]["beneficiary"]["decoded"]["address"], SAFE)
+            self.assertIn("unlockDate", custodian["reverted"])
+            summary = "\n".join(summary_lines(facts))
+            self.assertIn(f"modules=['{MODULE}'] guard={GUARD}", summary)
+            self.assertIn("custodian-getters", summary)
+            # One position covers 40% of active liquidity, so a bounded launch-window log scan is the only preset left to recommend.
+            queue = facts["recommended_presets"]
+            self.assertEqual([q["preset"] for q in queue], ["logs"])
+            self.assertIn("--preset logs --contract " + NFPM + " --topic ", queue[0]["command"])
+            self.assertIn("--from-block 90 --to-block " + str(facts["pin"]["number"]), queue[0]["command"])
+            self.assertIn("launch window", queue[0]["reason"])
+            self.assertIn("token_ids the logs rows print", queue[0]["then"])
+            self.assertIn("recommended preset 1 [canonical_lp_principal_custody]", summary)
+            self.assertEqual(read_json(root / "recommended-presets.json"), queue)
+            self.assertEqual(set(read_json(root / "work-plan.json")), {"surfaces", "overhead_requests", "contingency_requests", "seconds_required"}, "the work plan keeps the validator's shape")
+            from pipeline_note import _owners_text, write_and_compose
+            self.assertIn("getModulesPaginated() lists 1 module (" + MODULE + "); guard slot " + GUARD, _owners_text(safe))
+            write_and_compose(root)
+            note = read_json(root / "notes" / "pipeline.json")
+            custody = next(f for f in note["findings"] if f["id"] == "pipeline-launch-position-custody")
+            self.assertIn("unlockTime() = 2000000000", custody["text"])
+            self.assertIn("beneficiary() = " + SAFE, custody["text"])
+            self.assertTrue(any(str(e).endswith("-unlockTime") for e in custody["evidence"]), custody["evidence"])
+
+    def test_indexer_listed_sell_is_probed_when_the_explorer_names_no_sale(self):
+        def fetch_without_transfers(items, out):
+            records = fake_fetch(items, out)
+            for r in records:
+                if r["id"] == "explorer-transfers" and r.get("raw"):
+                    (Path(out) / r["raw"]).write_bytes(json.dumps({"items": []}).encode())
+            return records
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "run"
+            root.mkdir()
+            session = Investigation.create(root / "session.sqlite", 200, 600, request_ceiling=300, timeout_ceiling=900, limit_basis="analyst_safety")
+            cache = Cache(root / "cache.sqlite")
+            try:
+                intake(root / "draft", {"chain_id": CHAIN, "address": TOKEN}, "q", "m", True)
+                pipeline = Pipeline(root, {"chain_id": CHAIN, "address": TOKEN}, "q", "m", PipelineRpc(), session, cache, "synthetic", fetch=fetch_without_transfers, synthetic=True, registry=REGISTRY)
+                facts = pipeline.run_all()
+            finally:
+                cache.close()
+                session.close()
+            self.assertEqual(facts["indexed"]["recent_transfers_captured"], 0)
+            self.assertEqual((facts["discovery"]["geckoterminal"]["status"], facts["discovery"]["geckoterminal"]["sells"]), ("ok", 1))
+            self.assertEqual(facts["indexed"]["sale_candidates"], [SELL_TX])
+            self.assertEqual(facts["indexed"]["indexed_sells"], [SELL_TX])
+            self.assertTrue(any(s.get("verified") for s in facts["sales"]), facts["sales"])
+            self.assertNotIn("receipts", [q["preset"] for q in facts["recommended_presets"]])
+
+    def test_indexed_trades_fill_remaining_slots_and_fail_quietly(self):
+        from broad_collect import recommended_presets
+        def build(tmp, registry, fetch, prefilled=()):
+            root = Path(tmp) / "run"
+            root.mkdir()
+            session = Investigation.create(root / "session.sqlite", 200, 600, request_ceiling=300, timeout_ceiling=900, limit_basis="analyst_safety")
+            cache = Cache(root / "cache.sqlite")
+            try:
+                pipeline = Pipeline(root, {"chain_id": CHAIN, "address": TOKEN}, "q", "m", PipelineRpc(), session, cache, "synthetic", fetch=fetch, synthetic=True, registry=registry)
+                pipeline.pairs = [{"pair": POOL, "is_pool_id": False, "version": "v3"}]
+                pipeline.sell_candidates = list(prefilled)
+                (root / "discovery").mkdir()
+                pipeline.capture_indexed_trades(root / "discovery")
+                return pipeline
+            finally:
+                cache.close()
+                session.close()
+        other_sell = "0x" + "cd" * 32
+        def feed(items, out):
+            path = Path(out) / "trades.json"
+            path.write_text(json.dumps({"data": [{"type": "trade", "attributes": {"tx_hash": other_sell, "kind": "sell", "block_number": 99, "tx_from_address": BOB}},
+                                                 {"type": "trade", "attributes": {"tx_hash": "0x" + "ab" * 32, "kind": "sell", "block_number": 98}},
+                                                 {"type": "trade", "attributes": {"tx_hash": "bad", "kind": "sell", "block_number": 97}}]}))
+            return [{"id": items[0]["id"], "url": items[0]["url"], "http_status": 200, "raw": "trades.json", "captured_at_utc": "now", "bytes": path.stat().st_size}]
+        with tempfile.TemporaryDirectory() as tmp:
+            # The explorer named two transfers; the most recent listed sell replaces the second one.
+            pipeline = build(tmp, REGISTRY, feed, prefilled=["0x" + "11" * 32, "0x" + "22" * 32])
+            self.assertEqual(pipeline.sell_candidates, ["0x" + "11" * 32, other_sell])
+            self.assertEqual((pipeline.discovery["geckoterminal"]["status"], pipeline.discovery["geckoterminal"]["sells"]), ("ok", 2))
+        with tempfile.TemporaryDirectory() as tmp:
+            pipeline = build(tmp, REGISTRY, lambda items, out: [{"id": items[0]["id"], "url": items[0]["url"], "http_status": 429, "failure_category": "throttled", "captured_at_utc": "now"}])
+            self.assertEqual((pipeline.discovery["geckoterminal"]["status"], pipeline.sell_candidates, pipeline.indexed_trades), ("throttled", [], []))
+        with tempfile.TemporaryDirectory() as tmp:
+            pipeline = build(tmp, {k: v for k, v in REGISTRY.items() if k != "geckoterminal"}, feed)
+            self.assertEqual(pipeline.discovery["geckoterminal"]["status"], "no_geckoterminal_network_in_registry")
+        # Unprobed listed sells become a receipts recommendation only while no sale is verified.
+        facts = {"pin": {"number": 97}, "pools": [], "architecture": [], "positions": [], "sales": [], "receipts": [{"tx": other_sell}],
+                 "indexed": {"sale_candidates": [other_sell], "indexed_sells": [other_sell, "0x" + "ab" * 32, "0x" + "ac" * 32, "0x" + "ad" * 32]}}
+        queue = recommended_presets(facts)
+        self.assertEqual([q["preset"] for q in queue], ["receipts"])
+        self.assertIn("--tx 0x" + "ab" * 32 + ",0x" + "ac" * 32, queue[0]["command"])
+        self.assertEqual(recommended_presets({**facts, "sales": [{"verified": True}]}), [])
+
+    def test_position_custodian_is_matched_by_address_when_a_receipt_names_it_first(self):
+        class LockerToRpc(PipelineRpc):
+            def sale_receipt(self):
+                return {**super().sale_receipt(), "to": LOCKER}
+            def __call__(self, request):
+                response = super().__call__(request)
+                if request["method"] == "eth_getTransactionByHash" and request["params"][0] == SELL_TX:
+                    response["result"]["to"] = LOCKER
+                return response
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "run"
+            root.mkdir()
+            facts, rpc, status = self.run_pipeline(root, rpc=LockerToRpc())
+            custodians = [a for a in facts["actors"].values() if a.get("role") == "position_custodian"]
+            self.assertEqual([a["address"] for a in custodians], [LOCKER])
+            self.assertEqual(custodians[0]["getters"]["unlockTime"]["decoded"]["int"], 2000000000)
+
+    def test_logs_rows_print_position_ids_for_the_positions_preset(self):
+        from facts import summarize_row, INCREASE_LIQUIDITY_TOPIC
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "evidence").mkdir()
+            logs = [{"topics": [INCREASE_LIQUIDITY_TOPIC, abi(7)]}, {"topics": [INCREASE_LIQUIDITY_TOPIC, abi(9)]}, {"topics": [INCREASE_LIQUIDITY_TOPIC, abi(7)]}, {"topics": ["0x" + "ab" * 32]}]
+            (root / "evidence" / "scan.json").write_text(json.dumps({"response": {"jsonrpc": "2.0", "id": "scan", "result": logs}}))
+            row = {"id": "scan-logs", "address": NFPM, "kind": "rpc", "query": {"method": "eth_getLogs"}, "artifact": "evidence/scan.json", "observation_status": "ok"}
+            self.assertEqual(summarize_row(root, row)["decoded"], {"logs": 4, "token_ids": [7, 9], "token_ids_total": 2})
 
     def test_compose_note_reaches_delivery(self):
         with tempfile.TemporaryDirectory() as tmp:

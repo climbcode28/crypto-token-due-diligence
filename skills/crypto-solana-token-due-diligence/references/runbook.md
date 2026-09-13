@@ -163,8 +163,8 @@ items. A missing lane or expired budget is never completed broad work.
 ## 3. Judge from facts, up to four presets
 
 Presets spend the ordinary request grant that `start` left (`session.remaining_requests`
-in its output and in `status`); a preset that needs more is refused, so read that number
-before choosing the second preset.
+in its output and in `status`); a preset that needs more is refused. The recommended queue
+already drops rows the leftover grant cannot pay for and rows whose preset ran.
 
 Judge from `facts_summary`. For an omitted material detail:
 
@@ -177,19 +177,29 @@ Categories: `controls`, `pools`, `holders`, `quotes`, `transactions`, `programs`
 arithmetic by hand or fetch again to produce citations.
 
 The coordinator may run up to four presets while the collection cutoff and the ordinary
-grant allow, in order of what would change a conclusion (custody and positions first,
-then exits, then history), each a small JSON file (data, not a
+grant allow: the printed recommended queue in its printed order, then a preset only for a
+hash or address the user or a lane named. Each is a small JSON file (data, not a
 script) with a stable `id` of at most 12 characters, `kind` and `parameters`:
+
+`start` (and every `collect`) derives `recommended_presets` from the facts and writes their request
+files under `$RUN/recommended-presets/`: `pool_activity` for the leading pool when no sale verified
+(indexer-listed trades probed first), `creator_history` for attributed keys without a history page,
+`programs` for a pool whose program or ProgramData stayed unread (it reads the ProgramData
+metadata slice too). Run them in order with
+`collect "$RUN" --request <file>` and the same provider flags; the list shrinks as they run and
+is capped by the four-preset limit; the printed list, not the folder, is authoritative (a satisfied row's
+file stays on disk). A focused run gets no queue. A preset outside the list needs a hash or address the
+user or a lane named.
 
 | Kind | Parameters |
 | --- | --- |
-| `pool` | `adapter`, `pool` (must appear in this run's exact-mint discovery or captured accounts), optional `lp_accounts` (at most six) |
+| `pool` | `adapter`, `pool` (must appear in this run's exact-mint discovery or captured accounts), optional `lp_accounts` (at most six); never re-read a pool `start` already sampled: the importer keeps the census batch, and the re-read adds nothing |
 | `positions` | `adapter`, `pool`, `positions` (at most six discovered supported leads; after the standard samples, `start` censuses a Raydium CLMM or Meteora DLMM pool's fixed-layout positions and samples up to four of the largest, fitted to the leftover grant and to one atomic batch, recorded as `position_census` on the pool fact; it is skipped with a reason when fewer than 13 (CLMM) or 21 (DLMM) requests remain, the two-send margin included, and when it runs it leaves only a two-send margin, so no coordinator preset can follow it) |
 | `transactions` | `signatures` (at most two) |
-| `pool_activity` | `pool` (captured), optional `limit` (1–25 signatures, default 10), `receipts` (0–4 sampled swap receipts, default 2) and `probes` (receipts–8 signatures classified, default 4) |
+| `pool_activity` | `pool` (captured), optional `limit` (1–25 signatures, default 10), `receipts` (0–4 sampled swap receipts, default 2) and `probes` (receipts–8 signatures classified, default 4); indexer-listed trades captured by `start` (up to six sells and two buys) are probed before the chain listing |
 | `holders` | none: holder discovery (largest accounts or the bounded scan) plus the same-batch balance sample; it repeats what `start` already attempted, so use it only when `diagnostics` shows neither the largest-accounts read nor the bounded scan ran |
 | `creator_history` | `keys` (at most two attributed keys), optional `before` cursors |
-| `programs` | `addresses` (known program/controller dependencies) |
+| `programs` | `addresses` (known program/controller dependencies; each upgradeable program's ProgramData metadata slice is read with it) |
 | `quote` | `adapter` = `raydium_cpmm`, exact `pool` |
 
 Example: `{"id":"custody1","kind":"pool","parameters":{"adapter":"raydium_amm_v4","pool":"EXACT_POOL","lp_accounts":["EXACT_LP_ACCOUNT"]}}`
@@ -256,9 +266,15 @@ explicitly undeliverable as completed broad research; describe its limits. `read
 [report-replay](report-replay.md). Old schema-1 bundles are validated with
 `validate --profile legacy-v1`; they keep their original rendering.
 
-Automatic activity sampling requests at most ten recent signatures per selected pool
-and, across the selected pools, probes at most four of them and samples at most two
-receipts; `pool_activity`
+Automatic activity sampling captures the indexer's recent trade listing for the leading pool
+(GeckoTerminal; the second pool's feed only when probes remain for it) and requests at most 25 recent
+signatures per pool; across the selected pools it probes at most six signatures, indexer-listed
+sells first, then a buy, then the chain listing (skipping signatures that failed on chain), and
+samples at most two receipts carrying a supported swap at the exact pool. The listing names
+candidates only; the receipt establishes the swap, so a pool whose recent chain listing is
+dominated by bot transactions that touch it without swapping no longer exhausts the window.
+`receipt-classification.json` records per pool the signatures listed, failed on chain, unseen
+and the indexed candidates; `pool_activity`
 classifies its probes the same way (skipping signatures already sampled or classified;
 a probe with any receipt status other than `ok`, such as a budget refusal, timeout,
 provider error or empty result, keeps that status in `receipt-classification.json` and a

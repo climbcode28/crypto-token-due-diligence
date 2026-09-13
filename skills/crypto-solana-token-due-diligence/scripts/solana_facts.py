@@ -59,9 +59,12 @@ def describe(operation,data):
     if operation=='holders':
         share=data['coverage_share'];ratio='undefined (zero supply)' if share is None else share['percent_display']+'%'
         owners='; '.join(r['spending_owner']+': '+r['amount_atomic']+' atomic ('+(r['supply_share']['percent_display']+'%' if r['supply_share'] else 'undefined share')+'), '+str(len(r['accounts']))+' accounts' for r in data['owners'])
-        return ('Sampled '+str(len(data['accounts']))+' accounts: '+data['observed_base_amount_atomic']+'/'+data['supply_atomic']+' atomic units ('+ratio+'). Custody exclusions '+data['custody_excluded_amount_atomic']+'. Spending-owner aggregates: '+owners+'. '+data['scope']+'.')
+        head=('Largest '+str(len(data['accounts']))+' token accounts (exact ranking at the discovery slot)') if (data.get('discovery') or {}).get('method')=='getTokenLargestAccounts' else 'Sampled '+str(len(data['accounts']))+' accounts'
+        return (head+': '+data['observed_base_amount_atomic']+'/'+data['supply_atomic']+' atomic units ('+ratio+'). Custody exclusions '+data['custody_excluded_amount_atomic']+'. Spending-owner aggregates: '+owners+'. '+data['scope']+'.')
     if operation=='pool':
-        return (data['adapter']['id']+' pool '+data['pool']+'. Reserves atomic '+json.dumps(data.get('reserves_atomic'))+
+        concentrated=data['adapter']['id'] in ('raydium_clmm','orca_whirlpool','meteora_dlmm')
+        reserves=('Reserves atomic '+json.dumps(data['reserves_atomic'])) if data.get('reserves_atomic') is not None else ('Reserves not inferred (concentrated pool; position coverage '+str(data.get('position_coverage'))+')' if concentrated else 'Reserves unresolved')
+        return (data['adapter']['id']+' pool '+data['pool']+'. '+reserves+
             '; observed vault count '+str(len(data['vaults']))+'; sampled positions '+str(len(data.get('positions',[])))+census_text(data.get('position_census'))+'. Principal, fees, custody, locks and execution are separately scoped below.')
     if operation=='metadata':
         verified=data['verified_creators'];return ('Metaplex metadata: name '+json.dumps(data['name'])+', symbol '+json.dumps(data['symbol'])+', update authority '+data['update_authority']+(' (mutable)' if data['is_mutable'] else ' (immutable)')+'; '+str(len(data['creators']))+' creator entries, verified: '+(', '.join(verified) if verified else 'none')+'. Keys are attribution leads, not identities; the URI is text only.')
