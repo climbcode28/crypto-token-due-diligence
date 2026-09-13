@@ -36,6 +36,9 @@ The installer links the skills into your user account and leaves existing files 
 Start a new session after installation. Use `./install.sh --copy` if symlinks are
 unavailable, or `./install.sh --uninstall` to remove installed links.
 Linked installs pick up updates when you run `git pull` in the clone.
+Opening the cloned folder itself also works without installing: Codex and Cursor read the
+registrations in `.agents/skills/` and `.cursor/skills/`, and Claude Code reads `.claude/skills/`.
+All of them point at the shared copies under `skills/`.
 
 ## Usage
 
