@@ -1,18 +1,14 @@
-# Crypto research
+# Crypto token due diligence
 
-Token due-diligence skills for [Claude Code](https://claude.com/claude-code),
+Crypto token due-diligence skills for [Claude Code](https://claude.com/claude-code),
 [Codex](https://openai.com/codex) and [Cursor](https://cursor.com).
 
 [![Token due-diligence architecture](docs/diagrams/crypto-token-diligence-architecture-dark.png)](docs/diagrams/crypto-token-diligence-architecture-dark.png)
-
-Individual diagrams: [EVM](docs/diagrams/evm-diligence-architecture-dark.png) ·
-[Solana](docs/diagrams/solana-diligence-architecture-dark.png).
-
 **Input**
 ```text
-token_address:      Exact EVM or Solana token address (required)
-token_name:         Token name (optional)
-additional_context: Questions, links, or specific requirements (optional)
+token_address:       Exact EVM or Solana token address (required)
+token_name:          Token name (optional)
+additional_context:  Questions, links, or specific requirements (optional)
 ```
 **Output:** A source-linked assessment of token controls, liquidity, project
 credibility, creator history and token economics.
@@ -21,9 +17,9 @@ Reports label each finding as **✅ Good**, **🟡 Potential Risk**, **🔴 Bad*
 what could not be verified, and save the full supporting evidence under `research/`.
 Research is read-only: no wallet connection, signing or trading.
 
-**For informational and educational purposes only—not financial or investment advice.**
+**THIS SKILL IS FOR INFORMATIONAL AND EDUCATIONAL PURPOSES ONLY - <u>NOT FINANCIAL OR INVESTMENT ADVICE</u>.**
 Findings may be incomplete or incorrect and do not constitute a recommendation to buy,
-sell, or hold any asset. Independently verify information before making financial decisions.
+sell, or hold any asset. Independently verify key information before making financial decisions. AI can miss things or get them wrong, so verify important findings yourself. A positive report doesn’t guarantee a token is safe.
 
 ## Skills
 
@@ -41,7 +37,7 @@ only when you invoke them by name.
 
 ## Quick start
 
-Requires **Python 3.10+**, **Git**, and **Claude Code, Codex or Cursor**. No Python packages required.
+Requires **Python 3.10+**, **Git**, and **Claude Code, Codex or Cursor**. No Python packages required. If you don't have these tools installed, or aren't sure whether you do, ask your agent - they can help you 🙂 
 ```sh
 git clone <repository URL> ~/crypto-research
 cd ~/crypto-research
@@ -60,12 +56,14 @@ Tool execution uses your host's normal permission settings.
 
 In **Codex**:
 ```text
-$crypto-token-due-diligence $PONS 0x39dBED3a2bd333467115dE45665cC57F813C4571 - focus on liquidity, creator history, and whether the project has delivered what it claims.
+$crypto-token-due-diligence
+$PONS 0x39dBED3a2bd333467115dE45665cC57F813C4571
+
+Focus on liquidity, creator history, and whether
+the project has delivered what it claims.
 ```
 
-In **Claude Code** or **Cursor**, use `/crypto-token-due-diligence` with the same request.
-You can also invoke either specialist directly. Include the network when known,
-relevant links, and any specific requirements—for example, “Can I exit 50,000 tokens?”
+In **Claude Code** or **Cursor**, use `/crypto-token-due-diligence` with the same request format.
 
 You receive a concise assessment with evidence links, clearly labeled research gaps,
 and a saved report. Public data availability affects coverage; a positive finding is
@@ -108,7 +106,7 @@ Editable skills live under `skills/`. Follow [project guidance](AGENTS.md) and t
 [EVM port notes](.claude/skills/crypto-evm-token-due-diligence/CLAUDE-CODE-PORT.md)
 when changing them.
 
-Run the offline regression suites from the repository root:
+You can run the offline regression test suites from the repository root:
 
 ```sh
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s skills/crypto-token-due-diligence/tests -q
