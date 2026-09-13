@@ -1,5 +1,22 @@
 # Token diligence architecture diagrams
 
+## Carbon background — current default
+
+The user selected the Carbon study as the default for all three diagrams.
+The combined diagram promotes that approved study directly, retaining the
+4608 × 3072 export from its 1536 × 1024 native image. Resampling adds no detail.
+EVM and Solana were edited separately with built-in image_gen, using their
+existing diagrams as content references and Carbon as the background reference.
+Both specialist outputs are 1536 × 1024. Visual review checked wording, layout,
+source inventories, connectors and footers. README keeps its stable image paths;
+the HTML viewer also uses Carbon (#141619). Background study files were removed.
+
+Specialist edit prompt:
+
+```text
+Use case: style-transfer. Image 1 is the EDIT TARGET architecture diagram. Image 2 is ONLY the approved Carbon BACKGROUND reference. Change ONLY image 1's background and box-interior surfaces to match image 2's near-black neutral graphite Carbon, base #141619, matte smooth with no texture or glow. Preserve every foreground word, handwriting, size, placement, box, dashed border, connector, arrowhead, underline and colored symbol from IMAGE 1 exactly. Do not copy image 2's content or layout. No added/omitted text, no redesign, no shadows or blurring. Preserve full 3:2 canvas, sharp legibility, white text and pale cyan lines, original green/yellow/red/white finding symbols. Footer stays 'Read-only access · 7 - 8 minute deadline · Missing evidence clearly labeled'. Highest available native resolution. Output single complete edited diagram.
+```
+
 ## Earlier background with sharper foreground
 
 The user requested the earlier navy background character with the cleaner render's
