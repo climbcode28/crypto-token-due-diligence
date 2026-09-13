@@ -172,8 +172,8 @@ Judge from `facts_summary`. For an omitted material detail:
 python3 "$S/scripts/solana_facts.py" "$RUN/draft" --check --category holders
 ```
 
-Categories: `controls`, `pools`, `holders`, `quotes`, `transactions`, `programs`,
-`creator`, `launch`, `maturity`, `source_assurance`. Do not open raw manifests, do
+Categories: `controls`, `pools`, `holders`, `corroboration`, `quotes`, `transactions`,
+`programs`, `creator`, `launch`, `maturity`, `source_assurance`. Do not open raw manifests, do
 arithmetic by hand or fetch again to produce citations.
 
 The coordinator may run up to four presets while the collection cutoff and the ordinary
@@ -283,3 +283,11 @@ receipts, which the sale and rebuy facts verify alongside start's (at most ten);
 curve is sampled like a pool and its trades verify with a native or token quote. Only
 supported historical swap effects with exact pool/mint/owner and balance reconciliation
 become sample sales. Empty/short history is not archive coverage or proof of no selling.
+
+`start` also captures RugCheck's token report for the exact mint (`api.rugcheck.xyz`, no key) as a
+third-party corroboration document: the importer derives a `rugcheck` fact (category `corroboration`,
+coverage current_concentration, route `follow_up`) carrying transfer-graph insider networks with wallet
+counts and supply shares, listed top holders with insider flags, lockers, creator and authority claims,
+risks and score. Listed holders present in the exact largest-holder sample are marked verified with the
+sampled amount; everything else is the indexer's claim. A refused or rate-limited report is a stated
+capture limit, never a fact. Rate it by the linked-wallets rule in the reporting scenarios.

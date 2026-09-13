@@ -4,12 +4,12 @@ from pathlib import Path
 from solana_common import sha,need
 from solana_profile import Evidence,strict_json,regular,PROFILE
 
-VERSION='1.3.0'
+VERSION='1.4.0'
 CATEGORIES={'mint':'controls','controls':'controls','holders':'holders','program':'programs','controllers':'programs',
  'pool':'pools','local_quote':'quotes','public_quote':'quotes','quote_sizes':'quotes','transaction':'transactions',
  'sales':'transactions','rebuys':'transactions','history':'launch','launch':'launch','metadata':'launch','creator_activity':'creator',
  'inventory':'creator','prior_launches':'creator','source_assurance':'source_assurance',
- 'discovery_pools':'maturity','repository_metadata':'maturity','repository_revision':'maturity','repository_tree':'maturity'}
+ 'discovery_pools':'maturity','repository_metadata':'maturity','repository_revision':'maturity','repository_tree':'maturity','rugcheck':'corroboration'}
 LIMIT_KEYS={'gaps','missing','remaining','limitations','scope','coverage','enumeration','unsupported_lock_paths','selection_scope','newer_unpinned',
  'reserve_quantity_scope','unknown_extensions','extension_errors','additional_withheld_or_confidential_unknown'}
 ATTENTION_KEYS={'mint_authority','freeze_authority','controller','delegate','close_authority','upgrade_authority','authority',
@@ -72,6 +72,13 @@ def describe(operation,data):
         return 'Reconciled '+operation+' candidates in the supplied receipt sample. Counts describe this verification sample; indexed market activity and total actor history remain separate.'
     if operation in ('local_quote','public_quote','quote_sizes'):
         return 'Illustrative '+operation.replace('_',' ')+' with exact input/output units and retained fee/context limits. Estimate or source quote; no trade was executed.'
+    if operation=='rugcheck':
+        nets=data.get('insider_networks') or [];lead=nets[0] if nets else None
+        head=('RugCheck report (third-party transfer-graph analysis): '+str(data.get('insider_networks_total'))+' insider networks'
+              +((', the largest '+str(lead['size'])+' wallets holding '+(lead['supply_share']['percent_display']+'% of supply' if lead.get('supply_share') else lead['token_amount_atomic']+' atomic'+(' (exceeds reported supply)' if lead.get('exceeds_supply') else ''))) if lead else ''))
+        sample=('no largest-holder sample bound; listed holders unverified' if not data.get('sample_size') else str(data.get('top_holders_verified_in_sample'))+' of '+str(len(data.get('top_holders') or []))+' listed top holders verified by token account in the exact largest-holder sample')
+        return (head+'; '+sample+'; '
+                +str(len(data.get('lockers') or []))+' lockers; '+str(len(data.get('risks') or []))+' listed risks; score '+str(data.get('score'))+'. Networks are the indexer\'s claim, not proven common ownership.')
     if operation in ('discovery_pools','repository_metadata','repository_revision','repository_tree'):
         return 'Captured '+operation.replace('_',' ')+' publication with its original source and capture time. These metrics do not establish organic use, universal rank, authorship, safety or delivered functionality.'
     if operation=='source_assurance':

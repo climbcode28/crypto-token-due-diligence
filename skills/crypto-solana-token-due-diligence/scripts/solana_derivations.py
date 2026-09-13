@@ -3,8 +3,8 @@ import re
 from solana_common import need,target_identity,pubkey
 from solana_programs import observed_account
 
-VERSION='1.5.0'  # Persisted derivation contract; bumped whenever any operation's output shape or input binding changes.
-RUNTIME_VERSION='1.7.0'
+VERSION='1.6.0'  # Persisted derivation contract; bumped whenever any operation's output shape or input binding changes.
+RUNTIME_VERSION='1.8.0'
 # The contract version in which each operation's output last changed. A derivation recorded
 # before its operation last changed cannot be recomputed by this engine: read or replay it
 # with its frozen engine instead. Operations absent here have not changed since 1.0.0.
@@ -24,7 +24,10 @@ RUNTIME_VERSION='1.7.0'
 # program scan made every censused pool fact unusable); a resolved concentrated sample with observed positions reports status
 # observed (reserves are never inferred there). A pool derivation recorded at 1.4.0 with a bound census read neither
 # recomputes nor shares the output: read or replay it with its frozen engine, so the pool entry moves to 1.5.0.
-CHANGED_IN={**{op:'1.1.0' for op in ('controllers','discovery_pools','holders','mint','controls','history')},'pool':'1.5.0','transaction':'1.3.0','sales':'1.3.0','rebuys':'1.3.0'}
+# 1.6.0 (2026-09-13, evening): new publication operation rugcheck (RugCheck token report bound to the exact mint: insider networks
+# with supply shares, top holders verified by token account against the holders derivation, owner corroboration separate);
+# existing operations unchanged, so their entries stay put.
+CHANGED_IN={**{op:'1.1.0' for op in ('controllers','discovery_pools','holders','mint','controls','history')},'pool':'1.5.0','transaction':'1.3.0','sales':'1.3.0','rebuys':'1.3.0','rugcheck':'1.6.0'}
 
 
 def version_tuple(value):
@@ -38,7 +41,7 @@ def recomputable(operation,recorded):
     if recorded>version_tuple(VERSION):return 'derivation recorded by a newer engine; use read/replay'
     if recorded<version_tuple(CHANGED_IN.get(operation,'1.0.0')):return 'operation version differs from installed engine; use read/replay'
     return 'ok'
-PUBLICATION_OPS={'public_quote','discovery_pools','repository_metadata','repository_revision','repository_tree'}
+PUBLICATION_OPS={'public_quote','discovery_pools','repository_metadata','repository_revision','repository_tree','rugcheck'}
 EXECUTION_OPS={'transaction','sales','rebuys','launch','creator_activity','inventory','prior_launches'}
 
 
@@ -51,6 +54,9 @@ def compute(operation,parameters,target,resolve):
     if operation=='public_quote':
         from solana_quotes import public_quote
         d=get('capture');return public_quote(p['source'],target,d['record'],d['raw'],p['output_mint'],p['input_atomic'],slippage_bps=p.get('slippage_bps',50))
+    if operation=='rugcheck':
+        import solana_discovery as discovery
+        d=get('capture');return discovery.rugcheck_report(d['record'],d['raw'],target,holders=get('holders') if p.get('holders') else None)
     if operation in ('discovery_pools','repository_metadata','repository_revision','repository_tree'):
         import solana_discovery as discovery
         d=get('capture')

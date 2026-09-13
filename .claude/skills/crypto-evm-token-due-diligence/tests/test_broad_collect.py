@@ -185,6 +185,13 @@ def fake_fetch(items, out):
                                "total": {"value": str(5 * 10 ** 21)}, "method": "swap", "timestamp": "2026-01-01T00:00:00Z"},
                               {"transaction_hash": hh("buy"), "block_number": 94, "from": {"hash": POOL, "is_contract": True}, "to": {"hash": BOB, "is_contract": False},
                                "total": {"value": str(10 ** 21)}, "method": "swap"}], "next_page_params": None}
+        elif item["id"] == "goplus-token-security":
+            body = {"code": 1, "message": "OK", "result": {TOKEN: {"holder_count": "36949", "lp_holder_count": "159", "is_honeypot": "0", "is_mintable": "0", "is_proxy": "0", "is_open_source": "1",
+                     "transfer_pausable": "0", "is_blacklisted": "0", "buy_tax": "0", "sell_tax": "0", "owner_address": "", "creator_address": CAROL,
+                     "holders": [{"address": ALICE, "tag": "", "is_contract": 0, "is_locked": 0, "percent": "0.05", "balance": "50000"}, {"address": "0x" + "77" * 20, "tag": "", "is_contract": 1, "is_locked": 0, "percent": "0.01", "balance": "10000"}],
+                     "lp_holders": [{"address": LOCKER, "tag": "", "is_contract": 1, "is_locked": 0, "percent": "0.594481", "value": "1384506.2", "NFT_list": [{"NFT_id": "7", "amount": "1", "in_effect": "1"}]},
+                                    {"address": BOB, "tag": "", "is_contract": 0, "is_locked": 1, "percent": "0.096", "value": "223801.4", "NFT_list": [{"NFT_id": "12", "amount": "1", "in_effect": "1"}], "locked_detail": [{"end_time": "2030-01-01", "opt_token": "x", "amount": "1"}]}],
+                     "dex": [{"liquidity_type": "UniV3", "name": "UniswapV3", "liquidity": "3233675.8", "pool_fee": "0.01", "pair": POOL}]}}}
         elif item["id"] == "geckoterminal-trades":
             body = {"data": [{"id": "t1", "type": "trade", "attributes": {"tx_hash": SELL_TX, "kind": "sell", "block_number": 95, "tx_from_address": ALICE}},
                              {"id": "t2", "type": "trade", "attributes": {"tx_hash": "0x" + "ee" * 32, "kind": "buy", "block_number": 96, "tx_from_address": BOB}}]}
@@ -271,7 +278,7 @@ class BroadCollectTests(unittest.TestCase):
             self.assertEqual(facts["holder_summary"]["read_count"], len(top))
             self.assertIn(DEAD, facts["holder_selection"]["excluded_addresses"])
             self.assertEqual(len(rpc.calls), 102, "holder arithmetic and delivery preservation add no RPC requests (102 = 78 + locker() and its two architecture reads + seven Safe reads + eleven custodian getters + the second phase-4 collection's pin reads)")
-            self.assertEqual(status["started_attempts"], 112, "no extra discovery requests or session charges (112: the 102 pipeline reads plus nine discovery captures and pin charges)")
+            self.assertEqual(status["started_attempts"], 113, "no extra discovery requests or session charges (113: the 102 pipeline reads plus ten discovery captures and pin charges)")
             self.assertNotIn(DEAD, top, "already-read balances are not re-read")
             self.assertEqual(facts["indexed"]["counters"], {"holders_count": 1234, "transfers_count": 98765})
             self.assertEqual(facts["indexed"]["sale_candidates"], [SELL_TX])
@@ -322,12 +329,12 @@ class BroadCollectTests(unittest.TestCase):
             self.assertIn("custodian-getters", summary)
             # One position covers 40% of active liquidity, so a bounded launch-window log scan is the only preset left to recommend.
             queue = facts["recommended_presets"]
-            self.assertEqual([q["preset"] for q in queue], ["logs"])
-            self.assertIn("--preset logs --contract " + NFPM + " --topic ", queue[0]["command"])
-            self.assertIn("--from-block 90 --to-block " + str(facts["pin"]["number"]), queue[0]["command"])
-            self.assertIn("launch window", queue[0]["reason"])
-            self.assertIn("token_ids the logs rows print", queue[0]["then"])
-            self.assertIn("recommended preset 1 [canonical_lp_principal_custody]", summary)
+            self.assertEqual([q["preset"] for q in queue], ["positions", "logs"])  # GoPlus lists an unread LP position first, then the bounded scan
+            self.assertIn("--preset logs --contract " + NFPM + " --topic ", queue[1]["command"])
+            self.assertIn("--from-block 90 --to-block " + str(facts["pin"]["number"]), queue[1]["command"])
+            self.assertIn("launch window", queue[1]["reason"])
+            self.assertIn("token_ids the logs rows print", queue[1]["then"])
+            self.assertIn("recommended preset 2 [canonical_lp_principal_custody]", summary)
             self.assertEqual(read_json(root / "recommended-presets.json"), queue)
             self.assertEqual(set(read_json(root / "work-plan.json")), {"surfaces", "overhead_requests", "contingency_requests", "seconds_required"}, "the work plan keeps the validator's shape")
             from pipeline_note import _owners_text, write_and_compose
@@ -407,6 +414,117 @@ class BroadCollectTests(unittest.TestCase):
         self.assertEqual([q["preset"] for q in queue], ["receipts"])
         self.assertIn("--tx 0x" + "ab" * 32 + ",0x" + "ac" * 32, queue[0]["command"])
         self.assertEqual(recommended_presets({**facts, "sales": [{"verified": True}]}), [])
+
+    def test_goplus_claims_are_cross_checked_and_unread_lp_positions_are_recommended_first(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "run"
+            root.mkdir()
+            facts, rpc, status = self.run_pipeline(root)
+            g = facts["goplus"]
+            self.assertEqual((g["status"], g["holder_count"], g["lp_holder_count"], g["evidence"]), ("ok", 36949, 159, "doc-goplus-token-security"))
+            self.assertEqual(g["flags"]["is_honeypot"], False)
+            self.assertEqual(g["flags"]["is_open_source"], True)
+            self.assertEqual([(r["address"], r["share_pct"], r["is_locked"], r["nft_ids"], r["verified"]) for r in g["lp_holders"]],
+                             [(LOCKER, 59.4481, False, [7], True), (BOB, 9.6, True, [12], False)])
+            self.assertEqual(g["lp_holders"][0]["verified_positions"][0]["id"], 7)
+            self.assertEqual((g["lp_holders_verified"], g["holders_verified"], g["unread_lp_nft_ids"]), (1, 1, [12]))
+            self.assertTrue(g["holders"][0]["verified"] and g["holders"][0]["sample_pct_supply"] is not None)
+            self.assertIn("doc-goplus-token-security", facts["document_evidence"])
+            queue = facts["recommended_presets"]
+            self.assertEqual(queue[0]["preset"], "positions")
+            self.assertIn("--preset positions --ids 12", queue[0]["command"])
+            summary = "\n".join(summary_lines(facts))
+            self.assertIn("goplus [doc-goplus-token-security] holders=36949", summary)
+            self.assertIn("goplus-lp-holders:", summary)
+            from pipeline_note import write_and_compose
+            write_and_compose(root)
+            note = read_json(root / "notes" / "pipeline.json")
+            texts = {f["id"]: f["text"] for f in note["findings"]}
+            self.assertIn("GoPlus counts 159 LP holders and lists 2", texts["pipeline-launch-position-custody"])
+            self.assertIn("verified as position 7", texts["pipeline-launch-position-custody"])
+            self.assertIn("GoPlus corroboration", texts["pipeline-token-controls"])
+            self.assertIn("GoPlus lists 36949 holders", texts["pipeline-holder-distribution"])
+            self.assertTrue(all("doc-goplus-token-security" in f["evidence"] for f in note["findings"] if f["id"] in ("pipeline-launch-position-custody", "pipeline-token-controls", "pipeline-holder-distribution")))
+
+    def test_goplus_unread_ids_rank_by_share_and_failure_paths_stay_quiet(self):
+        from broad_collect import goplus_facts, recommended_presets
+        def goplus(lp_holders, **entry):
+            return {"status": "ok", "evidence": "doc-goplus-token-security", "holders": [], "lp_holders": lp_holders, "dex": [], "flags": {}, **entry}
+        nfts = lambda rows: [{"id": i, "share_pct": share, "amount": amount, "amount_known": amount != "", "in_effect": in_effect, "empty": amount == "0"} for i, share, amount, in_effect in rows]
+        g = goplus([{"address": LOCKER, "share_pct": 59.0, "is_locked": False, "is_contract": True, "nft_ids": [7, 30, 40, 41], "nfts": nfts([(7, 50.0, "1", True), (30, 9.0, "1", True), (40, 0.0, "0", True), (41, 20.0, "5", False)])},
+                    {"address": BOB, "share_pct": 12.0, "is_locked": True, "is_contract": False, "nft_ids": [12, 13, 14], "nfts": nfts([(12, 11.5, "1", True), (13, 0.5, "1", True), (14, None, "", True)])}])
+        out = goplus_facts(g, [{"id": 7, "owner": LOCKER, "pct_of_pool_active_liquidity": 40.0}], [], {}, [{"pair": POOL, "read": "v3", "target_in_pool": True}])
+        # Largest in-range share first, an unknown share last among in-range, the out-of-range position after them; the empty position 40 and the read position 7 are excluded.
+        self.assertEqual(out["unread_lp_nft_ids"], [12, 30, 13, 14, 41])
+        queue = recommended_presets({"pin": {"number": 97}, "pools": [], "architecture": [], "positions": [], "sales": [{"verified": True}], "goplus": out})
+        self.assertEqual((queue[0]["preset"], queue[0]["command"].split("--ids ")[1]), ("positions", "12,30,13,14,41"))
+        # Failure paths: every status is stated, nothing is queued, the summary names the status, the note says nothing about GoPlus.
+        def build(tmp, fetch, web=True):
+            root = Path(tmp) / "run"
+            root.mkdir()
+            session = Investigation.create(root / "session.sqlite", 200, 600, request_ceiling=300, timeout_ceiling=900, limit_basis="analyst_safety")
+            cache = Cache(root / "cache.sqlite")
+            try:
+                pipeline = Pipeline(root, {"chain_id": CHAIN, "address": TOKEN}, "q", "m", PipelineRpc(), session, cache, "synthetic", fetch=fetch, synthetic=True, registry=REGISTRY, web=web)
+                (root / "discovery").mkdir()
+                pipeline.capture_goplus(root / "discovery")
+                return pipeline
+            finally:
+                cache.close()
+                session.close()
+        def answering(body, http_status=200, failure=None):
+            def fetch(items, out):
+                path = Path(out) / "goplus.json"
+                path.write_text(json.dumps(body))
+                record = {"id": items[0]["id"], "url": items[0]["url"], "http_status": http_status, "raw": "goplus.json", "captured_at_utc": "now", "bytes": path.stat().st_size}
+                if failure:
+                    record["failure_category"] = failure
+                return [record]
+            return fetch
+        cases = [({"code": 1, "message": "OK", "result": {}}, 200, None, "token_not_listed"),
+                 ({"code": 4029, "message": "Request limit reached"}, 200, None, "api_4029:Request limit reached"),
+                 ({}, 429, "throttled", "throttled"),
+                 ({"code": 1, "message": "OK", "result": {TOKEN: {"holder_count": "5"}}}, 200, None, "ok")]
+        for body, http_status, failure, expected in cases:
+            with tempfile.TemporaryDirectory() as tmp:
+                pipeline = build(tmp, answering(body, http_status, failure))
+                self.assertEqual(pipeline.goplus["status"], expected, body)
+                self.assertEqual(pipeline.discovery["goplus"]["status"], expected)
+                facts = {"pin": None, "pools": [], "architecture": [], "positions": [], "sales": [],
+                         "goplus": goplus_facts(pipeline.goplus, [], [], {}, []), "coverage_hint": {}, "collections": [], "metadata": {}, "controls": {}, "source": {}, "discovery": {}, "links": {"websites": [], "socials": []}, "quotes": [], "balances": {}, "owners": {}, "receipts": [], "elapsed_seconds": 0}
+                self.assertEqual(recommended_presets(facts), [])
+                summary = "\n".join(summary_lines(facts))
+                self.assertIn("goplus", summary)
+                if expected != "ok":
+                    self.assertIn(f"goplus: {expected}", summary)
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertTrue(build(tmp, answering({})).goplus["status"].startswith("api_"), "a body without a code is an API-shape status, never a fact")
+
+    def test_positions_read_by_a_later_preset_verify_goplus_lp_holders_in_the_note(self):
+        from pipeline_note import build_pipeline_note, positions_from_draft
+        from bundle_assemble import read_draft
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "run"
+            root.mkdir()
+            facts, rpc, status = self.run_pipeline(root)
+            self.assertEqual(facts["goplus"]["unread_lp_nft_ids"], [12])
+            draft = read_draft(root / "draft")
+            # A later positions preset read position 12: its ownerOf and positions rows sit in the draft like any evidence row.
+            (root / "draft" / "evidence").mkdir(exist_ok=True)
+            # Imported preset rows carry a collection prefix on the id and keep the alias in their provenance, like a real draft.
+            owner_row = {"id": "c-abc123-positions-12-ownerOf", "kind": "rpc", "address": NFPM, "pin_id": "current", "query": {"method": "eth_call"}, "artifact": "evidence/positions-12-ownerOf.json", "observation_status": "ok",
+                         "collection_provenance": {"artifact": "imports/c-abc123/collection.json", "evidence_id": "positions-12-ownerOf", "sha256": "0" * 64}}
+            (root / "draft" / owner_row["artifact"]).write_text(json.dumps({"response": {"jsonrpc": "2.0", "id": "x", "result": word_address(BOB)}}))
+            words = [0, 0, int(TOKEN, 16), int(QUOTE, 16), 3000, (-887220) % 2 ** 256, 887220, 5 * 10 ** 17, 0, 0, 0, 0]
+            pos_row = {**owner_row, "id": "c-abc123-positions-12-positions", "artifact": "evidence/positions-12-positions.json", "collection_provenance": {**owner_row["collection_provenance"], "evidence_id": "positions-12-positions"}}
+            (root / "draft" / pos_row["artifact"]).write_text(json.dumps({"response": {"jsonrpc": "2.0", "id": "y", "result": "0x" + "".join(format(w, "064x") for w in words)}}))
+            draft["evidence"] += [owner_row, pos_row]
+            later = positions_from_draft(root, draft, facts)
+            self.assertEqual([(p["id"], p["owner"], p["liquidity"], p["pool"], p["source"]) for p in later], [(12, BOB, 5 * 10 ** 17, POOL, "preset")])
+            note = build_pipeline_note(facts, draft, run=root)
+            custody = next(f for f in note["findings"] if f["id"] == "pipeline-launch-position-custody")
+            self.assertIn("verified as position 12", custody["text"])
+            self.assertNotIn("Unread listed position ids", custody["text"])
 
     def test_position_custodian_is_matched_by_address_when_a_receipt_names_it_first(self):
         class LockerToRpc(PipelineRpc):

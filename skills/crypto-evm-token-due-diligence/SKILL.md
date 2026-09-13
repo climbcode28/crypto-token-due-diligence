@@ -101,7 +101,8 @@ Follow [runbook.md](references/runbook.md); the commands are exact. In order:
 4. **Judge from facts.** Read the pipeline's summary (or `bundle_assemble.py facts
    "$RUN/draft"`). Never `cat` collections, drafts or manifests. The pipeline already reads
    Safe signers, threshold, modules and guard, a position custodian's withdrawal getters and
-   sale receipts. Run the printed `recommended preset` lines in order (usually none or one)
+   sale receipts. Run the printed `recommended preset` lines in order (GoPlus-listed unread LP
+   positions first when any exist, otherwise usually none or one)
    while at least 150 s remain before the deadline, chained in one shell call with `;` (they
    share the run's draft and session files, so never as parallel tool calls); add a preset
    only for a receipt hash a lane found or a contract the user named. A reverted probe is

@@ -7,7 +7,7 @@ return a partial note if unfinished. The coordinator preserves two minutes for f
 delivery. Never reset time, budget, identity or source ownership.
 
 Read the compact facts in the context first. For current facts use the installed
-`scripts/solana_facts.py DRAFT --check --category pools --category holders --category
+`scripts/solana_facts.py DRAFT --check --category pools --category holders --category corroboration --category
 quotes --category transactions --category maturity`. Avoid raw-manifest reading and
 repeated arithmetic. The full facts file is available for an explicitly omitted
 material detail. A copied indexer label is a candidate, not an observed pool identity.

@@ -108,7 +108,48 @@ def receipts_from_draft(run, draft, facts):
     return out
 
 
+def positions_from_draft(run, draft, facts):
+    """Positions read after start (the positions preset) join the pipeline's own: owner from ownerOf, liquidity and pair from
+    positions(), matched to the canonical pool by token pair; without a pool tick the share of active liquidity stays unknown."""
+    import re
+    known = {p.get("id") for p in facts.get("positions") or []}
+    rows = {}
+    for e in draft.get("evidence", []):
+        # Imported rows carry a collection prefix on their id; the preset's alias survives in the provenance.
+        alias = (e.get("collection_provenance") or {}).get("evidence_id") or str(e.get("id") or "")
+        m = re.fullmatch(r"(?:positions|pos)-(\d+)-(ownerOf|positions)", alias)
+        if not m or e.get("kind") != "rpc" or e.get("observation_status", "ok") != "ok":
+            continue
+        pid = int(m.group(1))
+        if pid in known:
+            continue
+        try:
+            result = read_json(Path(run) / "draft" / e["artifact"])["response"]["result"]
+        except (OSError, ValueError, KeyError, TypeError):
+            continue
+        if not isinstance(result, str) or not re.fullmatch(r"0x[0-9a-fA-F]*", result):
+            continue
+        row = rows.setdefault(pid, {"id": pid, "owner": None, "liquidity": None, "pool": None, "pct_of_pool_active_liquidity": None, "source": "preset", "evidence": {}})
+        words = [int(result[2 + 64 * i:66 + 64 * i], 16) for i in range((len(result) - 2) // 64)]
+        if m.group(2) == "ownerOf" and words:
+            row["owner"] = "0x" + format(words[0], "040x") if 0 < words[0] < 2 ** 160 else None
+            row["evidence"]["owner"] = alias
+        elif m.group(2) == "positions" and len(words) >= 8:
+            token0, token1, fee, liquidity = "0x" + format(words[2], "040x"), "0x" + format(words[3], "040x"), words[4], words[7]
+            row.update(liquidity=liquidity, token0=token0, token1=token1, fee=fee)
+            row["evidence"]["positions"] = alias
+            row["pool"] = next((p["pair"] for p in facts.get("pools") or [] if {p.get("token0"), p.get("token1")} == {token0, token1} and p.get("fee") == fee), None)
+    return [rows[pid] for pid in sorted(rows) if rows[pid]["owner"] or rows[pid]["liquidity"] is not None]
+
+
 def build_pipeline_note(facts, draft, run=None):
+    if run is not None:
+        later = positions_from_draft(run, draft, facts)
+        if later:
+            from broad_collect import goplus_facts
+            facts = {**facts, "positions": list(facts.get("positions") or []) + later}
+            if (facts.get("goplus") or {}).get("status") == "ok":
+                facts["goplus"] = goplus_facts(facts["goplus"], facts["positions"], facts.get("top_holders"), facts.get("balances"), facts.get("pools"))
     from scaffold import scope_entries
     target = facts["target"]
     pin = facts.get("pin") or {}
@@ -158,6 +199,12 @@ def build_pipeline_note(facts, draft, run=None):
             evidence.append(getters[name].get("evidence") or ("token-" + name))
     if controls.get("code_bytes"):
         parts.append(f"Runtime is {controls['code_bytes']} bytes; clone status {((controls.get('clone') or {}).get('status'))}.")
+    g = facts.get("goplus") or {}
+    if g.get("status") == "ok":
+        flags = g.get("flags") or {}
+        named = ", ".join(f"{k}={'yes' if v else 'no'}" for k, v in flags.items() if k in ("is_honeypot", "is_mintable", "is_proxy", "is_open_source", "transfer_pausable", "is_blacklisted", "hidden_owner") and v is not None)
+        parts.append(f"GoPlus corroboration (third-party claims, not a source match): {named or 'no control flags returned'}; buy tax {g.get('buy_tax') or 'n/a'}, sell tax {g.get('sell_tax') or 'n/a'}.")
+        evidence.append(g.get("evidence"))
     findings.append(_finding("pipeline-token-controls", "token_controls", " ".join(parts), evidence, claim="source_analysis" if source.get("status") == "matched" else "state_observation"))
 
     # ---- launch execution ---------------------------------------------------------------
@@ -231,6 +278,13 @@ def build_pipeline_note(facts, draft, run=None):
                 parts.append(f"{name} is owned by {o['address']}; {_owners_text(o)}.")
                 ev = o.get("evidence") or {}
                 evidence += [e for e in (ev.get("getOwners"), ev.get("getThreshold"), ev.get("getModulesPaginated"), ev.get("guard")) if e]
+        g = facts.get("goplus") or {}
+        if g.get("status") == "ok" and g.get("lp_holders"):
+            listed = "; ".join(f"{_short(r['address'])} {_pct(r.get('share_pct'))} of LP value" + (", locked" if r.get("is_locked") else ", not flagged locked") + (", contract" if r.get("is_contract") else "")
+                               + (f", verified as position {', '.join(str(v['id']) for v in r['verified_positions'])}" if r.get("verified_positions") else "") for r in g["lp_holders"][:6])
+            parts.append(f"GoPlus counts {g.get('lp_holder_count') or 'an unknown number of'} LP holders and lists {len(g['lp_holders'])} (third-party claim; {g.get('lp_holders_verified')} verified against positions the pipeline read): {listed}."
+                         + (f" Unread listed position ids: {', '.join(str(i) for i in g['unread_lp_nft_ids'])}." if g.get("unread_lp_nft_ids") else ""))
+            evidence.append(g.get("evidence"))
         first_owner = positions[0].get("owner")
         owner_actor = next((a for a in actors.values() if a.get("address") == first_owner), None)
         subject = first_owner if owner_actor else (positions[0].get("pool") or None)
@@ -329,6 +383,12 @@ def build_pipeline_note(facts, draft, run=None):
         if counters.get("holders_count"):
             parts.append(f"The explorer indexes {counters['holders_count']:,} holders; transfer count {_number(counters.get('transfers_count'))} (document evidence).")
             evidence.append("doc-explorer-counters")
+        g = facts.get("goplus") or {}
+        if g.get("status") == "ok" and g.get("holders"):
+            top_listed = g["holders"][0]
+            parts.append(f"GoPlus lists {g.get('holder_count') or 'an unknown number of'} holders (third-party claim); its top listed holder {_short(top_listed['address'])} at {_pct(top_listed.get('share_pct'))}"
+                         + (", flagged contract" if top_listed.get("is_contract") else "") + f"; {g.get('holders_verified')} of {len(g['holders'])} listed holders sit in the pipeline's balance sample.")
+            evidence.append(g.get("evidence"))
         evidence.append("runtime")
         findings.append(_finding("pipeline-holder-distribution", "current_concentration", " ".join(parts), evidence))
 

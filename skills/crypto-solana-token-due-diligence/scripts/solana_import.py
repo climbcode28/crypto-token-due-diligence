@@ -137,6 +137,7 @@ class Importer:
         parts=urlsplit(record['url']);host=parts.hostname or '';gecko=host=='geckoterminal.com' or host.endswith('.geckoterminal.com')
         if host=='api.dexscreener.com' or (gecko and parts.path.endswith('/info')):return 'primary'
         if gecko and 'trades' in parts.path.split('/'):return 'follow_up'  # a pool's trade feed feeds receipt probes, never discovery
+        if host=='api.rugcheck.xyz':return 'follow_up'  # third-party corroboration, never pool discovery
         if gecko or host=='explorer.solana.com':return 'alternate'
         return None
 
@@ -146,6 +147,7 @@ class Importer:
         parts=urlsplit(record['url']);host=parts.hostname or ''
         if host in ('api.dexscreener.com','api.geckoterminal.com') and not parts.path.endswith('/info'):return 'canonical_lp_principal_custody'
         if host in ('lite-api.jup.ag','api.jup.ag'):return 'sellability_exit_depth'
+        if host=='api.rugcheck.xyz':return 'current_concentration'
         return 'development_disclosure'  # project pages and the token-info publication that names them
 
     def routes(self,records):
@@ -322,6 +324,12 @@ class Importer:
             params={'discovery':largest[-1],'sample':samples[-1]}
             if exclusions:params['custody_exclusions']=exclusions
             self.derive('auto-holders','holders',params)
+        for eid,o in list(self.obs.items()):
+            # RugCheck's report is a third-party corroboration document; its holders cross-check against the exact sample.
+            if o['kind']=='document' and o['status']=='ok' and urlsplit(o['source']['capture']['url']).hostname=='api.rugcheck.xyz':
+                params={'capture':eid}
+                if 'auto-holders' in self.objects:params['holders']='auto-holders'
+                self.derive('rugcheck-'+sha(eid.encode())[:12],'rugcheck',params)
         for eid,o in list(self.obs.items()):
             if o['kind']!='document' or o['status']!='ok':continue
             host=urlsplit(o['source']['capture']['url']).hostname

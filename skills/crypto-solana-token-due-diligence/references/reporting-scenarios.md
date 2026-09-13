@@ -37,6 +37,13 @@ run or whose sources answered nothing (its `gap_basis` says which).
   hold at most 30% of supply and the largest spending owner at most 5%; `potential_risk` above
   either bound; `bad` when one non-custody owner holds 50% or more. Beneficial ownership and
   linked wallets stay a stated limit in the text, never the reason for `unverified`.
+- **Linked wallets (RugCheck corroboration fact):** a transfer-linked insider network holding
+  10% or more of supply is `potential_risk`, stated with its wallet count and share, plus any
+  insider-flagged listed holders the exact largest-holder sample verified (the report does not
+  list a network's members); below that it is context in the concentration text. The network is
+  the indexer's claim, never proven common ownership, and it never makes a row `unverified`: a
+  refused report is a stated capture limit. A RugCheck locker or authority claim is a lead only;
+  custody and controls stay rated from the observed pool and mint facts.
 - **Custody (canonical_lp_principal_custody):** an `observed` pool fact with sampled positions
   and named custodians is rated from what they show: `good` when the sampled principal sits
   under a lock or program custody with no reachable withdrawal path; `potential_risk` when

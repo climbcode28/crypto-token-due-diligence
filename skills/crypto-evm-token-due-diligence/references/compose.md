@@ -60,6 +60,11 @@ route was not run or whose sources answered nothing.
   reachable withdrawal path; `Bad` when a single unlocked owner can remove most of it. A
   custodian whose getters all reverted and whose source is unmatched keeps its withdrawal powers
   as the specific gap, not the whole row.
+- **Listed LP holders (GoPlus):** the enumerated LP holders with lock flags are third-party claims;
+  rate custody from the verified positions and state the listed shares and lock flags as the
+  indexer's claim, naming the unread position ids the queue offers to verify. A listed LP holder
+  that is not locked and holds a majority of the LP value GoPlus tallies is `Potential Risk` once
+  its position is read; until then it is a specific gap, not the whole row.
 - **Policies:** a documented discretionary buyback, burn or fee policy without reconciled
   execution is `Potential Risk` (discretion is the observed concern); verified receipts of the
   executed part may be `Good` for that part. `Unverified` only when the policy page was never

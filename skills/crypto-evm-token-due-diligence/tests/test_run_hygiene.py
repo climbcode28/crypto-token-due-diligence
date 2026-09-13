@@ -177,7 +177,7 @@ class StartDiagnosticsTests(unittest.TestCase):
             with tempfile.TemporaryDirectory() as tmp:
                 info = self.head(Path(tmp) / "run", FailingRpc(rpc), discovery=denied)
             self.assertEqual((info["stage"], info["category"], info["transport_category"]), ("chain_check", "network_unavailable", transport))
-            self.assertEqual(info["discovery"], {**{k: "dns_resolution" for k in hosts}, "geckoterminal": "not_attempted"})  # the trade feed never runs without pairs
+            self.assertEqual(info["discovery"], {**{k: "dns_resolution" for k in hosts}, "geckoterminal": "not_attempted", "goplus": "not_attempted"})  # neither feed ran in this synthetic head-only case
             self.assertIn("(dexscreener, explorer, sourcify)", info["message"])
             self.assertIn("network permission for the start command itself", info["next_step"])
             self.assertIn("same run directory", info["next_step"])

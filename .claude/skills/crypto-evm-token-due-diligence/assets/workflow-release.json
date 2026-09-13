@@ -1,9 +1,10 @@
 {
-  "workflow_version": "3.4.0",
-  "backend_engine_version": "3.6.0",
+  "workflow_version": "3.4.1",
+  "backend_engine_version": "3.7.0",
   "reporting_engine_version": "2.6.2",
   "date": "2026-09-13",
   "changes": [
+    "Rating rules gain the listed-LP-holders clause; step 4 wording unchanged (the queue now starts with positions for GoPlus-listed unread LP ids). Backend 3.7.0.",
     "Step 4: run the printed recommended presets in order (usually none or one); Safe modules/guard, custodian getters and sale receipts are pipeline reads, so a preset is added only for a receipt hash a lane found or a contract the user named. Backend 3.6.0.",
     "Start-failure guidance: network_unavailable (nothing answered) means request network permission for the start command itself, then the identical in-place restart; other transport categories keep the declared-policy check. Backend 3.5.1; no reporting, schema or budget changes.",
     "Deeper targeted verification: the coordinator may order up to four presets (was two) while at least 150 s remain before the deadline, custody first: enumerate the canonical pool's other large positions with logs then positions, read locker withdrawal getters and Safe modules/guard, then receipts and side pools. Guidance only; no backend, reporting or budget changes.",
@@ -25,7 +26,7 @@
     "Chat delivery renders the four conclusions (technical exposure, credibility and maturity, token economics, research confidence) as four bullets, never one paragraph"
   ],
   "validation_scope": "Offline public-selection and clean-install tests plus specialist regression suites; live fresh-host acceptance outcomes and limitations are recorded separately in the review record.",
-  "previous_workflow_version": "3.3.2",
+  "previous_workflow_version": "3.4.0",
   "review_record": "../../../../docs/reviews/first-run-reliability.md",
   "completion_review_version": 2,
   "decision_review_version": 2,

@@ -156,7 +156,7 @@ findings, token-linked rights/economics, creator continuity and contrary evidenc
 Keep launch allocations, transfers, sales, fees, withdrawals and rebuys separate.
 A short history page is not archive coverage. Shared funders/deposits are not human
 identity or personal cash-out. Indexer metrics are scoped context, not organic-use,
-fraud, universal rank or future-return proof. Privilege or a price decline alone does
+fraud, universal rank or future-return proof; a RugCheck cluster claim is corroboration rated by the [rating rules](references/reporting-scenarios.md#rating-rules), its locker claims are leads. Privilege or a price decline alone does
 not establish malicious intent.
 
 ## Deliver

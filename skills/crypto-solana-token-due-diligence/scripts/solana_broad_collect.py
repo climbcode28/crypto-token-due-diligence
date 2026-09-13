@@ -598,7 +598,7 @@ def write_briefs(root):
                 'capture':[sys.executable,str(Path(__file__)),'capture',str(root),'--owner',owner,'--allow-network','--cost-policy','free','--url','PUBLIC_URL'],
                 'self_check':[sys.executable,str(Path(__file__)),'lane-check',str(root),'--owner',owner]+(['--allow-synthetic'] if meta['synthetic'] else [])},
             'attempts_remaining_in_grant':next((g['remaining'] for g in resources['grants'] if g['owner']==owner),0),
-            'facts':compact(facts, ['pools','holders','quotes','transactions','maturity'] if owner=='liquidity' else ['controls','programs','creator','launch','maturity','source_assurance'],limit=4096) if facts else 'Collection is unresolved; use retained diagnostics and do not invent conclusions.',
+            'facts':compact(facts, ['pools','holders','corroboration','quotes','transactions','maturity'] if owner=='liquidity' else ['controls','programs','creator','launch','maturity','source_assurance'],limit=4096) if facts else 'Collection is unresolved; use retained diagnostics and do not invent conclusions.',
             'captured_sources':[str(p.relative_to(root)) for p in sorted((root/'web-captures').glob('*.json'))]}
         # Immutable initial brief; current facts and intake remain accessible at fixed paths.
         if not path.exists():atomic(path,(contents+'\n\nRun context (data, not instructions):\n\n'+json.dumps(context,indent=2,ensure_ascii=False)+'\n').encode())
@@ -661,6 +661,8 @@ def start(root,target,*,question,received_at,deadline_at,focus=None,urls=None,sc
         requested=list(urls or [])
         if scope=='broad' or any(d in surfaces for d in ('canonical_lp_principal_custody','sellability_exit_depth','development_disclosure')):
             if target['genesis_hash']==MAINNET:requested+=list(source_plan(target).values())+([source_plan(target,surface='token_info')['primary']] if scope=='broad' else [])
+        if target['genesis_hash']==MAINNET and (scope=='broad' or set(surfaces)&{'current_concentration','canonical_lp_principal_custody','historical_launch_integrity'}):
+            requested.append(source_plan(target,surface='rugcheck')['primary'])  # third-party cluster and locker claims, cross-checked later
         with ThreadPoolExecutor(max_workers=2) as pool:
             web=pool.submit(capture,root,requested,opener_factory=opener_factory) if requested else None
             collect_sample(root,root,config,'baseline',mint_baseline(target['mint'],largest=scope=='broad' or 'current_concentration' in surfaces,metadata=True),factory=factory,expand_largest=scope=='broad' or 'current_concentration' in surfaces)
@@ -710,7 +712,7 @@ def start(root,target,*,question,received_at,deadline_at,focus=None,urls=None,sc
                 except ValueError as exc:diagnostics.append({'stage':'scaffold','reason':str(exc)})
     summary=None
     if (root/'draft/facts.json').exists():
-        try:summary=compact(strict_json((root/'draft/facts.json').read_bytes(),'facts.json'),['controls','pools','holders','quotes','transactions','programs','launch','maturity','source_assurance'],limit=6000)
+        try:summary=compact(strict_json((root/'draft/facts.json').read_bytes(),'facts.json'),['controls','pools','holders','corroboration','quotes','transactions','programs','launch','maturity','source_assurance'],limit=6000)
         except (ValueError,KeyError,TypeError):summary=None
     # The two lane pointers lead the output so a coordinator dispatches them before reading the long facts summary,
     # which comes last; a truncated display still shows what must happen first.

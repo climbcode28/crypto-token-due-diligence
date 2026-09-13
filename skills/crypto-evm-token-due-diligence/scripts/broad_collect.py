@@ -195,6 +195,11 @@ def sequence(value):
     return value if isinstance(value, list) else []
 
 
+def flag_value(value):
+    """GoPlus encodes booleans as "0"/"1" strings; anything else is unknown."""
+    return {"0": False, "1": True}.get(str(value)) if value not in (None, "") else None
+
+
 def nonnegative(value):
     return value if type(value) in (int, float) and math.isfinite(value) and value >= 0 else None
 
@@ -231,13 +236,14 @@ class Pipeline:
         self.quote_sizes, self.extra_pools, self.holders = list(quote_sizes), [address(p) for p in pools], holders or {}
         self.explorer, self.web, self.synthetic = explorer, web, synthetic
         self.registry = registry if registry is not None else presets.registry(self.target["chain_id"])
-        self.discovery = {"dexscreener": {"status": "not_attempted"}, "sourcify": {"status": "not_attempted"}, "explorer": {"status": "not_attempted"}, "geckoterminal": {"status": "not_attempted"}}
+        self.discovery = {"dexscreener": {"status": "not_attempted"}, "sourcify": {"status": "not_attempted"}, "explorer": {"status": "not_attempted"}, "geckoterminal": {"status": "not_attempted"}, "goplus": {"status": "not_attempted"}}
         self.pairs, self.links, self.abi, self.source_body = [], {"websites": [], "socials": []}, None, None
         self.collections, self.names, self.log = [], {}, []
         self.decoded = {}  # alias -> (row, decoded dict)
         self.pin = None
         self.creation = {}
         self.indexed_holders, self.indexed_transfers, self.sell_candidates, self.indexed_trades = [], [], [], []
+        self.goplus = {"status": "not_attempted"}
         self.counters, self.creator_activity, self.pins_seen = {}, {}, {}
         self.explorer_base = None
 
@@ -392,9 +398,92 @@ class Pipeline:
                 pass
         self.parse_explorer_extras(by_id, out)
         self.capture_indexed_trades(out)
+        self.capture_goplus(out)
         write_new(self.run / "discovery.json", {"schema_version": 1, "target": self.target, "captured_at_utc": stamp(),
                                                  "discovery": self.discovery, "pairs": self.pairs, "links": self.links,
                                                  "abi_getters": self.abi_getters()})
+
+    def capture_goplus(self, out):
+        """GoPlus token security (keyless): listed holders and LP holders with lock flags, contract flags and control
+        checks for the exact token. Third-party claims; LP holders are cross-checked against the positions the pipeline
+        read and holders against its balance sample when the facts are assembled."""
+        self.goplus = {"status": "not_attempted"}
+        item = {"id": "goplus-token-security", "url": f"https://api.gopluslabs.io/api/v1/token_security/{self.target['chain_id']}?contract_addresses={self.target['address']}",
+                "purpose": "Third-party token security: holders, LP holders with lock flags, control checks"}
+        if self.session is not None and self.fetch is not None and not self.session.acquire("discovery_web"):
+            self.goplus = {"status": "budget_exhausted", "url": item["url"]}
+            self.discovery["goplus"] = {"status": "budget_exhausted"}
+            return
+        if self.fetch is None:
+            from web_capture import capture
+            records = capture([item], out, timeout=15, session=self.session, operation="discovery_web")
+        else:
+            records = self.fetch([item], out)
+        record = next((r for r in records if r["id"] == item["id"]), None)
+        if record is None:
+            self.goplus = {"status": "not_captured", "url": item["url"]}
+            self.discovery["goplus"] = {"status": "not_captured"}
+            return
+        ok = record.get("http_status") == 200 and not record.get("failure_category")
+        status = "ok" if ok else (record.get("failure_category") or "http_" + str(record.get("http_status")))
+        self.goplus = {"status": status, "url": record["url"], "captured_at_utc": record.get("captured_at_utc"), "bytes": record.get("bytes", 0), "evidence": "doc-goplus-token-security"}
+        self.discovery["goplus"] = {"status": status, "url": record["url"]}
+        if not ok or not record.get("raw"):
+            return
+        try:
+            body = json.loads((out / record["raw"]).read_bytes().decode("utf-8"))
+        except (ValueError, OSError):
+            self.goplus["status"] = self.discovery["goplus"]["status"] = "unparseable"
+            return
+        body = mapping(body)
+        if body.get("code") != 1 or not isinstance(body.get("result"), dict):
+            self.goplus["status"] = self.discovery["goplus"]["status"] = "api_" + str(body.get("code")) + ":" + str(body.get("message"))[:40]
+            return
+        entry = mapping(body["result"].get(self.target["address"].lower()) or body["result"].get(self.target["address"]))
+        if not entry:
+            self.goplus["status"] = self.discovery["goplus"]["status"] = "token_not_listed"
+            return
+        def flag(name):
+            return flag_value(entry.get(name))
+        def pct(value):
+            try:
+                return round(float(value) * 100, 4) if value not in (None, "") else None
+            except (TypeError, ValueError):
+                return None
+        def addr(value):
+            value = str(value or "").lower()
+            return value if re.fullmatch(r"0x[0-9a-f]{40}", value) else None
+        holders, lp_holders = [], []
+        for row in sequence(entry.get("holders"))[:20]:
+            row = mapping(row)
+            if addr(row.get("address")):
+                holders.append({"address": addr(row.get("address")), "tag": str(row.get("tag") or "")[:40], "is_contract": flag_value(row.get("is_contract")),
+                                "is_locked": flag_value(row.get("is_locked")), "share_pct": pct(row.get("percent")), "balance": str(row.get("balance") or "")[:40]})
+        for row in sequence(entry.get("lp_holders"))[:20]:
+            row = mapping(row)
+            if addr(row.get("address")):
+                nfts = []
+                for nft in sequence(row.get("NFT_list"))[:20]:
+                    nft = mapping(nft)
+                    if str(nft.get("NFT_id") or "").isdigit() and int(nft["NFT_id"]) not in {n["id"] for n in nfts}:
+                        amount = str(nft.get("amount") or "")[:40]
+                        # Empty means a zero amount; an unknown amount is not empty, and an out-of-range position still holds principal.
+                        nfts.append({"id": int(nft["NFT_id"]), "share_pct": pct(nft.get("NFT_percentage")), "amount": amount, "amount_known": amount != "",
+                                     "in_effect": flag_value(nft.get("in_effect")), "empty": amount == "0"})
+                lp_holders.append({"address": addr(row.get("address")), "tag": str(row.get("tag") or "")[:40], "is_contract": flag_value(row.get("is_contract")),
+                                   "is_locked": flag_value(row.get("is_locked")), "share_pct": pct(row.get("percent")), "value": str(row.get("value") or "")[:40],
+                                   "nft_ids": sorted(n["id"] for n in nfts), "nfts": nfts,
+                                   "locked_detail": [{k: str(mapping(d).get(k) or "")[:40] for k in ("end_time", "amount", "opt_token")} for d in sequence(row.get("locked_detail"))[:4]]})
+        dex = [{"pair": addr(mapping(d).get("pair")), "type": str(mapping(d).get("liquidity_type") or "")[:20], "name": str(mapping(d).get("name") or "")[:30],
+                "fee": str(mapping(d).get("pool_fee") or "")[:12], "liquidity": str(mapping(d).get("liquidity") or "")[:40]} for d in sequence(entry.get("dex"))[:10] if addr(mapping(d).get("pair"))]
+        self.goplus.update(holder_count=int(entry["holder_count"]) if str(entry.get("holder_count") or "").isdigit() else None,
+                           lp_holder_count=int(entry["lp_holder_count"]) if str(entry.get("lp_holder_count") or "").isdigit() else None,
+                           holders=holders, lp_holders=lp_holders, dex=dex,
+                           flags={name: flag(name) for name in ("is_honeypot", "is_mintable", "is_proxy", "is_open_source", "transfer_pausable", "is_blacklisted", "is_whitelisted",
+                                                                "hidden_owner", "can_take_back_ownership", "selfdestruct", "external_call", "is_anti_whale", "slippage_modifiable", "trading_cooldown")},
+                           buy_tax=str(entry.get("buy_tax") or "")[:12], sell_tax=str(entry.get("sell_tax") or "")[:12],
+                           owner_address=addr(entry.get("owner_address")), creator_address=addr(entry.get("creator_address")),
+                           scope="third-party token-security claims captured from GoPlus; LP holders and holders are verified only where the pipeline read the same position or balance")
 
     def capture_indexed_trades(self, out):
         """Indexer-listed recent trades at the canonical pool (GeckoTerminal) name sale candidates when the explorer's
@@ -1207,6 +1296,7 @@ class Pipeline:
             self.discover(budget_ops=8)
         else:
             self.discovery = {k: {"status": "skipped"} for k in self.discovery}
+            self.goplus = {"status": "skipped"}
             write_new(self.run / "discovery.json", {"schema_version": 1, "target": self.target, "discovery": self.discovery, "pairs": [], "links": self.links, "abi_getters": []})
         self.mark("discovery")
         head = self.head()
@@ -1256,6 +1346,7 @@ class Pipeline:
                  "elapsed_seconds": round(time.monotonic() - started, 3), "phases": self.log,
                  "limits": ["Decoded values are display help bound to the linked evidence; semantics, source correspondence and economic meaning require review.",
                             "Registry addresses are candidates verified only by the code reads recorded here."]}
+        facts["goplus"] = goplus_facts(self.goplus, positions, self.top_holders, balances, pools_out)
         facts["recommended_presets"] = recommended_presets(facts)
         write_new(self.run / "facts.json", facts)
         write_new(self.run / "work-plan.json", self.work_plan(hints))  # the validator's plan shape, nothing else
@@ -1278,6 +1369,41 @@ class Pipeline:
         return facts
 
 
+def goplus_facts(goplus, positions, top_holders, balances, pools):
+    """The captured GoPlus claims with pipeline cross-checks: an LP holder is verified when one of its NFT ids is a position
+    the pipeline read (with our owner and share), a holder when its balance sits in the balance sample."""
+    out = dict(goplus)
+    if goplus.get("status") != "ok":
+        return out
+    read_positions = {p["id"]: p for p in positions or [] if p.get("id") is not None}
+    canonical = next((p["pair"] for p in pools or [] if p.get("read") == "v3" and p.get("target_in_pool")), None)
+    sampled = {h["address"].lower(): h for h in top_holders or [] if h.get("address")}
+    sampled.update({b["address"].lower(): {"pct_supply": b.get("pct_supply")} for b in (balances or {}).values() if b.get("address")})
+    for row in out.get("lp_holders", []):
+        matched = [pid for pid in row.get("nft_ids", []) if pid in read_positions]
+        row["verified_positions"] = [{"id": pid, "owner": read_positions[pid].get("owner"), "pct_of_pool_active_liquidity": read_positions[pid].get("pct_of_pool_active_liquidity")} for pid in matched]
+        row["verified"] = bool(matched)
+    for row in out.get("holders", []):
+        hit = sampled.get(row["address"])
+        row["verified"] = hit is not None
+        row["sample_pct_supply"] = hit.get("pct_supply") if hit else None
+    out["canonical_pool"] = canonical
+    out["canonical_pool_listed"] = bool(canonical) and any(d.get("pair") == canonical for d in out.get("dex", []))
+    out["lp_holders_verified"] = sum(1 for r in out.get("lp_holders", []) if r["verified"])
+    out["holders_verified"] = sum(1 for r in out.get("holders", []) if r["verified"])
+    # Unread listed positions are offered largest share first, in-range positions before out-of-range ones (out-of-range
+    # principal still needs custody), and a position with a zero amount is never worth a read.
+    unread = {}
+    for r in out.get("lp_holders", []):
+        for n in r.get("nfts") or [{"id": pid, "share_pct": None, "empty": False, "in_effect": None} for pid in r.get("nft_ids", [])]:
+            if n["id"] not in read_positions and not n.get("empty"):
+                share = n.get("share_pct") if n.get("share_pct") is not None else -1.0
+                key = (0 if n.get("in_effect") is not False else 1, -share)
+                unread[n["id"]] = min(unread.get(n["id"], key), key)
+    out["unread_lp_nft_ids"] = [pid for pid, _ in sorted(unread.items(), key=lambda kv: (kv[1], kv[0]))][:12]
+    return out
+
+
 def decode_module_page(raw):
     """(address[] modules, address next) from Safe.getModulesPaginated; None unless the ABI shape is exact."""
     if not isinstance(raw, str) or not re.fullmatch(r"0x(?:[0-9a-fA-F]{64})+", raw):
@@ -1297,6 +1423,12 @@ def recommended_presets(facts):
     out = []
     pin = (facts.get("pin") or {}).get("number")
     pools = facts.get("pools") or []
+    unread = (facts.get("goplus") or {}).get("unread_lp_nft_ids") or []
+    if unread:
+        ids = unread[:6]
+        out.append({"preset": "positions", "dimension": "canonical_lp_principal_custody",
+                    "command": f'collect --run "$RUN" --preset positions --ids {",".join(str(i) for i in ids)}',
+                    "reason": f"GoPlus lists {len(unread)} LP position ids the pipeline has not read; reading them verifies the listed LP holders' custody and shares on chain"})
     canonical = next((p for p in pools if p.get("read") == "v3" and p.get("target_in_pool")), None)
     nfpm = next((a["address"] for a in facts.get("architecture") or [] if a.get("label") == "nfpm"), None)
     positions = [p for p in facts.get("positions") or [] if canonical and p.get("pool") == canonical["pair"]]
@@ -1396,6 +1528,15 @@ def summary_lines(facts):
     if facts.get("document_evidence"):
         lines.append("document evidence: " + ", ".join(facts["document_evidence"]))
     lines.append("coverage_hint: " + ", ".join(f"{k}={v}" for k, v in facts["coverage_hint"].items()))
+    g = facts.get("goplus") or {}
+    if g.get("status") == "ok":
+        lp = "; ".join(f"{r['address'][:12]} {r.get('share_pct')}% locked={r.get('is_locked')} contract={r.get('is_contract')} nfts={r.get('nft_ids')} verified={r.get('verified')}" for r in g.get("lp_holders", [])[:6])
+        flags = {k: v for k, v in (g.get("flags") or {}).items() if v is not None}
+        lines.append(f"goplus [{g.get('evidence')}] holders={g.get('holder_count')} lp_holders={g.get('lp_holder_count')} verified_lp={g.get('lp_holders_verified')}/{len(g.get('lp_holders', []))} verified_holders={g.get('holders_verified')}/{len(g.get('holders', []))} buy_tax={g.get('buy_tax')} sell_tax={g.get('sell_tax')} flags={json.dumps(flags)} unread_lp_nft_ids={g.get('unread_lp_nft_ids')}")
+        if lp:
+            lines.append("goplus-lp-holders: " + lp)
+    elif g.get("status"):
+        lines.append(f"goplus: {g.get('status')} (third-party token security not available for this run)")
     recommended = facts.get("recommended_presets") or []
     for n, r in enumerate(recommended, 1):
         lines.append(f"recommended preset {n} [{r['dimension']}]: {r['command']} | {r['reason']}" + (f" | then: {r['then']}" if r.get("then") else ""))

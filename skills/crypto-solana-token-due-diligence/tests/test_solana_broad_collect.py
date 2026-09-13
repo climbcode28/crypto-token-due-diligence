@@ -621,6 +621,34 @@ class ImporterBoundaryTests(unittest.TestCase):
         root,target,opts=self.setup_run();focused=start(root,target,**{**opts,'scope':'focused','surfaces':['token_controls']})
         self.assertEqual(focused['recommended_presets'],[]);self.assertFalse((root/'recommended-presets').exists())
 
+    def test_rugcheck_report_becomes_a_corroboration_fact_cross_checked_against_the_sample(self):
+        from pool_fixture import key
+        root,target,opts=self.setup_run();result=start(root,target,**opts);self.assertFalse(result['diagnostics'],result['diagnostics'])
+        self.assertTrue(any('api.rugcheck.xyz' in u for u in Web.calls))
+        facts=json.loads((root/'draft/facts.json').read_text())['facts'];row=next(f for f in facts if f['operation']=='rugcheck')
+        self.assertEqual((row['category'],row['usable']),('corroboration',True));d=row['data']
+        self.assertEqual((d['insider_networks'][0]['size'],d['insider_networks'][0]['supply_share']['percent_display']),(5,'20.0000'))
+        verified=[t for t in d['top_holders'] if t['verified_in_sample']];self.assertEqual([(t['address'],t['sample_amount_atomic']) for t in verified],[(key(7),'10000')])
+        self.assertEqual((d['top_holders_verified_in_sample'],d['lockers'][0]['type'],d['creator']),(1,'streamflow',key(90)))
+        self.assertIn('RugCheck report',row['summary']);self.assertIn('20.0000% of supply',row['summary'])
+        validate(root/'draft',True)
+        m=json.loads((root/'draft/manifest.json').read_text());att=next(a for a in m['attempts'] if a.get('source')=='api.rugcheck.xyz')
+        self.assertEqual((att['dimension'],att['route']),('current_concentration','follow_up'))
+        self.assertIn('corroboration',result['facts_summary'])
+        # A refused report is a stated capture limit, never a fact or an error.
+        root,target,opts=self.setup_run();Web.rugcheck=False;result=start(root,target,**opts)  # reset() restores the default report, so refuse after setup
+        facts=json.loads((root/'draft/facts.json').read_text())['facts'];self.assertFalse([f for f in facts if f['operation']=='rugcheck'])
+        self.assertFalse([d for d in result['diagnostics'] if d.get('category')=='derivation_errors'],result['diagnostics'])
+        # A report about another mint is a derivation error diagnostic, never a fact about this one.
+        root,target,opts=self.setup_run();Web.rugcheck={'mint':key(40),'token':{'supply':5},'insiderNetworks':[],'topHolders':[]};result=start(root,target,**opts)
+        self.assertTrue(any(d.get('category')=='derivation_errors' and any(e['operation']=='rugcheck' for e in d['errors']) for d in result['diagnostics']),result['diagnostics'])
+        self.assertFalse([f for f in json.loads((root/'draft/facts.json').read_text())['facts'] if f['operation']=='rugcheck'])
+        # A focused concentration run requests the report; a focused controls run does not.
+        root,target,opts=self.setup_run();start(root,target,**{**opts,'scope':'focused','surfaces':['current_concentration']})
+        self.assertTrue(any('api.rugcheck.xyz' in u for u in Web.calls))
+        root,target,opts=self.setup_run();start(root,target,**{**opts,'scope':'focused','surfaces':['token_controls']})
+        self.assertFalse(any('api.rugcheck.xyz' in u for u in Web.calls))
+
     def test_creator_history_for_an_attributed_wallet_is_bound_to_the_wallet_subject(self):
         from solana_broad_collect import collect
         root,target,opts=self.setup_run();start(root,target,**opts)

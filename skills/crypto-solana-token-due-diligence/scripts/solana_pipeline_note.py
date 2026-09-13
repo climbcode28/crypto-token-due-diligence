@@ -7,7 +7,8 @@ from solana_common import sha,need
 VERSION='1.0.0'
 DIMENSIONS={'controls':'token_controls','holders':'current_concentration','programs':'external_dependencies',
  'pools':'canonical_lp_principal_custody','quotes':'sellability_exit_depth','transactions':'sellability_exit_depth',
- 'launch':'historical_launch_integrity','creator':'admin_treasury_reward_custody','maturity':'development_disclosure','source_assurance':'development_disclosure'}
+ 'launch':'historical_launch_integrity','creator':'admin_treasury_reward_custody','maturity':'development_disclosure','source_assurance':'development_disclosure',
+ 'corroboration':'current_concentration'}
 
 
 def finding_id(eid,field=None):
@@ -19,7 +20,7 @@ def findings(facts):
     rows=[]
     for fact in facts['facts']:
         op=fact['operation'];usable=fact['usable'];dim=DIMENSIONS[fact['category']]
-        claim=('source_analysis' if fact['category'] in ('maturity','source_assurance') else 'inference' if fact['category'] in ('quotes','transactions','launch','creator') else 'state_observation') if usable else 'coverage_gap'
+        claim=('source_analysis' if fact['category'] in ('maturity','source_assurance','corroboration') else 'inference' if fact['category'] in ('quotes','transactions','launch','creator') else 'state_observation') if usable else 'coverage_gap'
         base={'id':finding_id(fact['evidence_id']),'owner':'pipeline','dimension':dim,'claim':claim,'strength':'bounded' if usable else 'unresolved',
               'confidence':'medium' if usable else 'low','impact':'informational','signal':None,'subject':fact['subject'],'participants':[],
               'text':fact['summary'] if usable else 'The '+op+' dependencies are unresolved; computed values are not a supported conclusion.',

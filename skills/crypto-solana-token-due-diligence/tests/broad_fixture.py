@@ -28,7 +28,7 @@ class RichRpc(Rpc):
         cls.values[key(7)]=holding(target['mint'],key(8),10000);cls.largest={target['mint']:[key(7)],a['lp']:[a['holder']]}
         from metadata_fixture import metadata_account
         cls.metadata=metadata_account(target['mint'],update_authority=key(90),creators=[(key(91),True,60),(key(92),False,40)]);cls.values[cls.metadata['address']]=cls.metadata['account']
-        cls.calls=[];cls.active=cls.peak=0;cls.mode='normal';cls.stamp=int(time.time());cls.receipt=None;cls.receipts={};Web.token_info=True;Web.pairs=None;Web.trades=None;return target
+        cls.calls=[];cls.active=cls.peak=0;cls.mode='normal';cls.stamp=int(time.time());cls.receipt=None;cls.receipts={};Web.token_info=True;Web.pairs=None;Web.trades=None;Web.rugcheck=None;return target
     def __call__(self,req):
         cls=type(self)
         with cls.lock:cls.calls.append(copy.deepcopy(req));cls.active+=1;cls.peak=max(cls.peak,cls.active)
@@ -69,7 +69,7 @@ class RichRpc(Rpc):
 
 
 class Web:
-    calls=[];blocked=False;token_info=True;pairs=None;trades=None  # pairs overrides the single default DEX Screener pair; trades feeds every pool's trade listing
+    calls=[];blocked=False;token_info=True;pairs=None;trades=None;rugcheck=None  # pairs overrides the single default DEX Screener pair; trades feeds every pool's trade listing; rugcheck: None default report, False refused, or a body
     def open(self,request,timeout):
         cls=type(self);cls.calls.append(request.full_url);url=request.full_url
         if cls.blocked:return Response(b'Unavailable',403,{'Content-Type':'text/plain'})
@@ -78,6 +78,17 @@ class Web:
               'liquidity':{'usd':'1000000'},'priceUsd':'2','volume':{'h24':'500000'},'info':{'websites':[{'url':'https://project.example/token'}]}}]
         elif 'geckoterminal' in url and url.endswith('/info'):
             value={'data':{'id':'solana_'+RichRpc.target['mint'],'type':'token','attributes':{'address':RichRpc.target['mint'],'name':'Coin','symbol':'COIN','websites':['https://project.example/'],'twitter_handle':None,'telegram_handle':None,'discord_url':None}}} if cls.token_info else {'data':{}}
+        elif 'api.rugcheck.xyz' in url:
+            from solana_accounts import decode_mint
+            if cls.rugcheck is False:return Response(b'rate limited',429,{'Content-Type':'text/plain'})
+            supply=int(decode_mint(RichRpc.values[RichRpc.target['mint']])['supply_atomic'])
+            value=cls.rugcheck or {'mint':RichRpc.target['mint'],'token':{'supply':supply,'decimals':decode_mint(RichRpc.values[RichRpc.target['mint']])['decimals']},'tokenMeta':{'name':'Coin','symbol':'COIN'},
+                'score':1200,'score_normalised':12,'rugged':False,'totalHolders':321,'graphInsidersDetected':7,'detectedAt':'2026-09-01T00:00:00Z',
+                'insiderNetworks':[{'id':'knotty-yellow-snail','size':5,'type':'transfer','tokenAmount':supply//5,'activeAccounts':5},{'id':'vast-mango','size':2,'type':'transfer','tokenAmount':supply//50,'activeAccounts':2}],
+                'topHolders':[{'address':key(7),'owner':key(8),'amount':10000,'decimals':9,'pct':0.01,'insider':False},{'address':key(70),'owner':key(71),'amount':5000,'decimals':9,'pct':0.005,'insider':True}],
+                'lockers':{key(72):{'owner':key(73),'type':'streamflow','usdcLocked':1000}},'lockerOwners':{},'totalLPProviders':1,
+                'markets':[{'pubkey':RichRpc.pool['pool'],'marketType':'raydium_cpmm'}],'creator':key(90),'creatorTokens':[],'mintAuthority':None,'freezeAuthority':None,
+                'risks':[{'name':'Low amount of LP Providers','level':'warn','score':300,'description':'x'}],'verification':None}
         elif 'geckoterminal' in url and url.endswith('/trades'):value={'data':cls.trades or []}
         elif 'geckoterminal' in url:value={'data':[]}
         elif 'lite-api.jup.ag' in url:

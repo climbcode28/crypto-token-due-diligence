@@ -5,7 +5,7 @@ import sys
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]/"scripts"))
-from solana_discovery import MAINNET, pools, source_plan, repository_urls, repository_metadata, repository_revision, repository_tree, registry, trades, trades_url
+from solana_discovery import MAINNET, pools, source_plan, repository_urls, repository_metadata, repository_revision, repository_tree, registry, trades, trades_url, rugcheck_report
 from solana_common import sha, target_identity
 from solana_fixture import TARGET, KEY, OTHER, GENESIS
 
@@ -51,6 +51,63 @@ class TradeFeedTests(unittest.TestCase):
         for change in ({"status": "http_403"}, {"shell_suspected": True}, {"final_url": "https://api.geckoterminal.com/other"}):
             with self.assertRaises(ValueError):
                 trades({**record, **change}, raw, GENESIS)
+
+
+class RugCheckTests(unittest.TestCase):
+    def report(self, **over):
+        body = {"mint": MAIN_TARGET["mint"], "token": {"supply": 1000000, "decimals": 6}, "score": 100, "score_normalised": 10, "rugged": False, "totalHolders": 50,
+                "graphInsidersDetected": 9, "detectedAt": "2026-09-01T00:00:00Z",
+                "insiderNetworks": [{"id": "small", "size": 2, "type": "transfer", "tokenAmount": 10000, "activeAccounts": 2},
+                                    {"id": "big", "size": 7, "type": "transfer", "tokenAmount": 400000, "activeAccounts": 6}, {"id": "bad", "size": "x", "tokenAmount": 1}, "junk"],
+                "topHolders": [{"address": KEY, "owner": OTHER, "amount": 250000, "pct": 25.0, "insider": True}, {"address": "not-a-key", "amount": 1}, {"address": GENESIS, "owner": None, "amount": 1000, "pct": 0.1}],
+                "lockers": {GENESIS: {"owner": KEY, "type": "streamflow", "usdcLocked": 12.5}, "bad": {}}, "totalLPProviders": 3,
+                "markets": [{"pubkey": GENESIS, "marketType": "raydium_cpmm"}, {"pubkey": "no"}], "creator": KEY, "creatorTokens": [{}, {}],
+                "mintAuthority": None, "freezeAuthority": OTHER, "risks": [{"name": "Top 10 holders high ownership", "level": "danger", "score": 1000}]}
+        body.update(over)
+        return capture(body, source_plan(MAIN_TARGET, surface="rugcheck")["primary"])
+
+    def test_report_binds_the_mint_cross_checks_the_sample_and_bounds_every_list(self):
+        record, raw = self.report()
+        holders = {"accounts": [{"address": KEY, "spending_owner": OTHER, "amount_atomic": "250000"}, {"address": OTHER, "spending_owner": KEY, "amount_atomic": "1"}],
+                   "owners": [{"spending_owner": OTHER, "amount_atomic": "250000"}, {"spending_owner": KEY, "amount_atomic": "1"}]}
+        r = rugcheck_report(record, raw, MAIN_TARGET, holders=holders)
+        self.assertEqual([(n["id"], n["size"], n["supply_share"]["percent_display"], n["exceeds_supply"]) for n in r["insider_networks"]], [("big", 7, "40.0000", False), ("small", 2, "1.0000", False)])
+        self.assertEqual(r["insider_networks_total"], 2)
+        top = r["top_holders"]
+        # KEY is verified by its own token account (amounts agree); GENESIS is not sampled even though its owner is not in the sample.
+        self.assertEqual([(t["address"], t["insider"], t["verified_in_sample"], t["sample_amount_atomic"], t["amount_matches"]) for t in top], [(KEY, True, True, "250000", True), (GENESIS, False, False, None, None)])
+        self.assertEqual((top[0]["owner_in_sample"], top[0]["sample_owner_amount_atomic"]), (True, "250000"))
+        self.assertEqual(top[0]["supply_share"]["percent_display"], "25.0000")
+        self.assertEqual((r["top_holders_verified_in_sample"], r["sample_size"]), (1, 2))
+        self.assertEqual(r["lockers"], [{"address": GENESIS, "owner": KEY, "type": "streamflow", "usd_locked": "12.5"}])
+        self.assertEqual((r["creator"], r["creator_tokens"], r["claimed_mint_authority"], r["claimed_freeze_authority"]), (KEY, 2, None, OTHER))
+        # An owner-only match is corroboration, never verification: the sampled amount belongs to another account.
+        owner_only = {"accounts": [{"address": OTHER, "spending_owner": OTHER, "amount_atomic": "1"}], "owners": [{"spending_owner": OTHER, "amount_atomic": "1"}]}
+        t = rugcheck_report(record, raw, MAIN_TARGET, holders=owner_only)["top_holders"][0]
+        self.assertEqual((t["verified_in_sample"], t["sample_amount_atomic"], t["owner_in_sample"], t["sample_owner_amount_atomic"]), (False, None, True, "1"))
+        # A network amount above the reported supply stays visible instead of becoming a clean 100%.
+        over, over_raw = self.report(insiderNetworks=[{"id": "over", "size": 1, "type": "transfer", "tokenAmount": 2000000, "activeAccounts": 1}])
+        n = rugcheck_report(over, over_raw, MAIN_TARGET)["insider_networks"][0]
+        self.assertEqual((n["supply_share"], n["exceeds_supply"]), (None, True))
+        self.assertEqual(r["markets"], [{"pool": GENESIS, "type": "raydium_cpmm"}])
+        self.assertEqual(r["risks"], [{"name": "Top 10 holders high ownership", "level": "danger", "score": 1000}])
+        self.assertIn("indexer's claims", r["scope"])
+        # Without the sample nothing is verified; a report for another mint, another route or a non-object body is refused.
+        self.assertEqual((rugcheck_report(record, raw, MAIN_TARGET)["top_holders_verified_in_sample"], rugcheck_report(record, raw, MAIN_TARGET)["sample_size"]), (0, 0))
+        with self.assertRaises(ValueError):
+            rugcheck_report(record, raw, {**MAIN_TARGET, "mint": OTHER})
+        other, other_raw = self.report(mint=OTHER)
+        with self.assertRaises(ValueError):
+            rugcheck_report(other, other_raw, MAIN_TARGET)
+        wrong, wrong_raw = capture({"mint": MAIN_TARGET["mint"]}, source_plan(MAIN_TARGET)["primary"])
+        with self.assertRaises(ValueError):
+            rugcheck_report(wrong, wrong_raw, MAIN_TARGET)
+        listing, listing_raw = capture([1, 2], source_plan(MAIN_TARGET, surface="rugcheck")["primary"])
+        with self.assertRaises(ValueError):
+            rugcheck_report(listing, listing_raw, MAIN_TARGET)
+        # No supply: shares stay unknown instead of being invented.
+        record, raw = self.report(token={})
+        self.assertIsNone(rugcheck_report(record, raw, MAIN_TARGET)["insider_networks"][0]["supply_share"])
 
 
 class DiscoveryTests(unittest.TestCase):

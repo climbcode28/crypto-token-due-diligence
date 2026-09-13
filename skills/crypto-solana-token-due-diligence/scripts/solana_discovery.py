@@ -29,6 +29,9 @@ def source_plan(target, *, surface="pools", program=None):
     if surface == "token_info":
         need(target["genesis_hash"] == MAINNET, "public token index supports mainnet only")
         return {"primary": "https://api.geckoterminal.com/api/v2/networks/solana/tokens/"+target["mint"]+"/info"}
+    if surface == "rugcheck":
+        need(target["genesis_hash"] == MAINNET, "RugCheck report supports mainnet only")
+        return {"primary": "https://api.rugcheck.xyz/v1/tokens/"+target["mint"]+"/report"}
     need(surface in ("program_metadata", "source_verification"), "unsupported discovery surface")
     pubkey(program)
     need(target["genesis_hash"] == MAINNET, "program metadata route requires explicit mainnet target")
@@ -145,6 +148,87 @@ def pools(record, raw, target, *, source="dexscreener"):
             "candidates": candidates, "rejected": rejected, "duplicates": duplicates,
             "project_links": list({r["url"]: r for r in links}.values()), "evidence": [record["id"]],
             "scope": "one bounded indexer response; not exhaustive pool or custody verification"}
+
+
+def _int(value):
+    if type(value) is int and value >= 0:
+        return value
+    if isinstance(value, Decimal) and value == value.to_integral_value() and value >= 0:
+        return int(value)
+    if isinstance(value, str) and re.fullmatch(r"[0-9]{1,40}", value):
+        return int(value)
+    return None
+
+
+def _key(value):
+    try:
+        return pubkey(value) if isinstance(value, str) else None
+    except ValueError:
+        return None
+
+
+def rugcheck_report(record, raw, target, holders=None):
+    """RugCheck's token report: transfer-graph insider networks, top holders with insider flags, lockers, creator and
+    authority claims. Third-party computed claims bound to the exact mint; a listed holder that also sits in the exact
+    largest-holder sample is marked verified with the sampled amount. A network is the indexer's claim, never a proven
+    common owner."""
+    from solana_accounts import ratio
+    target = target_identity(target)
+    value = captured_json(record, raw, expected_url=source_plan(target, surface="rugcheck")["primary"])
+    need(isinstance(value, dict) and value.get("mint") == target["mint"], "RugCheck report subject mismatch")
+    token = value.get("token") if isinstance(value.get("token"), dict) else {}
+    supply = _int(token.get("supply"))
+    def share(amount):
+        # An amount above the reported supply is an indexer inconsistency: it stays visible, never a clean 100%.
+        return ratio(amount, supply) if supply and amount <= supply else None
+    networks = []
+    for row in (value.get("insiderNetworks") or [])[:200]:
+        if not isinstance(row, dict):
+            continue
+        amount, size = _int(row.get("tokenAmount")), _int(row.get("size"))
+        if amount is None or size is None:
+            continue
+        networks.append({"id": str(row.get("id") or "")[:60], "size": size, "type": str(row.get("type") or "")[:20],
+                         "active_accounts": _int(row.get("activeAccounts")), "token_amount_atomic": str(amount), "supply_share": share(amount),
+                         "exceeds_supply": bool(supply and amount > supply)})
+    networks.sort(key=lambda n: -int(n["token_amount_atomic"]))
+    # Verification is by token account only: the sampled amount belongs to that exact account. An owner that appears
+    # in the sample through another account is corroboration, reported separately with the owner aggregate.
+    sample_accounts = {row["address"]: row.get("amount_atomic") for row in ((holders or {}).get("accounts") or []) if isinstance(row, dict) and row.get("address")}
+    sample_owners = {row["spending_owner"]: row.get("amount_atomic") for row in ((holders or {}).get("owners") or []) if isinstance(row, dict) and row.get("spending_owner")}
+    top = []
+    for row in (value.get("topHolders") or [])[:100]:
+        if not isinstance(row, dict):
+            continue
+        address, owner, amount = _key(row.get("address")), _key(row.get("owner")), _int(row.get("amount"))
+        if address is None or amount is None:
+            continue
+        verified = address in sample_accounts
+        sampled = sample_accounts.get(address) if verified else None
+        top.append({"address": address, "owner": owner, "amount_atomic": str(amount), "supply_share": share(amount), "insider": row.get("insider") is True,
+                    "verified_in_sample": verified, "sample_amount_atomic": sampled,
+                    "amount_matches": (str(amount) == str(sampled)) if verified else None,
+                    "owner_in_sample": owner is not None and owner in sample_owners,
+                    "sample_owner_amount_atomic": sample_owners.get(owner) if owner else None})
+    lockers = []
+    for address, row in (value.get("lockers") or {}).items() if isinstance(value.get("lockers"), dict) else []:
+        key = _key(address)
+        if key and isinstance(row, dict):
+            lockers.append({"address": key, "owner": _key(row.get("owner")), "type": str(row.get("type") or "")[:40], "usd_locked": str(row.get("usdcLocked") or row.get("usdLocked") or "")[:32]})
+    risks = [{"name": str(r.get("name") or "")[:80], "level": str(r.get("level") or "")[:20], "score": _int(r.get("score"))}
+             for r in (value.get("risks") or [])[:40] if isinstance(r, dict)]
+    markets = [{"pool": _key(m.get("pubkey")), "type": str(m.get("marketType") or "")[:30]} for m in (value.get("markets") or [])[:100] if isinstance(m, dict) and _key(m.get("pubkey"))]
+    return {"target": target, "source": "rugcheck", "evidence": [record["id"]], "captured_at": record["captured_at"],
+            "detected_at": str(value.get("detectedAt") or "")[:40], "score": _int(value.get("score")), "score_normalised": _int(value.get("score_normalised")),
+            "rugged": value.get("rugged") is True, "supply_atomic": str(supply) if supply is not None else None,
+            "total_holders": _int(value.get("totalHolders")), "graph_insiders_detected": _int(value.get("graphInsidersDetected")),
+            "insider_networks": networks[:20], "insider_networks_total": len(networks),
+            "top_holders": top[:20], "top_holders_verified_in_sample": sum(1 for t in top[:20] if t["verified_in_sample"]),
+            "sample_size": len(sample_accounts), "lockers": lockers[:20], "total_lp_providers": _int(value.get("totalLPProviders")),
+            "markets": markets[:20], "markets_total": len(markets), "creator": _key(value.get("creator")),
+            "creator_tokens": len(value.get("creatorTokens") or []) if isinstance(value.get("creatorTokens"), list) else None,
+            "claimed_mint_authority": _key(value.get("mintAuthority")), "claimed_freeze_authority": _key(value.get("freezeAuthority")), "risks": risks[:20],
+            "scope": "third-party transfer-graph analysis captured from RugCheck; networks and flags are the indexer's claims, verified members are those present in the exact largest-holder sample"}
 
 
 def trades_url(pool):
