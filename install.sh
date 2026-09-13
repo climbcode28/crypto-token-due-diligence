@@ -19,7 +19,7 @@ CLAUDE_DIR="${HOME}/.claude/skills"
 CLAUDE_AGENTS_DIR="${HOME}/.claude/agents"
 CODEX_DIR="${HOME}/.agents/skills"
 SKILLS="crypto-token-due-diligence crypto-evm-token-due-diligence crypto-solana-token-due-diligence deep-plan implement-review-improve"
-AGENTS="evm-liquidity-lane.md evm-project-lane.md"
+AGENTS="evm-liquidity-lane.md evm-project-lane.md phase-reviewer.md"
 
 install_one() {
   target_dir="$1"; name="$2"; source="$3"
@@ -63,7 +63,7 @@ install_one "$CLAUDE_DIR" "crypto-token-due-diligence" "$HERE/skills/crypto-toke
 install_one "$CLAUDE_DIR" "crypto-solana-token-due-diligence" "$HERE/skills/crypto-solana-token-due-diligence"
 install_one "$CLAUDE_DIR" "deep-plan" "$HERE/skills/deep-plan"
 install_one "$CLAUDE_DIR" "implement-review-improve" "$HERE/skills/implement-review-improve"
-echo "Claude Code research-lane subagents (personal agents in $CLAUDE_AGENTS_DIR):"
+echo "Claude Code subagents, research lanes and the read-only phase reviewer (personal agents in $CLAUDE_AGENTS_DIR):"
 for a in $AGENTS; do install_one "$CLAUDE_AGENTS_DIR" "$a" "$HERE/.claude/agents/$a"; done
 
 echo "Codex and Cursor (personal skills in $CODEX_DIR):"

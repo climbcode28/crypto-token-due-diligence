@@ -63,7 +63,7 @@ Use the execution permissions and tools actually available in the session. A ski
 
 ## Stage 2 — Review
 
-After implementing each phase, spawn one independent reviewer subagent using the host's available subagent tool. Use a fresh reviewer for each phase, with minimal inherited conversation when supported. Do not substitute a second self-review when delegation is available. In all-phase mode, complete this review and the resulting fixes before advancing to the next dependent phase.
+After implementing each phase, spawn one independent reviewer subagent using the host's available subagent tool. Prefer a read-only reviewer agent definition when the host exposes one (for example a project or personal agent named `phase-reviewer`); otherwise use the general subagent type and state the read-only mandate in the prompt. Use a fresh reviewer for each phase, with minimal inherited conversation when supported. Do not substitute a second self-review when delegation is available. In all-phase mode, complete this review and the resulting fixes before advancing to the next dependent phase.
 
 Give the reviewer the absolute project and plan paths, the selected phase and acceptance criteria, applicable project guidance, changed-file scope, and the pre-phase baseline or diff needed to distinguish your changes from existing user work. Include untracked files. Supply actual verification commands/results, not a favorable interpretation or a list of defects you expect it to find. Ask it to inspect the final files, diff and relevant callers independently; your implementation summary is not the evidence.
 
@@ -113,7 +113,7 @@ Record concrete findings by severity with file/line references where useful, the
 2. Defer unrelated improvements and speculative redesigns. If a finding needs a consequential product decision or additional authorization, explain the concrete issue and ask only for the missing decision while continuing independent work.
 3. Re-run checks affected by the fixes, plus any required project gates not yet completed. Do not repeat unchanged passing checks without a dependency, failure, or unresolved risk that warrants it.
 4. Inspect the final diff for accidental scope expansion and confirm that fixes addressed the findings without introducing a new problem. Continue repairing failures attributable to this phase until it is verified or a concrete blocker prevents progress; do not stop on a fixable failure merely because the first review pass finished.
-   Return substantive behavior/security fixes or disputed unresolved findings to the same reviewer for a focused follow-up. Do not rerun a full review for cosmetic edits or invent issues to force another iteration. Disclose a failed follow-up as a review gap; apply the same fallback/completion-gate rule as Stage 2.
+   Return substantive behavior/security fixes or disputed unresolved findings for a focused follow-up review: continue the same reviewer where the host can resume it, otherwise spawn a fresh reviewer and hand it the prior findings and the fix diff. Do not rerun a full review for cosmetic edits or invent issues to force another iteration. Disclose a failed follow-up as a review gap; apply the same fallback/completion-gate rule as Stage 2.
 5. Reconcile every acceptance criterion with its evidence. Update a plan's completion markers only if the user requested progress tracking or the project workflow requires it; preserve the plan's design and future phases.
 
 ## Completion And Final Report
