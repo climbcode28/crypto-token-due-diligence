@@ -22,21 +22,19 @@ report says what it could not verify. Licensed under the [MIT License](LICENSE).
   specialist without duplicate research.
 
 Current EVM versions: workflow 3.2.7, backend engine 3.4.2, reporting engine 2.6.2.
-Python 3.10+ standard library only, no packages, no API keys.
+Python 3.10+ standard library only; no packages or API keys required for public RPC.
+Optional dRPC access uses your own key and requires paid-use authorization.
 
-![EVM token due diligence architecture](docs/diagrams/evm-diligence-architecture-dark.png)
+[![Complete token due diligence architecture: router, EVM and Solana](docs/diagrams/crypto-token-diligence-architecture-dark.png)](docs/diagrams/crypto-token-diligence-architecture-dark.png)
 
-**How to read the diagram.** You give a token address (and optionally a name). One
-coordinator collects and verifies evidence: pinned RPC reads through your configured or
-public endpoint plus Dexscreener, Sourcify and the chain explorer. That becomes *shared
-evidence*: a facts file and a set of automatic findings the pipeline writes itself. Two web
-research lanes run in parallel from that evidence, one for liquidity and market (custody,
-exits, holders) and one for project and creator (delivery, economics, history), using web
-sources only. The coordinator assesses the evidence, orders targeted verification where a
-lead changes a conclusion, reconciles everything into one validated report, and presents
-findings from that preserved report with four markers. Unverified means missing evidence
-and is always kept separate from observed risk. The whole run is read-only, works inside
-fixed time and request limits, and never treats a gap as a pass.
+**How to read the diagram.** The router passes the address, full request and original
+deadline to one specialist: EVM or Solana. That specialist verifies identity, collects
+shared evidence and runs two web research lanes. The coordinator assesses and reconciles
+the findings into a preserved report. The common workflow is drawn once; it runs inside
+the selected specialist. Missing evidence stays separate from observed risk.
+
+Individual diagrams: [EVM](docs/diagrams/evm-diligence-architecture-dark.png) ·
+[Solana](docs/diagrams/solana-diligence-architecture-dark.png).
 
 ## Quick start
 
@@ -79,14 +77,64 @@ chmod 600 ~/.config/crypto-research/env
 The example points at the free public endpoint for Robinhood Chain mainnet (chain 4663).
 For another chain, put any HTTPS JSON-RPC endpoint for it in `ROBINHOOD_DRPC_URL` (or name
 another variable with `--rpc-url-env`); the skill verifies `eth_chainId` before trusting it.
-The Solana skill uses the public mainnet endpoint unless you set `SOLANA_RPC_URL`, and a dRPC
-endpoint (`SOLANA_DRPC_URL`, credential-free, plus the shared `DRPC_API_KEY`) when a run
-authorizes paid use. A paid provider (for example dRPC) is optional and is used
-only when you configure it and authorize it; personal standing authorizations belong in an
-untracked `HANDOFF.local.md` next to `HANDOFF.md`, whose generic policy is what the skill
-reads otherwise. The first research call may ask your tool for network permission; grant it
-for that command. A public endpoint may rate-limit a run of about 200 to 300 reads; the
-collector retries transient failures once and records anything still missing as a gap.
+A paid provider is optional and is used only when configured and authorized. Personal
+standing authorizations belong in an untracked `HANDOFF.local.md` next to `HANDOFF.md`;
+the EVM skill reads that policy when present, otherwise the generic policy. A key alone
+never authorizes spending. The first research call may ask your tool for network
+permission; provider flags do not bypass host network restrictions. Public endpoints may
+rate-limit or refuse reads; unresolved reads remain coverage gaps.
+
+#### Solana public RPC and optional dRPC
+
+Solana needs no configuration for public mainnet RPC. Its default public root is
+`https://api.mainnet-beta.solana.com`; `SOLANA_RPC_URL` can override that public HTTPS
+root. For dRPC, edit the private env file above to include:
+
+```sh
+export SOLANA_DRPC_URL='https://lb.drpc.org/solana'
+export DRPC_API_KEY='your-key'
+```
+
+`SOLANA_DRPC_URL` is optional: the URL shown is the default when dRPC is selected.
+`DRPC_API_KEY` is shared with the EVM skill and sent only in the `Drpc-Key` header.
+Keep the URL credential-free: do not paste a dashboard URL containing a `dkey` query
+parameter or key path segment. The collector refuses those URLs. Never put the env
+file or a real key in this repository or in a research artifact.
+
+| Solana provider flags | Selection |
+| --- | --- |
+| `--provider auto --cost-policy free` | Public root, even when a key is configured. |
+| `--provider auto --cost-policy paid --allow-paid` | dRPC when a key is configured; otherwise public root. |
+| `--provider drpc --cost-policy paid --allow-paid` | Requires a key and paid-use authorization; fails if unavailable. |
+| `--provider public --cost-policy free` | Public root only. |
+
+`auto` is the default. Use paid flags only when the user has authorized that bounded
+run. For direct helper use, source the private file with tracing disabled in the same
+shell invocation as each collection. For example, after replacing the mint, full
+question and original UTC timestamps (a ten-minute maximum, or the user's shorter limit):
+
+```sh
+set +x
+source "$HOME/.config/crypto-research/env"
+python3 skills/crypto-solana-token-due-diligence/scripts/solana_broad_collect.py start "$RUN" \
+  --mint EXACT_MINT --question 'The complete original request' \
+  --received-at ORIGINAL_ISO_UTC --deadline-at ABSOLUTE_ISO_UTC \
+  --provider drpc --allow-network --cost-policy paid --allow-paid
+```
+
+Set `RUN` to a fresh `research/<mint>-<utc>` directory first. Repeat the same sourcing
+and provider/cost flags for every later `collect` in that run. `provider.json` locks
+the provider and transport namespace hash; it contains no URL or key. Provider selection
+is an offline preflight, and a later collection cannot switch tiers inside the run.
+
+The public tier may refuse holder methods or exhaust method windows. The dRPC tier
+removes the public per-method windows but retains 40 sends per ten seconds and the
+same session budget. Account census reads have a 20-second timeout; other reads use
+five seconds. Transient node lag can receive up to three slot-aware retries within the
+remaining budget (the reserved final recheck permits only one). Refusals, unsupported
+data and retained-but-unusable reads stay explicit diagnostics. See the
+[Solana runbook](skills/crypto-solana-token-due-diligence/references/runbook.md) for
+start, lane, preset and finalize commands.
 
 ### Run a due diligence
 
@@ -108,6 +156,17 @@ $crypto-evm-token-due-diligence Broad diligence on chain 4663, token 0x39dBED3a2
 Not sure of the network? Use the entry point with the same words:
 `/crypto-token-due-diligence <address> <your request>`.
 
+For an exact Solana mint, invoke the specialist directly:
+
+```text
+/crypto-solana-token-due-diligence Broad diligence on Solana mainnet mint <EXACT_MINT>. General diligence, no special requirements.
+```
+
+In Codex, use `$crypto-solana-token-due-diligence` with the same request. To use your
+configured dRPC account, include an explicit bounded authorization, such as: "Use my
+configured dRPC for this read-only run, within the standard 120-send budget." The
+router also accepts an exact Solana mint and preserves the full request.
+
 State real requirements when you have them, for example "I need to exit 50,000 tokens" or
 "I require locked liquidity"; the report then evaluates those conditions explicitly instead
 of assuming them. Extra asks and links travel with the run: "dig into the lore behind this
@@ -122,13 +181,14 @@ What comes back, in roughly 5 to 10 minutes:
   🟡 Potential Risk or 🔴 Bad with links into the evidence, a separate ⚪ Unverified list
   of what could not be established, and a **Conclusions** block of four bullets: technical
   exposure, credibility and maturity, token economics, research confidence.
-- **A frozen report** at `research/<token>-<timestamp>/report/report.md` with every finding
+- **A frozen report** at `research/<token>-<timestamp>/report/report.md` (EVM), or the
+  `report_path` returned by Solana `finalize` under `$RUN/final`, with every finding
   tied to raw evidence (pinned RPC responses, receipts, captured pages), all eleven risk
   surfaces rated, coverage limits and a validation record. Nothing in it is an opinion
   without a source.
 
 Things the skills refuse to do: certify a token as safe, predict price, sign or broadcast
-transactions, use your keys, or turn a missing source into a passing check.
+transactions, use wallet private keys, or turn a missing source into a passing check.
 
 ### How an EVM run works
 
@@ -149,6 +209,29 @@ transactions, use your keys, or turn a missing source into a passing check.
    finding, adds its own adverse findings and coverage judgements, and `finalize` composes,
    validates, freezes and delivers the report in one step. The chat answer is written from
    the frozen report, never from memory.
+
+### How a Solana run works
+
+1. **Select and verify.** Local preflight selects public RPC or authorized dRPC, then
+   `start` verifies genesis hash and the mint's owner/layout. It discovers exact-mint
+   pool leads through DEX Screener and GeckoTerminal and collects controls, holders,
+   pools, positions, program dependencies and sampled transactions under one ledger.
+   SPL and Token-2022 remain distinct, including extension and authority checks.
+2. **Derive shared evidence.** The dependency-aware v2 collector retains actual context
+   slots and consistency rechecks. Eight adapters cover Raydium AMM v4/CPMM/CLMM,
+   Orca Whirlpool, Meteora DLMM/DAMM v2 and pump.fun curve/PumpSwap. Transaction
+   verification distinguishes ordinary swaps, router custody and native/token-quote
+   curve trades; only reconciled historical effects become sales or rebuys facts.
+   Import recomputes typed derivations and surfaces degraded reads as gaps.
+3. **Research and assess.** Two web-only lanes cover liquidity/market and project/creator.
+   They stop at the earlier of receipt +300 seconds or deadline −120 seconds. The
+   coordinator may use at most two sequential named presets against the same run.
+4. **Reconcile and freeze.** The coordinator and checked lane notes cover eleven
+   surfaces, original requirements and four conclusion axes. `finalize` composes,
+   validates, freezes, renders and reproduces the report bytes. Collection stops at
+   the earlier of receipt +480 seconds or deadline −120 seconds, reserving two minutes
+   for delivery. The shared ceiling is 120 sends and 64 MiB; incomplete work stays a
+   checkpoint. Older frozen bundles retain their own engine contracts.
 
 ### Notes and limits
 

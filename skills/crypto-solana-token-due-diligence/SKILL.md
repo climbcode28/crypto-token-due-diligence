@@ -56,14 +56,19 @@ the hope of a different answer.
 - Verified EVM targets use [EVM diligence](../crypto-evm-token-due-diligence/SKILL.md).
   The router only classifies candidate format; this specialist verifies identity.
 
-Solana standard start uses credential-free public HTTPS RPC: the default mainnet
-endpoint, or a public root in `SOLANA_RPC_URL`. No policy file, private env, key,
-payment, provider check or persistent endpoint configuration is needed; the configured
-EVM dRPC endpoint/authorization is irrelevant here and the helper refuses custom or
-authenticated endpoints. Start's preflight is local and makes zero requests. The free
-tier refuses some methods (`getTokenLargestAccounts`) and windows others; the helper
-waits out windows, marks refused methods, substitutes a bounded account scan where one
-exists, and reports refused or unsent reads in start's `diagnostics`. Read them.
+Solana standard start defaults to credential-free public HTTPS RPC: mainnet or the
+public root in `SOLANA_RPC_URL`, with no private env or key required. Optional dRPC
+uses the shared `DRPC_API_KEY` and credential-free `SOLANA_DRPC_URL` (default
+`https://lb.drpc.org/solana`). Source `"$HOME/.config/crypto-research/env"` with tracing
+disabled in the same shell invocation as every keyed collection; never print it.
+`--provider auto` selects dRPC only with a key and authorized `--cost-policy paid
+--allow-paid`; otherwise it selects public RPC. `--provider drpc` requires both;
+`--provider public` never uses dRPC. A configured key alone grants no paid permission.
+The key travels only in the `Drpc-Key` header; credential-bearing URLs are refused.
+Local preflight makes zero requests. `provider.json` locks the provider/namespace
+for later collections; retain the same flags. The public tier can refuse or throttle
+methods; dRPC keeps session pacing and budgets. Read start's `diagnostics`, including
+node-lag retries, refused/unsent reads and degraded evidence, per the runbook.
 
 Respect public rate limits, preserve refusals and follow remaining authorized public
 routes. A configuration failure is not a token finding. A successful preflight is not
