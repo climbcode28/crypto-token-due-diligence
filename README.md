@@ -21,6 +21,10 @@ Reports label each finding as **🟢 Good**, **🟡 Potential Risk**, **🔴 Bad
 what could not be verified, and save the full supporting evidence under `research/`.
 Research is read-only: no wallet connection, signing or trading.
 
+**For informational and educational purposes only—not financial or investment advice.**
+Findings may be incomplete or incorrect and do not constitute a recommendation to buy,
+sell, or hold any asset. Independently verify information before making financial decisions.
+
 ## Skills
 
 | Skill | Purpose |
@@ -102,8 +106,7 @@ See [provider setup](HANDOFF.md) and the
 
 Editable skills live under `skills/`. Follow [project guidance](AGENTS.md) and the
 [EVM port notes](.claude/skills/crypto-evm-token-due-diligence/CLAUDE-CODE-PORT.md)
-when changing them. Maintained review records are in [plans/](plans/); archived setup
-records are described in the [provenance index](docs/development-history.md).
+when changing them.
 
 Run the offline regression suites from the repository root:
 
@@ -115,4 +118,4 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s skills/crypto-solana-t
 
 ## License
 
-[MIT](LICENSE). Research tooling, not financial advice.
+[MIT](LICENSE).
