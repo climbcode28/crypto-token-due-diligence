@@ -1,12 +1,24 @@
 # Crypto research
 
 Token due-diligence skills for [Claude Code](https://claude.com/claude-code),
-[Codex](https://openai.com/codex) and [Cursor](https://cursor.com). Provide an exact EVM token address or Solana mint,
-an optional token name, and any questions or context. Get a source-linked assessment
-of token controls, liquidity, project credibility, creator history and token economics.
+[Codex](https://openai.com/codex) and [Cursor](https://cursor.com).
 
-Reports label findings **Good**, **Potential Risk**, **Bad** or **Unverified**, explain
-what could not be verified, and save the supporting evidence under `research/`.
+[![Token due-diligence architecture](docs/diagrams/crypto-token-diligence-architecture-dark.png)](docs/diagrams/crypto-token-diligence-architecture-dark.png)
+
+Individual diagrams: [EVM](docs/diagrams/evm-diligence-architecture-dark.png) ·
+[Solana](docs/diagrams/solana-diligence-architecture-dark.png).
+
+**Input**
+```t
+token_address:      Exact EVM or Solana token address (required)
+token_name:         Token name (optional)
+additional_context: Questions, links, or specific requirements (optional)
+```
+**Output:** A source-linked assessment of token controls, liquidity, project
+credibility, creator history and token economics.
+
+Reports label each finding as **🟢 Good**, **🟡 Potential Risk**, **🔴 Bad** or **⚪️ Unverified**, explain
+what could not be verified, and save the full supporting evidence under `research/`.
 Research is read-only: no wallet connection, signing or trading.
 
 ## Skills
@@ -17,15 +29,14 @@ Research is read-only: no wallet connection, signing or trading.
 | [crypto-evm-token-due-diligence](skills/crypto-evm-token-due-diligence/SKILL.md) | EVM token research, including Robinhood Chain. |
 | [crypto-solana-token-due-diligence](skills/crypto-solana-token-due-diligence/SKILL.md) | Solana mint research for SPL and Token-2022 tokens. |
 | [deep-plan](skills/deep-plan/SKILL.md) | General workflow skill: interviews you about an idea and saves a phased plan. |
-| [implement-review-improve](skills/implement-review-improve/SKILL.md) | General workflow skill: implements one plan phase, reviews it, fixes and verifies. |
+| [implement-review-improve](skills/implement-review-improve/SKILL.md) | General workflow skill: implements one phase or all phases of a plan, reviewing, fixing and verifying each phase. |
 
 All five skills work in Claude Code, Codex and Cursor from one shared copy. The two
 workflow skills run only when you invoke them by name.
 
 ## Quick start
 
-Requires **Python 3.10+**, **Git**, and **Claude Code, Codex or Cursor**. No Python packages required.
-
+Requires **Python 3.10+**, **Git**, and **Claude Code, Codex or Cursor**. No Python packages required. Ask your agent how to set these up if you don't already have them set up 🙂
 ```sh
 git clone <repository URL> ~/crypto-research
 cd ~/crypto-research
@@ -40,12 +51,11 @@ Opening the cloned folder itself also works without installing: Codex and Cursor
 registrations in `.agents/skills/` and `.cursor/skills/`, and Claude Code reads `.claude/skills/`.
 All of them point at the shared copies under `skills/`.
 
-## Usage
+## Example Usage
 
 In **Codex**:
-
 ```text
-$crypto-token-due-diligence Research <TOKEN_ADDRESS>. Focus on liquidity, creator history, and whether the project has delivered what it claims.
+$crypto-token-due-diligence $PONS 0x39dBED3a2bd333467115dE45665cC57F813C4571 - focus on liquidity, creator history, and whether the project has delivered what it claims.
 ```
 
 In **Claude Code** or **Cursor**, use `/crypto-token-due-diligence` with the same request.
@@ -58,18 +68,20 @@ not a guarantee that a token is safe.
 
 ## Set an RPC endpoint
 
-**Solana works with public mainnet RPC by default.** For EVM, copy the configuration
-example outside the repository and edit it:
+**Both EVM and Solana work without dRPC or an API key.** The EVM skill selects a
+suitable public RPC endpoint when no configured, authorized dRPC endpoint is available.
+Solana uses public mainnet RPC by default.
 
+To configure a custom dRPC endpoint yourself, copy the template example file outside the repository and edit it:
 ```sh
 mkdir -p ~/.config/crypto-research
 cp env.example ~/.config/crypto-research/env
 chmod 600 ~/.config/crypto-research/env
 ```
 
-The example uses Robinhood Chain's public endpoint. Set `ROBINHOOD_DRPC_URL` to the
-HTTPS RPC endpoint for your EVM chain. `SOLANA_RPC_URL` optionally overrides Solana's
-public endpoint.
+The example uses Robinhood Chain's public endpoint. Despite its name,
+`ROBINHOOD_DRPC_URL` accepts a public or dRPC HTTPS endpoint for your EVM chain.
+`SOLANA_RPC_URL` optionally overrides Solana's public endpoint.
 
 **Optional dRPC:** add the following to that private env file, using your own key:
 
@@ -83,16 +95,6 @@ Keep keys out of URLs and the repository. Paid access requires your authorizatio
 a configured key alone does not permit spending. Public RPC requires no API key.
 See [provider setup](HANDOFF.md) and the
 [Solana runbook](skills/crypto-solana-token-due-diligence/references/runbook.md) for details.
-
-## Architecture
-
-The router selects one specialist, which collects evidence, runs two research lanes,
-and reconciles the findings into a preserved report.
-
-[![Token due-diligence architecture](docs/diagrams/crypto-token-diligence-architecture-dark.png)](docs/diagrams/crypto-token-diligence-architecture-dark.png)
-
-Individual diagrams: [EVM](docs/diagrams/evm-diligence-architecture-dark.png) ·
-[Solana](docs/diagrams/solana-diligence-architecture-dark.png).
 
 ## Development
 

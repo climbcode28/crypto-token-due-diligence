@@ -1,5 +1,40 @@
 # Token diligence architecture diagrams
 
+## Earlier background with sharper foreground
+
+The user requested the earlier navy background character with the cleaner render's
+sharp boxes, lettering and details. Built-in image_gen used the clean render as the
+foreground reference and the earlier textured render as the background reference.
+The selected native output is 1536 × 1024, exported at 4608 × 3072 via `sips` to
+retain the larger README asset dimensions. Export size is not native generated detail.
+Visual review checked the source inventory, intake, workflow, legend and footer.
+
+```text
+Targeted style compositing of TWO versions of the SAME approved architecture diagram.
+IMAGE 1 is the SHARP FOREGROUND master. Preserve its clean handwriting, crisp box edges, arrowheads, dashed lines, all text, every color of the foreground labels/lines/icons, and complete layout EXACTLY.
+IMAGE 2 is the BACKGROUND appearance reference ONLY. Its slightly darker, muted midnight-navy/blue-green background has subtle broad tonal variation that the user prefers. Do not copy image 2's fuzzy lettering, halos, blotches or edge artifacts.
+
+Requested result: Image 1's sharp boxes, text and details, with a background more like image 2. Restore that earlier dark navy mood and gentle broad variation, including inside boxes, but keep background texture extremely restrained and smooth. No noisy grain, black shadows around letters, mottled patches, compression artifacts or watercolor flecks. Keep box interiors in the same navy palette as the background. Do not tint or blur any foreground marks.
+
+This is NOT a redesign. All wording and composition must remain exactly as image 1, including the full left EVM and Solana source inventory, top two-line input "Token address + token name (optional)" / "+ additional context (optional)", the router and four main stages, two research lanes, the four colored finding markers, and the footer "Read-only access · 7 - 8 minute deadline · Missing evidence clearly labeled". Keep title "Crypto token due diligence". No added or omitted labels. Preserve all connector routes. No geometry shifts.
+
+Landscape 3:2; render at the highest available resolution. Desired result is the original background character with the newer sharp foreground. Prioritize clean legibility at large display size; do not soften text to imitate the old background.
+```
+
+## Larger export with original artwork preserved
+
+At the user's clarification to keep the exact colors, lettering and details, the
+combined PNG was resampled from 1536 × 1024 to 4608 × 3072 using macOS `sips`.
+No redrawing, denoising, sharpening or color changes were applied deliberately.
+Resampling increases pixel dimensions; it does not recover missing source detail
+or remove the original background texture. The stable README image path is retained.
+An earlier requested AI redraw with a flat background was discarded after that
+clarification; it is not the delivered asset.
+
+```sh
+sips --resampleHeightWidth 3072 4608 crypto-token-diligence-architecture-dark.png --out /tmp/crypto-token-diligence-architecture-4608.png
+```
+
 ## Matching EVM and Solana footers
 
 Both specialist PNGs now use the same user-requested footer as the combined PNG:
