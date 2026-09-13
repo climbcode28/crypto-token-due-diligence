@@ -1,7 +1,9 @@
 #!/usr/bin/env sh
-# Install the token-diligence skills for your user account so they work in every project.
+# Install the token-diligence and workflow skills for your user account so they work in every project.
 #
 #   ./install.sh            symlink the skills into ~/.claude/skills and ~/.agents/skills
+#                           (Cursor reads ~/.agents/skills too; inside this folder it also
+#                           sees the pointer skills in .cursor/skills)
 #   ./install.sh --copy     copy instead of symlink (use when your tool cannot follow links)
 #   ./install.sh --uninstall
 #
@@ -16,7 +18,7 @@ MODE="link"
 CLAUDE_DIR="${HOME}/.claude/skills"
 CLAUDE_AGENTS_DIR="${HOME}/.claude/agents"
 CODEX_DIR="${HOME}/.agents/skills"
-SKILLS="crypto-token-due-diligence crypto-evm-token-due-diligence crypto-solana-token-due-diligence"
+SKILLS="crypto-token-due-diligence crypto-evm-token-due-diligence crypto-solana-token-due-diligence deep-plan implement-review-improve"
 AGENTS="evm-liquidity-lane.md evm-project-lane.md"
 
 install_one() {
@@ -59,14 +61,18 @@ echo "Claude Code (personal skills in $CLAUDE_DIR):"
 install_one "$CLAUDE_DIR" "crypto-evm-token-due-diligence" "$HERE/.claude/skills/crypto-evm-token-due-diligence"
 install_one "$CLAUDE_DIR" "crypto-token-due-diligence" "$HERE/skills/crypto-token-due-diligence"
 install_one "$CLAUDE_DIR" "crypto-solana-token-due-diligence" "$HERE/skills/crypto-solana-token-due-diligence"
+install_one "$CLAUDE_DIR" "deep-plan" "$HERE/skills/deep-plan"
+install_one "$CLAUDE_DIR" "implement-review-improve" "$HERE/skills/implement-review-improve"
 echo "Claude Code research-lane subagents (personal agents in $CLAUDE_AGENTS_DIR):"
 for a in $AGENTS; do install_one "$CLAUDE_AGENTS_DIR" "$a" "$HERE/.claude/agents/$a"; done
 
-echo "Codex (personal skills in $CODEX_DIR):"
+echo "Codex and Cursor (personal skills in $CODEX_DIR):"
 for s in $SKILLS; do install_one "$CODEX_DIR" "$s" "$HERE/skills/$s"; done
 
 echo
 echo "Done. Start a new Claude Code or Codex session; the skills appear as"
-echo "  /crypto-token-due-diligence, /crypto-evm-token-due-diligence, /crypto-solana-token-due-diligence   (Claude Code)"
-echo "  \$crypto-token-due-diligence, \$crypto-evm-token-due-diligence, \$crypto-solana-token-due-diligence (Codex)"
+echo "  /crypto-token-due-diligence, /crypto-evm-token-due-diligence, /crypto-solana-token-due-diligence,"
+echo "  /deep-plan, /implement-review-improve                       (Claude Code and Cursor)"
+echo "  \$crypto-token-due-diligence, \$crypto-evm-token-due-diligence, \$crypto-solana-token-due-diligence,"
+echo "  \$deep-plan, \$implement-review-improve                     (Codex)"
 echo "The EVM skill needs an RPC endpoint; see README.md, section 'Set an RPC endpoint'."

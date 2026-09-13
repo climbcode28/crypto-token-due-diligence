@@ -10,6 +10,10 @@
   original request deadline. Retired crypto-research is not an active skill.
 - `.claude/skills/crypto-evm-token-due-diligence` is the Claude Code copy of the EVM skill.
   Edit the canonical folder first, then mirror the change there per its `CLAUDE-CODE-PORT.md`.
+- `skills/deep-plan` and `skills/implement-review-improve` are the shared workflow skills, explicit
+  invocation only, used unchanged by Claude Code, Codex and Cursor. `.cursor/skills/` holds Cursor
+  pointer skills that only name the canonical folder under `skills/` to read; change behavior in
+  the canonical folder, never in a pointer.
 - Preserve archived research-rubric provenance, verified EVM/Solana diligence routing, optional dRPC
   fallback, and evidence/identity/pin standards.
 - Use the implement-review-improve workflow for changes. Run the relevant standard-library
