@@ -192,5 +192,25 @@ class TransportTests(unittest.TestCase):
         self.assertTrue(all(row["response"] for row in shared.observations()))
 
 
+
+
+class FailureCategoryTests(unittest.TestCase):
+    def test_failure_category_is_coarse_and_url_free(self):
+        import errno, http.client, socket, ssl, urllib.error
+        from solana_transport import failure_category
+        self.assertEqual(failure_category(PermissionError(errno.EPERM, "Operation not permitted")), "not_permitted")
+        self.assertEqual(failure_category(urllib.error.URLError(socket.gaierror(8, "nodename nor servname provided"))), "dns")
+        self.assertEqual(failure_category(urllib.error.URLError("no host given")), "url_error")
+        self.assertEqual(failure_category(ConnectionRefusedError(61, "Connection refused")), "connection_refused")
+        self.assertEqual(failure_category(ConnectionResetError(54, "reset")), "connection_reset")
+        self.assertEqual(failure_category(TimeoutError()), "timeout")
+        self.assertEqual(failure_category(ssl.SSLError(1, "handshake")), "tls")
+        self.assertEqual(failure_category(OSError(errno.ENETUNREACH, "unreachable")), "unreachable")
+        self.assertEqual(failure_category(http.client.BadStatusLine("x")), "http_protocol")
+        self.assertEqual(failure_category(OSError(99, "something else")), "other")
+        for category in ("not_permitted", "dns", "url_error", "connection_refused", "tls", "other"):
+            self.assertNotIn("http", category.split("_")[0])  # categories name causes, never hosts or URLs
+
+
 if __name__ == "__main__":
     unittest.main()

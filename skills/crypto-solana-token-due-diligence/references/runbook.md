@@ -30,7 +30,15 @@ three times after waiting out the slot gap the error names (about 0.4 s per slot
 s per wait). A run records its provider in `provider.json` and every later `collect` must
 use the same provider flags; a mismatch is refused rather than mixing tiers. The helper's
 zero-request local preflight runs inside `start`; host network permission is still enforced
-by the host, and a flag does not bypass a denial.
+by the host, and a flag does not bypass a denial. Request that permission for the `start`
+command itself before running it. When the identity reads get no response at all, `start`
+stops with `research_status: blocked` and a `blocked` cause: `network_unavailable` (every
+request, RPC and web, failed before any response: the command had no network) or
+`identity_unavailable` (the web answered but the RPC endpoint did not). It writes no lane
+briefs. Follow its `next` action: fix the cause, then run `start` again in a new run
+directory with the same `--received-at` and `--deadline-at`; never dispatch lanes or compose
+from a blocked run. Failed sends record a URL-free `failure` category (for example
+`not_permitted`, `dns`, `connection_refused`) in the diagnostics.
 
 ## 1. Start once with original timing
 

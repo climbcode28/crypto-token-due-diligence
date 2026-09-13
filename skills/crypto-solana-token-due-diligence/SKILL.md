@@ -57,18 +57,15 @@ the hope of a different answer.
   The router only classifies candidate format; this specialist verifies identity.
 
 Solana standard start defaults to credential-free public HTTPS RPC: mainnet or the
-public root in `SOLANA_RPC_URL`, with no private env or key required. Optional dRPC
-uses the shared `DRPC_API_KEY` and credential-free `SOLANA_DRPC_URL` (default
-`https://lb.drpc.org/solana`). Source `"$HOME/.config/crypto-research/env"` with tracing
-disabled in the same shell invocation as every keyed collection; never print it.
-`--provider auto` selects dRPC only with a key and authorized `--cost-policy paid
---allow-paid`; otherwise it selects public RPC. `--provider drpc` requires both;
-`--provider public` never uses dRPC. A configured key alone grants no paid permission.
-The key travels only in the `Drpc-Key` header; credential-bearing URLs are refused.
-Local preflight makes zero requests. `provider.json` locks the provider/namespace
-for later collections; retain the same flags. The public tier can refuse or throttle
-methods; dRPC keeps session pacing and budgets. Read start's `diagnostics`, including
-node-lag retries, refused/unsent reads and degraded evidence, per the runbook.
+public root in `SOLANA_RPC_URL`; no private env or key is required. Optional dRPC uses
+the shared `DRPC_API_KEY` and credential-free `SOLANA_DRPC_URL` (default
+`https://lb.drpc.org/solana`); source `"$HOME/.config/crypto-research/env"` with tracing
+disabled in the same shell invocation as every keyed collection and never print it.
+`--provider auto` selects dRPC only with a key plus authorized `--cost-policy paid
+--allow-paid`, else public RPC; `drpc` requires both; `public` never uses dRPC. A key
+alone grants no paid permission and travels only in the `Drpc-Key` header; keyed URLs
+are refused. `provider.json` locks the provider for later collections (same flags). Read
+start's `diagnostics` (node lag, refused/unsent/degraded reads) per the runbook.
 
 Respect public rate limits, preserve refusals and follow remaining authorized public
 routes. A configuration failure is not a token finding. A successful preflight is not
@@ -78,18 +75,21 @@ Use background reads or hidden in-app browsing, not personal Chrome tabs/groups.
 
 ## Execute the standard workflow
 
-`S` is this skill's directory (resolve symlinks; `${CLAUDE_SKILL_DIR}` in Claude Code).
-`RUN` is a fresh `research/<mint>-<utc>` directory; never reuse an earlier run. Use only
-maintained commands in the runbook. Do not read helper source, write per-run scripts,
-open raw manifests or perform analyst arithmetic. Use the compact facts and named
-presets; raw evidence remains available for material disputes.
+`S` is this skill's directory (resolve symlinks; `${CLAUDE_SKILL_DIR}` in Claude Code);
+`RUN` is a fresh `research/<mint>-<utc>` directory, never an earlier run. Use only
+maintained runbook commands: no helper-source reading, per-run scripts, raw manifests or
+analyst arithmetic. Use compact facts and named presets; raw evidence is for disputes.
 
 1. **Start:** one `solana_broad_collect.py start` with the original `--received-at`
    and `--deadline-at` creates the intake, work plan and shared session; verifies
    identity; collects discovery, related controls and material pool/transaction/quote
    dependencies with consistency rechecks; builds facts, pipeline findings, an honest
    draft and three note scaffolds; prints a compact facts summary, `diagnostics` and
-   two pointer prompts. Typical wall clock is one to two minutes.
+   two pointer prompts. Typical wall clock is one to two minutes. Collection commands
+   need outbound network; in a sandboxed host request it for the exact command first
+   (Codex: escalated permissions). A `blocked` start (`network_unavailable` or
+   `identity_unavailable`) writes no lane pointers: follow its `next` action, rerun
+   `start` in a NEW run directory with the same timing flags, never dispatch lanes from it.
 2. **Lanes:** dispatch two general-purpose subagents (the default subagent type) with the two printed pointer prompts,
    verbatim, in the same turn that `start` returns and before reading facts yourself;
    the lane cutoff is receipt + 300 s whenever they are dispatched, so every minute

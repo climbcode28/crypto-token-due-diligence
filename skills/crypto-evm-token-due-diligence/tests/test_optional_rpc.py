@@ -171,6 +171,32 @@ class OptionalRpcTests(unittest.TestCase):
         self.assertEqual(result["status"], "ready")
         self.assertEqual(result["next_action"], "run_collector")
 
+    def test_explicit_public_selection_does_not_use_saved_paid_endpoint_or_key(self):
+        args = self.args(rpc_url_env="PUBLIC_RPC_URL", provider="generic",
+                         cost_policy="free", allow_paid=False)
+        env = {"PUBLIC_RPC_URL": "https://public-rpc.example.invalid/",
+               "ROBINHOOD_DRPC_URL": "https://lb.drpc.org/robinhood",
+               "DRPC_API_KEY": "SYNTHETIC-SECRET"}
+        result = self.check(args, env)
+        self.assertEqual(result["status"], "ready")
+        self.assertEqual(result["network_requests"], 0)
+        with patch.dict(os.environ, env, clear=True):
+            url, headers = rpc_collect.transport_settings(args)
+        self.assertEqual(url, env["PUBLIC_RPC_URL"])
+        self.assertEqual(headers, {})
+        self.assertNotIn("SYNTHETIC-SECRET", json.dumps(result))
+
+    def test_generic_free_flags_cannot_relabel_the_paid_endpoint(self):
+        args = self.args(provider="generic", cost_policy="free", allow_paid=False)
+        env = {"ROBINHOOD_DRPC_URL": "https://lb.drpc.org/robinhood",
+               "DRPC_API_KEY": "SYNTHETIC-SECRET"}
+        result = self.check(args, env)
+        self.assertEqual(result["status"], "invocation_required")
+        self.assertIn("paid_usage_not_authorized", result["blocking_reasons"])
+        with patch.dict(os.environ, env, clear=True):
+            with self.assertRaisesRegex(ValueError, "paid_usage_not_authorized"):
+                rpc_collect.transport_settings(args)
+
     def test_missing_generic_auth_hands_back_to_standard_flow(self):
         result = self.check(self.args(provider="generic", cost_policy="free", auth_env="CUSTOM_AUTH"),
                             {"ROBINHOOD_DRPC_URL": "https://example.invalid/"})

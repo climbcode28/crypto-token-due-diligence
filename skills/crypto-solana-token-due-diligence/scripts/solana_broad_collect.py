@@ -264,6 +264,37 @@ def provider_diagnostics(root):
     return rows
 
 
+NO_RESPONSE=('transport_failure','timeout','not_sent_deadline')
+
+
+def identity_block(root):
+    """Why identity could not be verified at all: a host that denied the network (every request in the identity stage, RPC
+    and web alike, failed before any response) or an RPC endpoint that answered nothing while the web did. Identity is never
+    inferred, so continuing would only restate that gap in every surface; the run stops and says how to start again."""
+    s=Session(root)
+    try:rows=s.observations()
+    finally:s.close()
+    rpc=[a for a in rows if a['transport_kind']=='rpc' and a['request_id'].startswith('baseline_network')]
+    if not rpc or any(a['status'] not in NO_RESPONSE for a in rpc):return None
+    web=[a for a in rows if a['transport_kind']=='web']
+    answered=any(a['status'] not in NO_RESPONSE for a in web)
+    failures={}
+    for a in rpc+web:
+        if a['status'] not in NO_RESPONSE:continue
+        try:kind=(json.loads(a['response']) if a['response'] else {}).get('failure') or a['status']
+        except (ValueError,AttributeError):kind=a['status']
+        failures[kind]=failures.get(kind,0)+1
+    if answered:
+        category='identity_unavailable'
+        reason='The RPC endpoint answered nothing for the network identity reads while web captures did answer: the endpoint, not the host network, is unreachable from this command.'
+        action='Run start again in a NEW run directory with the same --received-at and --deadline-at, using --provider public (or fix SOLANA_DRPC_URL and keep the dRPC flags). Do not dispatch lanes or compose from this run.'
+    else:
+        category='network_unavailable'
+        reason='Every request in the identity stage, RPC and web alike, failed before any response: this command had no outbound network access (a sandbox or host denial), so nothing about the token was observed.'
+        action='Grant this exact command outbound network access (in Codex, run it with escalated permissions), then run start again in a NEW run directory with the same --received-at and --deadline-at. Do not dispatch lanes or compose from this run; the deadline does not move.'
+    return {'stage':STAGES[0],'category':category,'failures':failures,'reason':reason,'next_action':action}
+
+
 def receipt_read(sig):
     """One named receipt read per signature, shared by the start probe and any later sample so a probe is never re-sent."""
     from solana_common import signature
@@ -474,10 +505,17 @@ def start(root,target,*,question,received_at,deadline_at,focus=None,urls=None,sc
     first=None
     try:first=refresh(root)
     except (ValueError,OSError,KeyError,TypeError) as exc:diagnostics.append({'stage':'initial_import','category':type(exc).__name__,'reason':str(exc) if isinstance(exc,ValueError) else 'Import incomplete.'})
-    pointers=write_briefs(root)
     have_identity=False
     if (root/'draft/facts.json').exists():
         f=strict_json((root/'draft/facts.json').read_bytes(),'facts.json');have_identity=any(x['operation']=='controls' and x['usable'] for x in f['facts'])
+    block=None if have_identity else identity_block(root)
+    if block:
+        # No lanes, briefs or scaffolds: a coordinator must not research a token whose identity was never observed.
+        diagnostics.append(block);diagnostics+=provider_diagnostics(root)
+        output={'next':block['next_action'],'research_status':'blocked','blocked':block['category'],'lane_pointers':[],'run':str(root),'draft':str(root/'draft'),'profile':PROFILE,
+          'investigation_id':meta['investigation_id'],'provider':provider,'diagnostics':diagnostics,'session':status(root),'collection':first,'facts_summary':None}
+        atomic(root/'start-result.json',encoded(output));return output
+    pointers=write_briefs(root)
     market_needed=scope=='broad' or bool(set(surfaces)&{'canonical_lp_principal_custody','side_pool_removal_risk','sellability_exit_depth','historical_launch_integrity'})
     related_needed=market_needed or bool(set(surfaces)&{'token_controls','external_dependencies','admin_treasury_reward_custody'})
     if have_identity and related_needed:

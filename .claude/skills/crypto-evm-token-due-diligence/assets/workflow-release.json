@@ -1,9 +1,10 @@
 {
-  "workflow_version": "3.2.8",
+  "workflow_version": "3.2.9",
   "backend_engine_version": "3.4.3",
   "reporting_engine_version": "2.6.2",
-  "date": "2026-09-12",
+  "date": "2026-09-13",
   "changes": [
+    "Distinguish paid-use approval rejection from general network denial; preserve standing authorization and host boundaries, continue independently permitted public research under required review, isolate public endpoint selection, and complete useful permitted work before requesting missing authorization. Read provider policy in a dedicated output. No backend, reporting, schema or host permission changes.",
     "Publication hardening: anonymous EVM web captures reject private destinations and connected peers, validate redirects, and ignore environment proxies. Claude uses ordinary host tool permissions without shipped auto-allow wildcards.",
     "Accept lossless crypto-token-due-diligence handoffs and preserve the original absolute deadline in collector scheduling; retire native-asset routing to crypto-research.",
     "Distinguish market activity from the receipt-verification sample; lead with evidenced trading activity, acknowledge user-reported execution, and describe untested size-dependent costs as research limits rather than implied selling difficulty.",
@@ -19,9 +20,9 @@
     "Retained from 3.1.0: structured start diagnostics with in-place restart, brief files with pointer prompts, lane compose --check, scaffold, presets and composes chained in one call",
     "Chat delivery renders the four conclusions (technical exposure, credibility and maturity, token economics, research confidence) as four bullets, never one paragraph"
   ],
-  "validation_scope": "Offline canonical and Claude EVM regression suites, including mocked private-destination, redirect, connected-peer and proxy isolation cases; no live network or hostile-code sandbox claim.",
-  "previous_workflow_version": "3.2.7",
-  "review_record": "../../../../docs/reviews/publication-review.md",
+  "validation_scope": "Offline router, canonical and Claude EVM, and Solana suites, including synthetic public-endpoint selection without paid credentials and refusal to relabel dRPC as free. No live RPC or guarantee of external host approval acceptance.",
+  "previous_workflow_version": "3.2.8",
+  "review_record": "../../../../docs/reviews/provider-approval-recovery.md",
   "completion_review_version": 2,
   "decision_review_version": 2,
   "source_comparison_version": "1.1.0",

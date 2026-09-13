@@ -91,7 +91,10 @@ Follow [runbook.md](references/runbook.md); the commands are exact. In order:
    not provider failure; `ready` is offline and proves nothing about the token. Public RPC
    is the fallback when configuration or authorization is genuinely absent.
    Before the first live shell call, apply the runbook's **Network execution context**
-   rule: collector flags do not grant host network permission.
+   rule: collector flags do not grant host network permission. If the host rejects paid
+   use, apply **Provider authorization and denial recovery** there: preserve the denial,
+   continue independently permitted public research, and ask only for genuinely missing
+   authorization after completing useful permitted work.
 2. **Start** `broad_collect.py start` in the background with the question, target and
    authorized provider flags. Pass the user's whole request as `--question`, any ask beyond
    the address (lore, a claim to check, a wallet to look at) verbatim as `--focus`, and every

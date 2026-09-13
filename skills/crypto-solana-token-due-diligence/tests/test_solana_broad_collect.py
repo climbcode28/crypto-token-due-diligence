@@ -180,6 +180,38 @@ class BroadTests(unittest.TestCase):
         self.assertEqual(len(results),2);marks=[m for m in status(root)['phases'] if m['phase'] in ('preset_p1','preset_p2')]
         self.assertEqual(marks[0]['phase'],marks[1]['phase']);self.assertNotEqual(marks[1]['phase'],marks[2]['phase'])
 
+    def test_start_without_any_network_is_blocked_and_names_the_cause(self):
+        # A sandbox that denies outbound network makes every send fail before any response; start must stop rather than
+        # hand out lane pointers for a token it never observed (live Codex run, 2026-09-13).
+        root,target,opts=self.setup_run()
+        def denied(rpc,request):raise PermissionError(1,'Operation not permitted')
+        class Denied(Web):
+            def open(self,request,timeout):type(self).calls.append(request.full_url);raise PermissionError(1,'Operation not permitted')
+        with unittest.mock.patch.object(RichRpc,'__call__',denied):r=start(root,target,**{**opts,'opener_factory':Denied})
+        self.assertEqual((r['research_status'],r['blocked'],r['lane_pointers'],r['facts_summary']),('blocked','network_unavailable',[],None))
+        self.assertEqual(list(r)[:2],['next','research_status'])  # the action leads the output
+        block=next(d for d in r['diagnostics'] if d.get('category')=='network_unavailable')
+        self.assertEqual(set(block['failures']),{'not_permitted'});self.assertGreaterEqual(block['failures']['not_permitted'],2)
+        self.assertIn('NEW run directory',block['next_action']);self.assertIn('escalated permissions',block['next_action'])
+        self.assertFalse((root/'lanes').exists());self.assertFalse(any((root/'draft/notes'/(o+'.json')).exists() for o in ('liquidity','project')))
+        self.assertEqual(json.loads((root/'start-result.json').read_text())['research_status'],'blocked')
+        again=start(root,target,**{**opts,'opener_factory':Denied});self.assertTrue(again['resumed']);self.assertEqual(again['research_status'],'blocked')
+
+    def test_start_with_a_dead_rpc_endpoint_but_a_live_web_is_blocked_as_identity_unavailable(self):
+        root,target,opts=self.setup_run()
+        def refused(rpc,request):raise ConnectionRefusedError(61,'Connection refused')
+        with unittest.mock.patch.object(RichRpc,'__call__',refused):r=start(root,target,**opts)
+        self.assertEqual((r['research_status'],r['blocked'],r['lane_pointers']),('blocked','identity_unavailable',[]))
+        block=next(d for d in r['diagnostics'] if d.get('category')=='identity_unavailable')
+        self.assertEqual(block['failures'],{'connection_refused':2});self.assertIn('--provider public',block['next_action'])
+        self.assertTrue(Web.calls)  # the web answered, so the host network was fine and only the endpoint was dead
+        packets=[json.loads(a['response']) for a in __import__('solana_session').Session(root).observations() if a['request_id'].startswith('baseline_network')]
+        self.assertEqual([(p['status'],p['failure']) for p in packets],[('transport_failure','connection_refused')]*2)
+
+    def test_start_whose_identity_read_answered_is_not_blocked(self):
+        root,target,opts=self.setup_run();RichRpc.mode='wrong_network';r=start(root,target,**opts)
+        self.assertEqual(r['research_status'],'partial');self.assertNotIn('blocked',r)  # an answered read that mismatches is a finding, not a block
+
 if __name__=='__main__':unittest.main()
 
 

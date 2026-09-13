@@ -1,4 +1,4 @@
-# Broad diligence runbook (workflow 3.2.8)
+# Broad diligence runbook (workflow 3.2.9)
 
 The ordered command sequence for an ordinary broad review. Target **5–7 minutes**, cap
 **10 minutes**, and **at most about 40 coordinator turns**: every turn costs 6–8 seconds of
@@ -31,9 +31,10 @@ provider flags, exact command, run directory and finite session budget intact.
 Apply this to `start`, subsequent presets and each lane's web captures; a successful
 escalated call does not change the default permission on later calls. Offline policy,
 availability, facts, compose and validation calls need no network escalation. If the
-host already allows the necessary network access, use its normal execution mode. If
-escalation is unavailable or denied, honor that boundary and report it; do not switch
-tools or providers to bypass it or change global sandbox/approval settings.
+host already allows the necessary network access, use its normal execution mode.
+Honor the stated scope of a denial; do not switch tools or providers to perform the
+denied action or change global sandbox/approval settings. Apply the recovery rule below
+before treating a provider-specific denial as a stop for the whole investigation.
 
 Do not spend a request demonstrating a restriction already declared by the host. If a
 restricted invocation was accidentally used, correct the permission on the bounded retry
@@ -41,6 +42,52 @@ before applying the helper's generic transport-retry instruction. A DNS failure 
 does not diagnose a sandbox block: with network permission already available, retain the
 normal bounded transport retry and provider-fallback rules. No first-call success guarantee
 is implied; provider outages, rate limits and real DNS problems remain possible.
+
+### Provider authorization and denial recovery
+
+Read `provider_context.py --policy` in its own tool output before choosing a provider;
+do not append it to a large reference dump where truncation can hide the policy.
+Honor applicable standing authorization unless the current user restricts it. The
+locator reports policy text, not a host approval token: a configured key, a file's
+assertion, and `--allow-paid` cannot compel the host to accept paid execution.
+
+If a host rejects the call, retain its actual reason and distinguish these cases:
+
+- **Omitted collector flags:** `invocation_required` is an offline invocation issue.
+  Apply already-established authorization; it does not justify asking for it again.
+- **Paid-use authorization rejected:** if relevant authorization is already in the
+  current user instructions, cite that instruction and the operation's finite request
+  ceiling and deadline in one review retry. A stated request cap must bound both
+  `--max-requests` and `--request-ceiling`; an allowance of 300 with a ceiling of 400
+  is not a 300-request cap. Likewise, both timeout values must fit the original deadline.
+  Do not repeatedly rephrase the same saved
+  claim as new consent. If the host still rejects paid use, leave that route blocked.
+  When the rejection permits safer alternatives and only paid use is denied, continue
+  independently authorized credential-free public RPC and public-document research.
+  Submit the public command through the host's required network review too; do not run
+  it through another tool to evade review. Briefly state the provider change and reason.
+- **General network/research denial, or unclear scope:** do not infer that a public
+  provider is permitted. Complete unaffected offline work and report the exact boundary.
+
+For a permitted public alternative, select a credential-free endpoint for the same
+chain from official network documentation. Set a dedicated `PUBLIC_RPC_URL` export and
+replace the provider arguments with `--rpc-url-env PUBLIC_RPC_URL --provider generic
+--allow-network --cost-policy free`, without `--allow-paid` or `--auth-env`. Apply the
+same selection to subsequent presets. Merely changing `--provider` to `generic` while
+leaving the configured dRPC URL selected is still dRPC and still requires paid approval.
+Do not forward the dRPC key to the public endpoint or modify the saved private env.
+
+Preserve the target, original deadline, run directory, and any existing session ledger
+and attempts across recovery. A host rejection before process creation is not an RPC
+attempt or a collector `start_failed` result. If the collector did execute, use only its
+supported recovery path; never erase output or reset budgets to force another start.
+Continue the standard pipeline when access succeeds; verify live identity and pins.
+Public access is not guaranteed and documentary listings alone never verify identity.
+
+Do useful permitted work before requesting user action. Do not turn optional paid
+access into a prerequisite for all diligence. If required work still needs rejected
+access, explain the host rejection and ask only for the missing authorization under the
+host's instructions. A repository edit cannot guarantee acceptance of saved consent.
 
 ## Step 1 in full
 

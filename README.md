@@ -100,6 +100,10 @@ a configured key alone does not permit spending. Public RPC requires no API key.
 See [provider setup](docs/provider-setup.md) and the
 [Solana runbook](skills/crypto-solana-token-due-diligence/references/runbook.md) for details.
 
+Every collection command needs outbound network. In Codex, approve network access for the
+`start` command itself. A `start` that gets no response at all stops as `blocked` and says
+how to rerun; nothing is researched from a blocked run.
+
 ## Development
 
 Editable skills live under `skills/`. Follow [project guidance](AGENTS.md) and the

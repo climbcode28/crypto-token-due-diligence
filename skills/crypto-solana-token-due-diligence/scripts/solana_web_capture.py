@@ -12,6 +12,7 @@ import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
 from solana_common import need, sha, write_new
+from solana_transport import failure_category
 from solana_session import Session, LimitError, TRANSIENT, encoded, label, OWNERS
 from solana_transport import NoRedirect, BROWSER_USER_AGENT, validate_endpoint, retry_after
 
@@ -218,6 +219,8 @@ def capture_one(session_root, source_id, *, owner="ordinary", opener=None, max_b
                                 packet["status"] = status if status != "ok" else "ok" if code == 200 else "http_"+str(code)
                     except (OSError, ValueError, http.client.HTTPException) as exc:
                         packet["status"] = "timeout" if isinstance(exc, TimeoutError) else "transport_failure" if isinstance(exc, OSError) else "invalid_response_or_url"
+                        if isinstance(exc, (OSError, http.client.HTTPException)):
+                            packet["failure"] = failure_category(exc)
                     finally:
                         if response is not None:
                             response.close()

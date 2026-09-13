@@ -3,11 +3,14 @@
 No imports from EVM, no network at import/preflight. Invocation flags are not host
 permissions and never authorize paid access by themselves.
 """
+import errno
 import http.client
 import json
 import math
 import os
 import re
+import socket
+import ssl
 import threading
 import time
 import urllib.error
@@ -260,6 +263,30 @@ READ_METHODS = {"getGenesisHash", "getAccountInfo", "getMultipleAccounts", "getB
 NODE_LAG_CODES = {-32016, -32004, -32005}
 
 
+def failure_category(exc):
+    """A coarse, URL-free reason for a failed send. It tells a host that denies the network (not_permitted, dns)
+    apart from an endpoint that is down (connection_refused, unreachable) without retaining any message text."""
+    if isinstance(exc, TimeoutError):
+        return "timeout"
+    if isinstance(exc, urllib.error.URLError):
+        return failure_category(exc.reason) if isinstance(exc.reason, OSError) else "url_error"
+    if isinstance(exc, ssl.SSLError):
+        return "tls"
+    if isinstance(exc, socket.gaierror):
+        return "dns"
+    if isinstance(exc, ConnectionRefusedError):
+        return "connection_refused"
+    if isinstance(exc, ConnectionResetError):
+        return "connection_reset"
+    if isinstance(exc, PermissionError) or getattr(exc, "errno", None) in (errno.EPERM, errno.EACCES):
+        return "not_permitted"
+    if getattr(exc, "errno", None) in (errno.ENETUNREACH, errno.EHOSTUNREACH, errno.ENETDOWN):
+        return "unreachable"
+    if isinstance(exc, http.client.HTTPException):
+        return "http_protocol"
+    return "other"
+
+
 def session_request(session, transport, request, *, family=None, owner="ordinary", retry=False, strict=False):
     """One accounted wire attempt. Callers explicitly schedule at most one retry.
 
@@ -281,7 +308,7 @@ def session_request(session, transport, request, *, family=None, owner="ordinary
     except LimitError as exc:
         # Refused before any send, so not an attempt; `wait_until` lets the caller wait out a window.
         return {"request": request, "status": "budget_denied", "reason": str(exc), "wait_until": exc.until, "response": None}
-    status, response = "transport_failure", None
+    status, response, failure = "transport_failure", None, None
     transport.local.response_bytes = 0
     try:
         remaining = min(session.remaining_seconds(owner), ticket["deadline"] - time.time())
@@ -313,11 +340,14 @@ def session_request(session, transport, request, *, family=None, owner="ordinary
     except (OSError, http.client.HTTPException) as exc:
         # Network and HTTP-protocol failures; retain only categories, never URL-bearing messages.
         status = "timeout" if isinstance(exc, TimeoutError) else "transport_failure"
+        failure = failure_category(exc)
     except (ValueError, TypeError, UnicodeError, KeyError, IndexError):
         status = "invalid"
     finally:
         # Every acquired attempt is finished, so an unexpected failure never strands a concurrency slot.
         packet = {"request": request, "status": status, "response": response}
+        if failure:
+            packet["failure"] = failure
         status = session.finish(ticket["id"], status, getattr(transport.local, "response_bytes", 0), packet)
         packet["status"] = status
     return packet
