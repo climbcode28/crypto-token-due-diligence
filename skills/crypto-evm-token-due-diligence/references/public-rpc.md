@@ -3,8 +3,9 @@
 The collector resolves a default by the exact target chain ID when no endpoint is
 configured. Explicit `--provider public --cost-policy free` selects that default even
 if paid configuration exists. This mode ignores saved endpoint/key exports and rejects
-custom authentication headers. `generic` retains explicit endpoint configuration and
-its authorization gates; a configured dRPC URL cannot be relabeled as free.
+custom authentication headers. `generic` retains explicit endpoint configuration (a
+configured dRPC URL needs its key, which is the user's authorization) and cannot be
+relabeled as free.
 
 | Chain ID | Network | Public endpoint | Primary source checked 2026-09-13 |
 | --- | --- | --- | --- |

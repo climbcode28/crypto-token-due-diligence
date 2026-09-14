@@ -44,26 +44,47 @@ class OptionalRpcTests(unittest.TestCase):
                             {"ROBINHOOD_DRPC_URL": "https://lb.drpc.live./robinhood-mainnet", "DRPC_API_KEY": "  \n"})
         self.assertEqual(result["reason"], "drpc_key_missing")
 
-    def test_key_alone_does_not_authorize_paid_use(self):
-        result = self.check(self.args(allow_paid=False),
-                            {"ROBINHOOD_DRPC_URL": "https://lb.drpc.org/robinhood-mainnet", "DRPC_API_KEY": "TEST-SECRET"})
-        self.assertEqual(result["status"], "invocation_required")
-        self.assertEqual(result["reason"], "paid_usage_not_authorized")
-        self.assertEqual(result["next_action"], "review_invocation_context")
+    def test_configured_key_is_the_standing_authorization_without_paid_flags(self):
+        # The key in the user's private env file authorizes bounded use: no --cost-policy paid or --allow-paid is needed.
+        env = {"ROBINHOOD_DRPC_URL": "https://lb.drpc.org/robinhood-mainnet", "DRPC_API_KEY": "TEST-SECRET"}
+        for provider in ("drpc", "generic", "auto"):
+            result = self.check(self.args(provider=provider, cost_policy=None, allow_paid=False), env)
+            self.assertEqual((result["status"], result["next_action"]), ("ready", "run_collector"), provider)
+            self.assertNotIn("TEST-SECRET", json.dumps(result))
+        with patch.dict(os.environ, env, clear=True):
+            self.assertEqual(rpc_collect.transport_settings(self.args(provider="auto", cost_policy=None, allow_paid=False)), (env["ROBINHOOD_DRPC_URL"], {"Drpc-Key": "TEST-SECRET"}))
 
-    def test_drpc_labeled_free_does_not_bypass_paid_gate(self):
+    def test_removing_the_key_selects_the_public_default_on_a_registered_chain(self):
+        # A dRPC URL left in the env file without its key is a complete opt-out: generic/auto select the chain's built-in
+        # public endpoint (named in endpoint_source) with no header; an explicit --provider drpc still names the missing key.
+        env = {"ROBINHOOD_DRPC_URL": "https://lb.drpc.org/robinhood"}
+        for provider in ("generic", "auto"):
+            args = self.args(provider=provider, cost_policy=None, allow_paid=False, chain_id=4663)
+            result = self.check(args, env)
+            self.assertEqual((result["status"], result["endpoint_source"]), ("ready", "builtin_public_key_missing"), provider)
+            with patch.dict(os.environ, env, clear=True):
+                self.assertEqual(rpc_collect.transport_settings(args), (rpc_collect.PUBLIC_RPC_ENDPOINTS[4663], {}))
+            self.assertEqual(args.provider, provider, "the parsed arguments are never mutated")
+        self.assertEqual(self.check(self.args(provider="drpc", chain_id=4663), env)["reason"], "drpc_key_missing")
+        self.assertEqual(self.check(self.args(provider="generic", cost_policy=None, chain_id=99999), env)["reason"], "drpc_key_missing", "no built-in default for the chain: the gap is named, nothing else is chosen")
+        # A key carried inside the URL is a misconfiguration, never "no key": the public default must not mask it.
+        for url in ("https://lb.drpc.org/?network=robinhood&dkey=TEST-SECRET", "https://lb.drpc.org/robinhood-mainnet/TEST-SECRET"):
+            result = self.check(self.args(provider="auto", cost_policy=None, allow_paid=False, chain_id=4663), {"ROBINHOOD_DRPC_URL": url})
+            self.assertNotEqual(result["status"], "ready", url)
+            self.assertNotIn("TEST-SECRET", json.dumps(result))
+
+    def test_free_policy_cannot_relabel_the_drpc_endpoint(self):
         result = self.check(self.args(cost_policy="free"),
                             {"ROBINHOOD_DRPC_URL": "https://lb.drpc.org/robinhood-mainnet", "DRPC_API_KEY": "TEST-SECRET"})
-        self.assertEqual(result["status"], "invocation_required")
+        self.assertEqual((result["status"], result["reason"]), ("invocation_required", "free_policy_selects_paid_endpoint"))
 
-    def test_configured_no_flags_requires_context_review_not_provider_fallback(self):
+    def test_configured_no_network_flag_requires_context_review_not_provider_fallback(self):
         result = self.check(self.args(allow_network=False, cost_policy=None, allow_paid=False),
                             {"ROBINHOOD_DRPC_URL": "https://lb.drpc.live/robinhood-mainnet", "DRPC_API_KEY": "TEST-SECRET"})
         self.assertEqual(result["status"], "invocation_required")
         self.assertEqual(result["reason_category"], "invocation")
         self.assertEqual(result["next_action"], "review_invocation_context")
-        self.assertEqual(result["blocking_reasons"],
-                         ["network_disabled", "cost_policy_undeclared", "paid_usage_not_authorized"])
+        self.assertEqual(result["blocking_reasons"], ["network_disabled"], "only the network flag gates a configured key")
         self.assertFalse(result["provider_tested"])
         self.assertEqual(result["network_requests"], 0)
 
@@ -146,7 +167,7 @@ class OptionalRpcTests(unittest.TestCase):
             prefix = 'set +x\nsource "$1" >/dev/null 2>&1 || exit 2\nshift\nexec "$@"\n'
             command = [sys.executable, str(SCRIPTS/"rpc_collect.py"), "--check-availability", "--provider", "drpc"]
             flags = ["--allow-network", "--cost-policy", "paid", "--allow-paid"]
-            for extra, expected in [([], "invocation_required"), (flags, "ready")]:
+            for extra, expected in [([], "invocation_required"), (["--allow-network"], "ready"), (["--provider", "auto", "--allow-network"], "ready"), (flags, "ready")]:
                 result = subprocess.run(["/bin/bash", "--noprofile", "--norc", "-c", prefix,
                                          "check", str(private), *command, *extra], cwd=root,
                                         env={"PYTHONDONTWRITEBYTECODE": "1"}, capture_output=True, text=True)
@@ -192,9 +213,9 @@ class OptionalRpcTests(unittest.TestCase):
                "DRPC_API_KEY": "SYNTHETIC-SECRET"}
         result = self.check(args, env)
         self.assertEqual(result["status"], "invocation_required")
-        self.assertIn("paid_usage_not_authorized", result["blocking_reasons"])
+        self.assertIn("free_policy_selects_paid_endpoint", result["blocking_reasons"])
         with patch.dict(os.environ, env, clear=True):
-            with self.assertRaisesRegex(ValueError, "paid_usage_not_authorized"):
+            with self.assertRaisesRegex(ValueError, "free_policy_selects_paid_endpoint"):
                 rpc_collect.transport_settings(args)
 
     def test_missing_generic_auth_hands_back_to_standard_flow(self):
@@ -202,11 +223,9 @@ class OptionalRpcTests(unittest.TestCase):
                             {"ROBINHOOD_DRPC_URL": "https://example.invalid/"})
         self.assertEqual(result["reason"], "rpc_authentication_missing")
 
-    def test_network_disabled_or_cost_undeclared_stays_offline(self):
-        for args, reason in [(self.args(provider="generic", cost_policy="free", allow_network=False), "network_disabled"),
-                             (self.args(provider="generic", cost_policy=None), "cost_policy_undeclared")]:
-            with self.subTest(reason=reason):
-                self.assertEqual(self.check(args, {"ROBINHOOD_DRPC_URL": "https://example.invalid/"})["reason"], reason)
+    def test_network_disabled_stays_offline_and_an_undeclared_policy_is_fine(self):
+        self.assertEqual(self.check(self.args(provider="generic", cost_policy="free", allow_network=False), {"ROBINHOOD_DRPC_URL": "https://example.invalid/"})["reason"], "network_disabled")
+        self.assertEqual(self.check(self.args(provider="generic", cost_policy=None), {"ROBINHOOD_DRPC_URL": "https://example.invalid/"})["status"], "ready")
 
     def test_ready_drpc_check_neither_contacts_provider_nor_prints_secrets(self):
         result = self.check(env={"ROBINHOOD_DRPC_URL": "https://lb.drpc.org/robinhood-mainnet", "DRPC_API_KEY": "TEST-SECRET"})

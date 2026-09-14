@@ -804,7 +804,9 @@ class ImporterBoundaryTests(unittest.TestCase):
                 out=subprocess.run([sys.executable,str(script),'capture',d+'/missing','--owner','liquidity','--allow-network','--cost-policy',policy,'--url','https://example.invalid/x'],capture_output=True,text=True,env={'PYTHONDONTWRITEBYTECODE':'1','PATH':os.environ.get('PATH','')})
                 message=json.loads(out.stdout)['errors'][0]['message'];self.assertNotIn('cost-policy',message,policy)  # refused for the missing run, never for the flag
             out=subprocess.run([sys.executable,str(script),'capture',d+'/missing','--owner','liquidity','--allow-network','--url','https://example.invalid/x'],capture_output=True,text=True,env={'PYTHONDONTWRITEBYTECODE':'1','PATH':os.environ.get('PATH','')})
-            self.assertIn('cost-policy',json.loads(out.stdout)['errors'][0]['message'])
+            self.assertNotIn('cost-policy',json.loads(out.stdout)['errors'][0]['message'])  # the cost policy is optional for a web capture
+            out=subprocess.run([sys.executable,str(script),'capture',d+'/missing','--owner','liquidity','--url','https://example.invalid/x'],capture_output=True,text=True,env={'PYTHONDONTWRITEBYTECODE':'1','PATH':os.environ.get('PATH','')})
+            self.assertIn('allow-network',json.loads(out.stdout)['errors'][0]['message'])
 
     def test_unusable_fact_finding_names_the_degraded_reads(self):
         from solana_pipeline_note import findings

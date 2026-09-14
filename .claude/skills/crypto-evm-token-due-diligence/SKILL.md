@@ -87,19 +87,19 @@ included). Verify `eth_chainId` and deployed code before treating identity as re
 Follow [runbook.md](references/runbook.md); the commands are exact. In order:
 
 1. **Provider policy.** Read the excerpt injected above (or run
-   `python3 "$SKILL_DIR/scripts/provider_context.py" --policy` if it is missing). Prefer the configured, authorized dRPC
-   for its matching network; for configured use, source the private env in the same shell
-   call as every collector and pass the flags the policy authorizes. `invocation_required` means omitted flags,
-   not provider failure; `ready` is offline and proves nothing about the token. Public RPC
-   is the fallback when configuration or authorization is genuinely absent: use
-   `--provider public --allow-network --cost-policy free`. The backend selects a
-   [built-in endpoint](references/public-rpc.md) for the exact chain; no private file,
-   API key or paid-use question is needed for a first public run.
+   `python3 "$SKILL_DIR/scripts/provider_context.py" --policy` if it is missing). A dRPC key in the
+   user's private env file is their standing authorization: source the env in the same
+   shell call as every collector and pass `--provider auto --allow-network`; the backend
+   uses dRPC when the key is present and the chain's
+   [built-in public endpoint](references/public-rpc.md) otherwise, so no paid-use flag or
+   consent question is needed; a chain the configured endpoint does not serve uses
+   `--provider public`. `invocation_required` means `--allow-network` was omitted,
+   not provider failure; `ready` is offline and proves nothing about the token.
+   `--provider public --cost-policy free` forces the credential-free route.
    Before the first live shell call, apply the runbook's **Network execution context**
-   rule: collector flags do not grant host network permission. If the host rejects paid
-   use, apply **Provider authorization and denial recovery** there: preserve the denial,
-   continue independently permitted public research, and ask only for genuinely missing
-   authorization after completing useful permitted work.
+   rule: collector flags do not grant host network permission. If the host rejects the
+   configured-provider command, apply **Provider authorization and denial recovery** there:
+   preserve the denial, continue permitted public research and state the boundary.
 2. **Start** `broad_collect.py start` in the background with the question, target and
    authorized provider flags. Pass the user's whole request as `--question`, any ask beyond
    the address (lore, a claim to check, a wallet to look at) verbatim as `--focus`, and every

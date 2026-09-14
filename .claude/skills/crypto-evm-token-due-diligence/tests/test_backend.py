@@ -315,21 +315,19 @@ class BackendTests(unittest.TestCase):
         self.assertFalse((self.root / "out").exists())
         self.assertFalse((self.root / "cli.sqlite").exists())
 
-    def test_drpc_requires_paid_gate_and_uses_secret_header(self):
+    def test_drpc_uses_secret_header_and_refuses_a_free_relabel(self):
         args = argparse.Namespace(allow_network=True, cost_policy="free", allow_paid=False, rpc_url_env="TEST_RPC",
                                   provider="generic", auth_env=None, auth_header="Authorization")
         with patch.dict(os.environ, {"TEST_RPC": "https://lb.drpc.org/robinhood-mainnet", "DRPC_API_KEY": "TEST-SECRET"}):
-            with self.assertRaises(Invalid): configured_transport(args)
-            args.cost_policy = "paid"
-            with self.assertRaises(Invalid): configured_transport(args)
-            args.allow_paid = True
+            with self.assertRaises(Invalid): configured_transport(args)  # a free policy cannot relabel the dRPC endpoint
+            args.cost_policy = None  # the configured key is the authorization; no paid flags needed
             transport = configured_transport(args)
             self.assertEqual(transport.headers, {"Drpc-Key": "TEST-SECRET"})
             self.assertNotIn("TEST-SECRET", transport.url)
         with patch.dict(os.environ, {"TEST_RPC": "https://lb.drpc.org/?network=ethereum&dkey=TEST-SECRET"}):
             with self.assertRaises(Invalid): configured_transport(args)
 
-    def test_drpc_trailing_dot_cannot_skip_paid_gate(self):
+    def test_drpc_trailing_dot_cannot_skip_the_free_relabel_gate(self):
         args = argparse.Namespace(allow_network=True, cost_policy="free", allow_paid=False, rpc_url_env="TEST_RPC",
                                   provider="generic", auth_env=None, auth_header="Authorization")
         with patch.dict(os.environ, {"TEST_RPC": "https://lb.drpc.org./ethereum"}):

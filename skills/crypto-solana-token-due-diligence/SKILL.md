@@ -36,7 +36,7 @@ One session permits at most 120 actual sends (160 on a keyed dRPC run) and 64 Mi
 three and public-web concurrency two per origin. Lanes each have fifteen reserved
 attempts; final checks and contingency remain reserved. Redirects, retries, failures
 and interrupted attempts count. Use the existing ledger; never refill by starting a
-new process/session. The configured ceiling is not permission for paid services.
+new process/session. The session ceiling bounds requests; it is not a spending limit.
 
 At cutoff preserve a partial/blocked checkpoint with actual facts and missing work.
 Timeouts, missing evidence, unsupported decoding and budget exhaustion never become
@@ -60,12 +60,12 @@ Solana defaults to credential-free public mainnet RPC or `SOLANA_RPC_URL`; no ke
 Optional dRPC uses shared `DRPC_API_KEY` and credential-free `SOLANA_DRPC_URL` (default
 `https://lb.drpc.org/solana`); source `"$HOME/.config/crypto-research/env"` with tracing disabled
 in the same keyed collection invocation, never print it, and send the key only in `Drpc-Key`.
-`--provider auto` uses dRPC only with a key and authorized `--cost-policy paid --allow-paid`;
-`drpc` requires both. `public` ignores unused dRPC settings and sends no key. `provider.json`
-locks later collections to the same provider/flags; read start's `diagnostics` per the runbook.
-Paid use needs current-user authorization; reuse applicable standing consent within bounds.
-Without it use public RPC directly, without a paid-use question. Per-command flags do not mean
-repeat consent. Host rejection uses [denial recovery](references/runbook.md#provider-authorization-and-denial-recovery).
+A configured key is the user's standing authorization for bounded read-only research:
+`--provider auto` (the default) uses dRPC whenever the key is present and the public root
+otherwise, with no paid-use flag or consent question; `--cost-policy free` or `public` forces
+the public root; `drpc` requires the key. `provider.json` locks later collections to the same
+provider; read start's `diagnostics` per the runbook. Host network permission still applies to
+every live command; a host rejection uses [denial recovery](references/runbook.md#provider-authorization-and-denial-recovery).
 
 Respect public rate limits, preserve refusals and follow remaining authorized public
 routes. A configuration failure is not a token finding. A successful preflight is not

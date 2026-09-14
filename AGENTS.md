@@ -28,17 +28,17 @@
   Older records live on the maintainer's local `archive/pre-publish` branch; the publication
   cleanup also preserves selected setup records there on disk, indexed in `docs/development-history.md`. When present on disk, do not
   rerun its historical installers as an installation or upgrade procedure; preserve evidence bytes.
-- Keep credentials outside the project. A configured dRPC key is not permission for paid
-  usage. Before the first EVM provider check or RPC attempt, read the current policy that
-  the EVM skill's `provider_context.py --policy` prints (Solana defaults to public RPC; configured
-  dRPC use requires explicit paid-use flags and current-user authorization): the untracked personal `HANDOFF.local.md` when it
-  exists on this machine, otherwise the generic section at the top of `docs/provider-setup.md`. Honor a
-  standing bounded paid read-only authorization recorded in the personal file unless the
-  current user restricts it; it does not authorize purchases, top-ups, plan changes or
-  unlimited usage. Never commit `HANDOFF.local.md`. Source the
-  documented private env file with tracing disabled in the same shell invocation as
-  every check/collection. For its matching network, prefer configured authorized dRPC
-  before public RPC. Omitted flags are an invocation issue, not provider failure.
+- Keep credentials outside the project. A dRPC key in the user's private env file is that
+  user's standing authorization for bounded read-only research: when it is configured the
+  skills use dRPC within their built-in ceilings, otherwise public RPC; it never authorizes
+  purchases, top-ups, plan changes or unlimited usage. Before the first EVM provider check
+  or RPC attempt, read the current policy that the EVM skill's `provider_context.py
+  --policy` prints: the untracked personal `HANDOFF.local.md` when it exists on this
+  machine, otherwise the generic section at the top of `docs/provider-setup.md`. Never
+  commit `HANDOFF.local.md`. Source the documented private env file with tracing disabled
+  in the same shell invocation as every check/collection. For its matching network,
+  prefer configured dRPC before public RPC. Omitted flags are an invocation issue, not
+  provider failure.
 - Research uses background access or hidden in-app browsing by default, not personal
   Chrome tabs/groups/pins. Preserve the quick-screen scope and research time budgets;
   timeouts or missing evidence never become passing checks.

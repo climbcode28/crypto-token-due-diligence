@@ -214,23 +214,40 @@ PUBLIC_RPC_ENDPOINTS = {
 DEFAULT_RPC_URL_ENV = "ROBINHOOD_DRPC_URL"
 
 
+def credential_free_drpc_url(parts):
+    """True for the documented credential-free dRPC shapes: a network path (/robinhood-mainnet) or ?network=<slug> alone."""
+    query = urllib.parse.parse_qs(parts.query, keep_blank_values=True)
+    network_path = re.fullmatch(r"/[a-z0-9-]+/?", parts.path)
+    network_query = (parts.path in ("", "/") and set(query) == {"network"} and len(query["network"]) == 1
+                     and re.fullmatch(r"[a-z0-9-]+", query["network"][0]))
+    return bool((network_path and not parts.query) or network_query)
+
+
 def selected_endpoint(args):
-    """Resolve one endpoint offline without changing exports or granting paid use."""
-    if args.provider == "public":
-        return PUBLIC_RPC_ENDPOINTS.get(getattr(args, "chain_id", None), ""), "builtin_public"
-    configured = os.environ.get(args.rpc_url_env, "")
-    # Never mask an invalid configured value, missing explicit custom export, or an
-    # explicit dRPC request. Generic's existing paid/auth gates still apply to dRPC URLs.
-    if configured or args.provider == "drpc" or args.rpc_url_env != DEFAULT_RPC_URL_ENV:
-        return configured, "configured"
+    """Resolve one endpoint offline without changing exports or the parsed arguments. `auto` is the generic selection:
+    the configured dRPC endpoint when its key is set, otherwise the chain's built-in public default (so removing the key
+    from the private env file is a complete opt-out on a registered chain)."""
+    provider = "generic" if getattr(args, "provider", None) == "auto" else args.provider
     default = PUBLIC_RPC_ENDPOINTS.get(getattr(args, "chain_id", None), "")
+    if provider == "public":
+        return default, "builtin_public"
+    configured = os.environ.get(args.rpc_url_env, "")
+    # Never mask an invalid configured value, a missing explicit custom export, or an explicit dRPC request.
+    parts = urllib.parse.urlsplit(configured) if configured else None
+    if parts is not None and provider == "generic" and args.rpc_url_env == DEFAULT_RPC_URL_ENV and default \
+            and is_drpc_host(parts.hostname) and credential_free_drpc_url(parts) and not os.environ.get("DRPC_API_KEY", "").strip():
+        # A credential-free dRPC URL left behind without its key never blocks the public route; a key carried inside the
+        # URL is a misconfiguration that stays named (rpc_url_carries_credential), never masked by the public default.
+        return default, "builtin_public_key_missing"
+    if configured or provider == "drpc" or args.rpc_url_env != DEFAULT_RPC_URL_ENV:
+        return configured, "configured"
     return default, "builtin_public" if default else "configured"
 
 
 def configuration_settings(args):
     """Validate local URL/auth formats only; this does not grant execution permission."""
     url, source = selected_endpoint(args)
-    need(source != "builtin_public" or not args.auth_env,
+    need(not source.startswith("builtin_public") or not args.auth_env,
          "built-in public RPC does not accept authentication headers")
     parts = urllib.parse.urlsplit(url)
     need(parts.scheme == "https" and bool(parts.hostname) and not parts.username and not parts.password
@@ -242,11 +259,7 @@ def configuration_settings(args):
     if drpc or args.provider == "drpc":
         # Accept only credential-free documented endpoint shapes.
         need(hostname in ("lb.drpc.org", "lb.drpc.live"), "unsupported dRPC host")
-        query = urllib.parse.parse_qs(parts.query, keep_blank_values=True)
-        network_path = re.fullmatch(r"/[a-z0-9-]+/?", parts.path)
-        network_query = (parts.path in ("", "/") and set(query) == {"network"} and len(query["network"]) == 1
-                         and re.fullmatch(r"[a-z0-9-]+", query["network"][0]))
-        need((network_path and not parts.query) or network_query, "use a credential-free dRPC network URL")
+        need(credential_free_drpc_url(parts), "use a credential-free dRPC network URL")
         key = os.environ.get("DRPC_API_KEY", "")
         need(bool(key.strip()), "DRPC_API_KEY is not configured")
         need(all(32 <= ord(c) <= 126 for c in key), "invalid authentication header value")
@@ -261,16 +274,16 @@ def configuration_settings(args):
 
 
 def invocation_blockers(args, drpc):
-    """Flags describe this invocation, not whether the user has standing approval."""
+    """Flags describe this invocation. A dRPC key in the user's private env file is that user's standing authorization for
+    bounded read-only research within the built-in ceilings (docs/provider-setup.md), so no paid-use flag is required;
+    an explicit free policy cannot relabel a dRPC endpoint (use --provider public for the credential-free default)."""
     reasons = []
     if not args.allow_network:
         reasons.append("network_disabled")
-    if args.cost_policy not in ("free", "paid"):
-        reasons.append("cost_policy_undeclared")
     if args.provider == "public" and args.cost_policy == "paid":
         reasons.append("public_requires_free_policy")
-    if (drpc or args.cost_policy == "paid") and (args.cost_policy != "paid" or not args.allow_paid):
-        reasons.append("paid_usage_not_authorized")
+    if drpc and args.cost_policy == "free":
+        reasons.append("free_policy_selects_paid_endpoint")
     return reasons
 
 
@@ -295,6 +308,7 @@ def provider_availability(args):
     """
     reason = None
     blockers = []
+    source = None
     try:
         url, source = selected_endpoint(args)
         drpc = args.provider == "drpc" or is_drpc_host(urllib.parse.urlsplit(url).hostname)
@@ -315,13 +329,14 @@ def provider_availability(args):
         reason = "rpc_url_carries_credential" if "credential-free" in str(exc) else "rpc_configuration_invalid"
     except TypeError:
         reason = "rpc_configuration_invalid"
-    # Configuration absence can select alternatives. Omitted flags first require the
-    # agent to consult trusted context; Python cannot infer approval from a saved key.
+    # Configuration absence selects the public alternative. A configured key is the user's standing authorization, so
+    # only the network flag and a contradictory free/public policy block an invocation.
     status = "fallback" if reason else "invocation_required" if blockers else "ready"
     return {"schema_version": 2, "status": status,
             "reason": reason or (blockers[0] if blockers else None),
             "reason_category": "configuration" if reason else "invocation" if blockers else None,
             "blocking_reasons": [reason] if reason else blockers,
+            "endpoint_source": source,  # configured | builtin_public | builtin_public_key_missing (a dRPC URL without its key)
             "network_requests": 0, "provider_tested": False,
             "next_action": {"fallback": "continue_standard_flow",
                             "invocation_required": "review_invocation_context",
@@ -807,13 +822,13 @@ class Collector:
 def add_provider_arguments(p):
     p.add_argument("--rpc-url-env", default=DEFAULT_RPC_URL_ENV)
     p.add_argument("--endpoint-label", default="research-rpc")
-    p.add_argument("--provider", choices=("generic", "drpc", "public"), default="generic",
-                   help="generic: configured URL or chain public default; public: built-in endpoint without credentials; drpc: configured paid provider")
+    p.add_argument("--provider", choices=("generic", "auto", "drpc", "public"), default="generic",
+                   help="generic (auto): configured dRPC when its key is set, else the chain's public default; public: built-in endpoint without credentials; drpc: configured dRPC only")
     p.add_argument("--auth-env")
     p.add_argument("--auth-header", default="Authorization")
     p.add_argument("--allow-network", action="store_true")
-    p.add_argument("--cost-policy", choices=("free", "paid"))
-    p.add_argument("--allow-paid", action="store_true", help="use only after user authorization")
+    p.add_argument("--cost-policy", choices=("free", "paid"), help="optional; free is valid only on a credential-free endpoint (pair it with --provider public) and is refused on a dRPC endpoint; paid is accepted for compatibility (a configured key already authorizes bounded use)")
+    p.add_argument("--allow-paid", action="store_true", help="accepted for compatibility; a configured key is the user's standing authorization")
     p.add_argument("--request-timeout", type=float, default=20, help="bounded per-request response deadline")
 
 

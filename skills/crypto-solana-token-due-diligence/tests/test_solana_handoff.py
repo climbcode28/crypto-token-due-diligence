@@ -54,7 +54,9 @@ class HandoffTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'DRPC_API_KEY'):public_config(allow_network=True,cost_policy='paid',allow_paid=True,provider='drpc')
         # With the key but without paid authorization, auto still falls back; with it, dRPC is used with the key in a header.
         with patch.dict(os.environ,{'SOLANA_DRPC_URL':'https://lb.drpc.org/solana','DRPC_API_KEY':'test-only'}),patch('socket.socket',side_effect=AssertionError('network')):
-            os.environ.pop('SOLANA_RPC_URL',None);c=public_config(allow_network=True,cost_policy='free');self.assertEqual((c['provider'],c['fallback']),('public','paid_usage_not_authorized'))
+            os.environ.pop('SOLANA_RPC_URL',None);c=public_config(allow_network=True,cost_policy='free');self.assertEqual((c['provider'],c['fallback']),('public','cost_policy_free'))  # an explicit free policy opts out
+            c=public_config(allow_network=True);self.assertEqual((c['provider'],c['fallback'],c['url'],c['headers']),('drpc',None,'https://lb.drpc.org/solana',{'Drpc-Key':'test-only'}))  # the configured key is the authorization
+            with self.assertRaisesRegex(ValueError,'contradicts'):public_config(allow_network=True,cost_policy='free',provider='drpc')
             # The key inside the URL (a path segment or dkey) is refused with the fix named; the preflight names it too.
             for shape in ('https://lb.drpc.org/solana/test-only','https://lb.drpc.org/?network=solana&dkey=test-only'):
                 with patch.dict(os.environ,{'SOLANA_DRPC_URL':shape}),self.assertRaisesRegex(ValueError,'belongs only in DRPC_API_KEY'):public_config(allow_network=True,cost_policy='paid',allow_paid=True)

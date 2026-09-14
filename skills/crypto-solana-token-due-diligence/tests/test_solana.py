@@ -236,16 +236,18 @@ class CollectorTests(unittest.TestCase):
         args = collect.parser().parse_args(["--allow-network", "--cost-policy", "free"])
         with patch.dict(os.environ, {"SOLANA_RPC_URL": "https://lb.drpc.live/solana", "DRPC_API_KEY": "SECRET_TEST_KEY"}, clear=True):
             row = collect.provider_availability(args)
-        self.assertEqual(row["reason"], "paid_usage_not_authorized")
+            ready = collect.provider_availability(collect.parser().parse_args(["--allow-network"]))
+        self.assertEqual(row["reason"], "free_policy_selects_paid_endpoint")  # a free policy cannot relabel the dRPC endpoint
+        self.assertEqual(ready["status"], "ready")  # the configured key is the authorization
         result = subprocess.run([sys.executable, str(SCRIPTS/"solana_collect.py"), "--check-availability"],
                                 env={"PYTHONDONTWRITEBYTECODE": "1"}, capture_output=True, text=True)
         self.assertEqual(result.returncode, 0)
         self.assertEqual(json.loads(result.stdout)["network_requests"], 0)
 
-    def test_configured_unapproved_invocation_creates_no_artifacts(self):
+    def test_configured_invocation_without_network_permission_creates_no_artifacts(self):
         with tempfile.TemporaryDirectory() as td:
             result = subprocess.run([sys.executable, str(SCRIPTS/"solana_collect.py"),
-                                     "--out", str(Path(td)/"run"), "--allow-network", "--cost-policy", "paid"],
+                                     "--out", str(Path(td)/"run"), "--cost-policy", "paid"],
                 env={"SOLANA_RPC_URL": "https://lb.drpc.live/solana", "DRPC_API_KEY": "SYNTHETIC-SECRET",
                      "PYTHONDONTWRITEBYTECODE": "1"}, capture_output=True, text=True)
             self.assertEqual(result.returncode, 3, result.stderr)

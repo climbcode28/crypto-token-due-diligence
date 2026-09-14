@@ -19,7 +19,7 @@ offline. Prefer official public RPC and available explorer/API evidence for Sola
 no dRPC setup is required. A collector can receive a verified public endpoint via a
 temporary environment variable, without saving a personal connection or credential.
 Respect public rate limits and preserve incomplete evidence. Network and cost
-declarations use the standalone Solana transport; dRPC access needs applicable paid-use authorization. Do not source or print unrelated credential files.
+declarations use the standalone Solana transport; dRPC access needs the configured key (`docs/provider-setup.md`). Do not source or print unrelated credential files.
 Availability schema 2 distinguishes `fallback` for configuration gaps from
 `invocation_required / review_invocation_context` for omitted flags. Review applicable
 current/standing authorization once, then apply it or continue authorized alternatives

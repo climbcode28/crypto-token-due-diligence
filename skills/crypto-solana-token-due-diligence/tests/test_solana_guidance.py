@@ -43,9 +43,9 @@ class GuidanceTests(unittest.TestCase):
         normalized=' '.join(text.split())
         for sentence in ("`SOLANA_RPC_URL` | Optional override for Solana's public endpoint.",
                          '`SOLANA_DRPC_URL` | Optional dRPC endpoint for Solana;',
-                         'Solana dRPC use requires `--cost-policy paid --allow-paid`',
+                         'Solana dRPC use needs the key',
                          'public use needs no private configuration.',
-                         'A configured key alone is not authorization for paid use.'):
+                         'standing authorization for bounded read-only research'):
             self.assertIn(sentence,normalized)
         self.assertNotIn('four folders under',text)
         self.assertNotIn('custom Solana dRPC is deferred',text)  # the policy now permits it

@@ -72,9 +72,9 @@ not a guarantee that a token is safe.
 ## Set an RPC endpoint
 
 **Both EVM and Solana work without dRPC or an API key.** The EVM skill selects a
-public RPC from built-in defaults for its seven registered mainnets when no configured,
-authorized dRPC endpoint is available; other chains need an explicit endpoint.
-Solana uses public mainnet RPC by default.
+public RPC from built-in defaults for its seven registered mainnets when no dRPC key is
+configured; other chains need an explicit endpoint. Solana uses public mainnet RPC by
+default.
 
 To configure a custom dRPC endpoint yourself, copy the template example file outside the repository and edit it:
 ```sh
@@ -96,9 +96,12 @@ export SOLANA_DRPC_URL='https://lb.drpc.org/solana'
 export DRPC_API_KEY='your-key'
 ```
 
-Keep keys out of URLs and the repository. Paid access requires your authorization;
-a configured key alone does not permit spending. Existing consent can be reused within
-its bounds, subject to host approval. Public RPC requires no API key or private env file.
+Keep keys out of URLs and the repository. Configuring the key is your authorization:
+whenever it is present the skills use dRPC within their built-in per-run ceilings, and
+otherwise they fall back to public RPC, which needs no key or private file. No consent
+prompt is asked per run; remove the key from the file to stop, or pass `--provider public`
+(Solana also accepts `--cost-policy free`) on a single command. Host network approval
+still applies to every live command.
 See [provider setup](docs/provider-setup.md) and the
 [Solana runbook](skills/crypto-solana-token-due-diligence/references/runbook.md) for details.
 

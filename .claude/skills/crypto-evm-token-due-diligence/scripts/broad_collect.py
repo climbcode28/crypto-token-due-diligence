@@ -1855,6 +1855,12 @@ def remaining_recommendations(run, facts, ran):
     return fresh[:4]
 
 
+def provider_note(route):
+    """One printed line when the configured dRPC URL has no key and the chain's built-in public endpoint is used instead."""
+    if route.get("endpoint_source") == "builtin_public_key_missing":
+        print(json.dumps({"provider_note": "the configured dRPC URL has no DRPC_API_KEY, so the chain's built-in public endpoint is used; add the key to the private env file to use dRPC"}))
+
+
 def preset_collect(args):
     from investigation import Investigation
     run = Path(args.run)
@@ -1868,6 +1874,7 @@ def preset_collect(args):
         if route["status"] != "ready":
             print(json.dumps(route, sort_keys=True))
             return 3
+        provider_note(route)
         transport = configured_transport(args)
         pipeline = Pipeline(run, target, facts.get("question", ""), "", transport, session, cache, args.endpoint_label)
         pipeline.pin = facts["pin"]
@@ -1894,7 +1901,7 @@ def main():
     start.add_argument("--focus", default="", help="the user's extra asks beyond the address, verbatim; rendered into both lane briefs")
     start.add_argument("--url", action="append", default=[], help="a link the user gave (repeatable, at most six); lanes capture these first")
     start.add_argument("--materiality", default="All privileged authority and principal-removal powers are material; exit sizes are illustrative")
-    start.add_argument("--max-requests", type=int, default=300)
+    start.add_argument("--max-requests", type=int, default=360)  # the standard reads plus start's own preset queue; the 400 ceiling stays
     start.add_argument("--timeout", type=float, default=600)
     start.add_argument("--request-ceiling", type=int, default=400)
     start.add_argument("--timeout-ceiling", type=float, default=1500)
@@ -1975,6 +1982,7 @@ def main():
             if route["status"] != "ready":
                 print(json.dumps(route, sort_keys=True))
                 return 3
+            provider_note(route)
             transport = configured_transport(args)
         if restart:
             archive_failed_attempt(args.run)

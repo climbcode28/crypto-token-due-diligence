@@ -17,7 +17,7 @@ from solana_facts import encoded,atomic,build,compact
 from solana_profile import regular,strict_json,PROFILE,DIMENSIONS,Evidence,validate_report
 from solana_compose import CHECKLISTS,empty_coverage,expand_finding,note_header,validate_imports,ComposeError,preflight
 
-VERSION='1.9.0'
+VERSION='1.10.0'
 ASSETS=Path(__file__).resolve().parents[1]/'assets'
 STAGES=('identity_discovery','related_accounts_controllers','pool_transaction_quote_dependencies','final_consistency_checks')
 PRESET_CAP=4  # coordinator-named presets per run beyond the recommended queue; the collection cutoff and request grants gate each one before this count does
@@ -33,23 +33,25 @@ DRPC_ROOT='https://lb.drpc.org/solana'
 DRPC_URL_ENV='SOLANA_DRPC_URL'
 
 
-def public_config(*,allow_network,cost_policy,rpc_url_env='SOLANA_RPC_URL',provider='auto',allow_paid=False):
+def public_config(*,allow_network,cost_policy=None,rpc_url_env='SOLANA_RPC_URL',provider='auto',allow_paid=False):
     """Endpoint selection without a network request. The keyed endpoint is dRPC: DRPC_API_KEY (shared with the EVM
     skill) plus an optional SOLANA_DRPC_URL, a credential-free lb.drpc.org network URL that defaults to the Solana
-    network URL. `auto` uses it when the invocation authorizes paid use (--cost-policy paid --allow-paid) and
-    otherwise the credential-free public root (SOLANA_RPC_URL may name another public root); `drpc` requires it;
-    `public` never uses it. A fallback is a workflow decision recorded in the result, never evidence; it is recorded
-    only when a dRPC URL is configured explicitly, since a key alone may serve the EVM skill."""
-    need(allow_network and cost_policy in ('free','paid') and provider in ('auto','public','drpc'),'Collection needs explicit --allow-network and --cost-policy free|paid.')
+    network URL. A key in the user's private env file is that user's standing authorization for bounded read-only
+    research within the session ceiling (docs/provider-setup.md): `auto` uses dRPC whenever the key is configured
+    unless --cost-policy free asks for the credential-free public root (SOLANA_RPC_URL may name another public
+    root); `drpc` requires the key; `public` never uses it. --cost-policy paid and --allow-paid are accepted for
+    compatibility. A fallback is a workflow decision recorded in the result, never evidence; it is recorded only when
+    a dRPC URL is configured explicitly, since a key alone may serve the EVM skill."""
+    need(allow_network and cost_policy in (None,'free','paid') and provider in ('auto','public','drpc'),'Collection needs explicit --allow-network (--cost-policy free selects the public root).')
     public_root=os.environ.get(rpc_url_env,'');keyed_url=os.environ.get(DRPC_URL_ENV,'')
     if public_root and is_drpc_host(validate_endpoint(public_root).hostname):keyed_url,public_root=keyed_url or public_root,''  # a dRPC URL under the public name still means dRPC
-    key=bool(os.environ.get('DRPC_API_KEY','').strip());paid=cost_policy=='paid' and allow_paid;fallback=None
-    if provider=='drpc':need(key,'DRPC_API_KEY is not configured.');need(paid,'dRPC use needs --cost-policy paid --allow-paid.')
-    use_drpc=provider=='drpc' or (provider=='auto' and key and paid)
+    key=bool(os.environ.get('DRPC_API_KEY','').strip());fallback=None
+    if provider=='drpc':need(key,'DRPC_API_KEY is not configured.');need(cost_policy!='free','--provider drpc contradicts --cost-policy free; use --provider public for the credential-free root.')
+    use_drpc=provider=='drpc' or (provider=='auto' and key and cost_policy!='free')
     if use_drpc and keyed_url:
         parts=validate_endpoint(keyed_url);need(is_drpc_host(parts.hostname),DRPC_URL_ENV+' is not a dRPC URL.')
         need(credential_free_network_url(parts),DRPC_URL_ENV+' carries the key (rpc_url_carries_credential): use the credential-free network URL (for example https://lb.drpc.org/solana); the key belongs only in DRPC_API_KEY.')
-    if provider=='auto' and keyed_url and not use_drpc:fallback='drpc_key_missing' if not key else 'paid_usage_not_authorized'
+    if provider=='auto' and keyed_url and not use_drpc:fallback='drpc_key_missing' if not key else 'cost_policy_free'
     if use_drpc:url=keyed_url or DRPC_ROOT
     else:
         url=public_root or PUBLIC_ROOT;public=validate_endpoint(url)
@@ -690,7 +692,7 @@ def start(root,target,*,question,received_at,deadline_at,focus=None,urls=None,sc
         result=strict_json(regular(root,'start-result.json').read_bytes(),'start-result.json')
         result.update(resumed=True,session=status(root));return result
     atomic(root/'intake.json',encoded(meta));diagnostics=[]
-    if config.get('fallback'):diagnostics.append({'stage':'provider','category':'provider_fallback','reason':'A dRPC configuration was present but not usable ('+config['fallback']+'); the credential-free public root was used. This is a workflow decision, not evidence.'})
+    if config.get('fallback'):diagnostics.append({'stage':'provider','category':'provider_fallback','reason':'A dRPC configuration was present but not used ('+config['fallback']+'); the credential-free public root was used. This is a workflow decision, not evidence.'})
     work=json.loads((ASSETS/'work-plan.template.json').read_text());work.update({k:meta[k] for k in ('scope','received_at','target_at','deadline_at','user_hard_deadline')})
     work['investigation_id']=meta['investigation_id'];work['target']=target;work['question']=question;work['focus']=focus or [];work['urls']=urls or []
     work.setdefault('limits',{})['attempts']=meta['max_requests']  # the keyed ceiling, not the template's public figure
@@ -981,7 +983,7 @@ def main():
         elif a.action=='collect':need(a.request is not None,'A bounded preset JSON request is required.');result=collect(a.root,strict_json(a.request.read_bytes(),'preset request'),config)
         elif a.action=='brief':result={'lane_pointers':write_briefs(a.root)}
         elif a.action=='capture':
-            need(a.allow_network and a.cost_policy in ('free','paid'),'Capture requires --allow-network --cost-policy free; a run\'s paid RPC flags are accepted (web captures cost nothing).')
+            need(a.allow_network,'Capture requires --allow-network (web captures cost nothing; --cost-policy is accepted for compatibility).')
             result=capture(a.root,a.url,a.owner,dimension=a.dimension)
         elif a.action=='lane-check':result=lane_check(a.root,a.owner,allow_synthetic=a.allow_synthetic)
         elif a.action=='refresh':

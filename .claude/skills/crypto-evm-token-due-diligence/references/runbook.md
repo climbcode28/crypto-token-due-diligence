@@ -20,8 +20,8 @@ is a new dated directory under the project's ignored `research/` folder.
 ## Network execution context
 
 Before the first network-bearing shell call, read the host's declared network and
-approval policy from the current tool/environment instructions. `--allow-network` and
-`--allow-paid` authorize the collector's own gates; they do not grant shell network access.
+approval policy from the current tool/environment instructions. `--allow-network`
+authorizes the collector's own gate; it does not grant shell network access.
 When the host declares network access restricted and offers per-command escalation,
 request that permission on the **first** authorized collector or `web_capture.py` call.
 With Codex `exec_command`, use `sandbox_permissions: "require_escalated"` and a concise
@@ -47,23 +47,23 @@ is implied; provider outages, rate limits and real DNS problems remain possible.
 
 Read `provider_context.py --policy` in its own tool output before choosing a provider;
 do not append it to a large reference dump where truncation can hide the policy.
-Honor applicable standing authorization unless the current user restricts it. The
-locator reports policy text, not a host approval token: a configured key, a file's
-assertion, and `--allow-paid` cannot compel the host to accept paid execution.
+A dRPC key in the user's private env file is that user's standing authorization for
+bounded read-only research (`docs/provider-setup.md`); no per-run consent is asked. The
+locator reports policy text, not a host approval token: the host's own approval still
+applies to every network command.
 
 If a host rejects the call, retain its actual reason and distinguish these cases:
 
 - **Omitted collector flags:** `invocation_required` is an offline invocation issue.
   Apply already-established authorization; it does not justify asking for it again.
-- **Paid-use authorization rejected:** if relevant authorization is already in the
-  current user instructions, cite that instruction and the operation's finite request
-  ceiling and deadline in one review retry. A stated request cap must bound both
-  `--max-requests` and `--request-ceiling`; an allowance of 300 with a ceiling of 400
-  is not a 300-request cap. Likewise, both timeout values must fit the original deadline.
-  Do not repeatedly rephrase the same saved
-  claim as new consent. If the host still rejects paid use, leave that route blocked.
-  When the rejection permits safer alternatives and only paid use is denied, continue
-  independently authorized credential-free public RPC and public-document research.
+- **Configured-provider command rejected by the host:** cite the policy (the configured
+  key is the authorization) and the operation's finite request ceiling and deadline in
+  one review retry. A stated request cap must bound both `--max-requests` and
+  `--request-ceiling`; an allowance of 360 with a ceiling of 400 is not a 360-request
+  cap. Likewise, both timeout values must fit the original deadline. Do not repeatedly
+  rephrase the policy as new consent. If the host still rejects the command, leave that
+  route blocked. When the rejection permits safer alternatives and only the configured
+  provider is denied, continue credential-free public RPC and public-document research.
   Submit the public command through the host's required network review too; do not run
   it through another tool to evade review. Briefly state the provider change and reason.
 - **General network/research denial, or unclear scope:** do not infer that a public
@@ -76,7 +76,7 @@ chain, ignoring saved endpoint/key exports. Other chains require a credential-fr
 endpoint from official network documentation, selected via a dedicated `PUBLIC_RPC_URL`
 export and `--rpc-url-env PUBLIC_RPC_URL --provider generic --allow-network --cost-policy free`.
 Apply the same selection to subsequent presets. Merely changing `--provider` to `generic` while
-leaving the configured dRPC URL selected is still dRPC and still requires paid approval.
+leaving the configured dRPC URL selected is still dRPC (the key is its authorization).
 Do not forward the dRPC key to the public endpoint or modify the saved private env.
 
 Preserve the target, original deadline, run directory, and any existing session ledger
@@ -93,9 +93,9 @@ host's instructions. A repository edit cannot guarantee acceptance of saved cons
 
 ## Step 1 in full
 
-For a first-time user without configured, authorized dRPC, use public RPC directly;
-no private env file, API key or paid-use question is needed. For an already configured,
-authorized provider, use the variant below instead so its preference is preserved.
+For a first-time user without a configured dRPC key, use public RPC directly; no
+private env file, API key or paid-use question is needed. With a key configured for the
+target chain, use the variant below instead so its preference is preserved.
 
 ```sh
 set +x
@@ -105,20 +105,23 @@ python3 "$SKILL_DIR/scripts/broad_collect.py" start \
   --chain-id 4663 --address 0x… --run "$RUN" \
   --question 'General diligence on the exact token; no special acceptance requirements' \
   --provider public --allow-network --cost-policy free \
-  --max-requests 300 --timeout 600 --request-ceiling 400 --timeout-ceiling 1500
+  --max-requests 360 --timeout 600 --request-ceiling 400 --timeout-ceiling 1500
 ```
 
-**Configured provider variant:** with already-established paid dRPC authorization,
-source `"$HOME/.config/crypto-research/env"` with tracing disabled and suppressed output
-in the **same shell invocation** before `start` (stop that invocation if sourcing fails).
-Replace the public arguments with `--provider drpc --allow-network --cost-policy paid
---allow-paid`. Use these flags on every later collection, reusing existing consent
-within its bounds rather than asking again. For a configured free endpoint, use
+**Configured provider variant:** with a dRPC key in the private env file (the standing
+authorization), source `"$HOME/.config/crypto-research/env"` with tracing disabled and
+suppressed output in the **same shell invocation** before `start` (stop that invocation if
+sourcing fails) and replace the public arguments with `--provider auto --allow-network`:
+dRPC when the key is present, the built-in public endpoint otherwise, with no consent
+question (`--cost-policy paid --allow-paid` are accepted but add nothing). The configured
+endpoint serves one chain; for another chain use `--provider public`. Use the same flags
+on every later collection. For a configured free endpoint, use
 `--provider generic --allow-network --cost-policy free` and its URL export.
 
 The generic adapter also selects the built-in public default when no endpoint is
-configured. It preserves configuration errors and paid-use gates when an endpoint is
-configured; `public` deliberately selects the credential-free built-in endpoint.
+configured, and when the configured dRPC URL has no key (printed as a `provider_note`).
+It preserves configuration errors and refuses a free policy on a dRPC endpoint;
+`public` deliberately selects the credential-free built-in endpoint.
 
 For a routed request, retain its absolute `deadline_at` (Unix seconds). In the same
 launch shell call, compute the remaining duration immediately before

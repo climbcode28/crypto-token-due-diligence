@@ -2,18 +2,27 @@
 
 ## Current provider policy
 
-Both specialists work with public RPC by default. This repository ships no credentials
-and grants no standing permission to spend money on a paid provider.
+Both specialists work with public RPC by default. This repository ships no credentials.
 
 - Optional private configuration belongs in `~/.config/crypto-research/env`, outside
   the checkout. Copy `env.example`, set file mode `600`, and source it with tracing
   disabled in the same shell invocation as a configured provider check or collection.
-- A configured key alone is not authorization for paid use. The current user must
-  authorize it; nothing here permits purchases, top-ups, or plan changes.
-- An optional, ignored `HANDOFF.local.md` at the repository root can record the current
-  user's machine-local provider policy and bounded standing authorization. Its first
-  second-level section takes precedence for EVM; `provider_context.py --policy`
-  identifies the source. Never publish that file or reuse someone else's authorization.
+- A dRPC key in that file is the configuring user's standing authorization for bounded
+  read-only research on that key: whenever the key is present the skills use dRPC for its
+  matching network (EVM within the run's request ceiling, 400 by default; Solana within
+  the 160-send session ceiling) and otherwise fall back to public RPC. No per-run consent
+  flag or question is needed; remove the key from the file to stop. Nothing here permits
+  purchases, top-ups or plan changes, and never reuse someone else's key.
+- To opt out on one command, ask for the credential-free route explicitly: on Solana
+  `--cost-policy free` (or `--provider public`), on EVM `--provider public --cost-policy
+  free` (a free policy on the configured dRPC endpoint is refused by name). Removing the
+  key from the file opts out: a credential-free dRPC URL left behind selects the chain's
+  built-in public endpoint under the default provider on a registered chain, while an
+  explicit `--provider drpc` or a custom endpoint variable stops with `drpc_key_missing`.
+  `--cost-policy paid --allow-paid` are accepted for compatibility.
+- An optional, ignored `HANDOFF.local.md` at the repository root can record machine-local
+  provider notes. Its first second-level section takes precedence for EVM;
+  `provider_context.py --policy` identifies the source. Never publish that file.
 - Respect host network permissions and each run's request, byte, and time limits.
   Missing access or evidence remains a gap, never a passing check.
 
@@ -26,19 +35,19 @@ and grants no standing permission to spend money on a paid provider.
 | `SOLANA_DRPC_URL` | Optional dRPC endpoint for Solana; defaults to `https://lb.drpc.org/solana`. |
 | `DRPC_API_KEY` | Shared dRPC authentication key, sent as a header rather than embedded in URLs. |
 
-EVM dRPC use requires the configured endpoint and the authorized invocation flags.
-Solana dRPC use requires `--cost-policy paid --allow-paid`; public use needs no private
-configuration. Never print the private env file or place keys in captured URLs.
+EVM dRPC use needs the configured endpoint and the key; Solana dRPC use needs the key (and
+optionally `SOLANA_DRPC_URL`); public use needs no private configuration. Never print the
+private env file or place keys in captured URLs.
 
-Paid flags belong on every authorized command; they do not require repeated consent.
-Reuse the current user's applicable standing authorization within its bounds. Host
-approval rules still apply; if paid access alone is denied, complete permitted public
-research under the specialist's recovery rules before requesting missing authorization.
+The configured key is the authorization on every command; nothing asks for consent again.
+Host approval rules still apply to every network command; if the host denies a
+configured-provider command, complete permitted public research under the specialist's
+recovery rules and state the boundary.
 
 EVM has [built-in public endpoints](../skills/crypto-evm-token-due-diligence/references/public-rpc.md)
-for its seven registered mainnets. `--provider public --cost-policy free` ignores paid
-configuration; `generic` uses the configured URL or the chain's public default when
-unset. All live commands still require `--allow-network` and host network permission.
+for its seven registered mainnets. `--provider public` ignores the configuration; `generic`
+(or `auto`) uses the configured dRPC endpoint when its key is set and the chain's public
+default otherwise. All live commands still require `--allow-network` and host network permission.
 
 ## Research and maintenance
 

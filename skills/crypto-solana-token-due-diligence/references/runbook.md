@@ -14,12 +14,13 @@ holder concentration is usually a gap on it. A configured dRPC endpoint lifts th
 limits: with `DRPC_API_KEY` in the documented user env file (source
 `"$HOME/.config/crypto-research/env"` in the same shell invocation as the command, never
 print it) and optionally `SOLANA_DRPC_URL` (a credential-free `https://lb.drpc.org/solana`
-network URL, the default when unset), `--provider auto` (the default) uses dRPC when the
-invocation authorizes paid use
-(`--cost-policy paid --allow-paid`) and otherwise falls back to the public root, recording
-`provider_fallback` in `diagnostics` only when `SOLANA_DRPC_URL` is set (a key alone, which
-may be the EVM skill's, records nothing); `--provider drpc` requires it and `--provider public`
-never uses it. `SOLANA_RPC_URL` only overrides the public root. The key goes only in
+network URL, the default when unset), `--provider auto` (the default) uses dRPC whenever the
+key is configured (the configured key is the user's standing authorization for bounded
+read-only research; no paid-use flag or consent question is needed) and otherwise the public
+root, recording `provider_fallback` in `diagnostics` only when `SOLANA_DRPC_URL` is set (a key
+alone, which may be the EVM skill's, records nothing; the reason is `drpc_key_missing` or
+`cost_policy_free`); `--cost-policy free` forces the public root, `--provider drpc` requires
+the key and `--provider public` never uses it. `SOLANA_RPC_URL` only overrides the public root. The key goes only in
 `DRPC_API_KEY` (sent as a `Drpc-Key` header); a URL that carries it (a `dkey` parameter or a
 key path segment) is refused with `rpc_url_carries_credential`. A keyed endpoint drops the
 public tier's per-method windows, raises the session ceiling from 120 to 160 sends (the room a
@@ -47,23 +48,22 @@ action. Never dispatch lanes or compose from a blocked run. Failed sends record 
 
 ## Provider authorization and denial recovery
 
-Choose paid dRPC only after establishing current-user authorization. Reuse applicable
-standing consent within its bounds unless the user restricts it; a saved policy is
-context, not a host approval token. A configured key and paid flags cannot compel the
-host to accept paid execution. Without established consent, start public research
+A dRPC key in the user's private env file is that user's standing authorization for
+bounded read-only research (`docs/provider-setup.md`): use dRPC whenever it is configured,
+without asking; a saved policy is context, not a host approval token, and the host's own
+approval still applies to every network command. Without a key, start public research
 directly; optional paid access must not become a prerequisite for diligence.
 
-An omitted paid flag is an invocation issue: apply established authorization without
-asking again. If the host rejects paid authorization and the relevant consent is in
-the current user instructions, cite it and the finite request ceiling/original deadline
-in one review retry. Do not repeatedly rephrase a saved-file assertion as new consent.
-If only paid use is denied and the host permits safer alternatives, leave paid access
-blocked and continue independently authorized public RPC/documents through the host's
-required network review. Use `--provider public --allow-network --cost-policy free`,
-omit `--allow-paid`, and do not source the private env. Public selection ignores unused
-dRPC configuration and never forwards its key. Briefly state the provider change and
-the host's reason. A general network/research denial or unclear scope does not authorize
-switching providers/tools; complete only unaffected work and explain the boundary.
+An omitted `--allow-network` is an invocation issue. If the host rejects the
+configured-provider command, cite the policy and the finite request ceiling/original
+deadline in one review retry; do not repeatedly rephrase it as new consent. If only the
+configured provider is denied and the host permits safer alternatives, leave it blocked
+and continue public RPC/documents through the host's required network review. Use
+`--provider public --allow-network --cost-policy free` and do not source the private env.
+Public selection ignores unused dRPC configuration and never forwards its key. Briefly
+state the provider change and the host's reason. A general network/research denial or
+unclear scope does not authorize switching providers/tools; complete only unaffected work
+and explain the boundary.
 
 A host rejection before process creation consumes no RPC attempts: retry an allowed
 public command with the same run path, original intake and deadline. Once a collector
@@ -92,13 +92,12 @@ python3 "$S/scripts/solana_broad_collect.py" start "$RUN" \
   --provider public --allow-network --cost-policy free
 ```
 
-With dRPC configured **and paid use already authorized**, source the user env file
-with tracing disabled in the same invocation, replace `--provider public` with
-`--provider drpc`, and replace the free policy with `--cost-policy paid --allow-paid`
-(the key is read from the environment, never from an
-argument); the same flags apply to every `collect` in that run. `capture` is web-only and
-keeps `--cost-policy free` (the lane briefs print it that way); the run's paid flags are
-accepted there too.
+With a dRPC key configured, source the user env file with tracing disabled in the same
+invocation and use `--provider auto --allow-network` (dRPC whenever the key is present; the
+key is read from the environment, never from an argument; `--cost-policy paid --allow-paid`
+are accepted but unnecessary); the same flags apply to every `collect` in that run. `capture`
+is web-only and needs only `--allow-network` (the lane briefs still print `--cost-policy
+free`, which is accepted).
 
 `--mint`, `--question`, `--received-at` and `--deadline-at` are required; `--focus` and
 `--url` repeat; `--genesis-hash` defaults to mainnet; `--rpc-url-env` names the public

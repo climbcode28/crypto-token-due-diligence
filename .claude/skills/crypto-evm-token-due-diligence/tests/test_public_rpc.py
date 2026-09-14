@@ -51,12 +51,11 @@ class PublicRpcTests(unittest.TestCase):
     def test_configured_paid_route_retains_gate_then_explicit_public_has_no_auth(self):
         env = {"ROBINHOOD_DRPC_URL": "https://lb.drpc.org/robinhood", "DRPC_API_KEY": "SYNTHETIC-KEY"}
         with patch.dict(os.environ, env, clear=True):
-            denied = rpc_collect.provider_availability(self.args())
+            denied = rpc_collect.provider_availability(self.args())  # an explicit free policy cannot relabel the configured dRPC endpoint
             self.assertEqual(denied["status"], "invocation_required")
-            self.assertIn("paid_usage_not_authorized", denied["blocking_reasons"])
-            authorized = self.args(provider="drpc", cost_policy="paid", allow_paid=True)
-            self.assertEqual(rpc_collect.transport_settings(authorized),
-                             (env["ROBINHOOD_DRPC_URL"], {"Drpc-Key": "SYNTHETIC-KEY"}))
+            self.assertIn("free_policy_selects_paid_endpoint", denied["blocking_reasons"])
+            for authorized in (self.args(provider="drpc", cost_policy="paid", allow_paid=True), self.args(cost_policy=None), self.args(provider="auto", cost_policy=None)):
+                self.assertEqual(rpc_collect.transport_settings(authorized), (env["ROBINHOOD_DRPC_URL"], {"Drpc-Key": "SYNTHETIC-KEY"}))
             public = self.args(provider="public")
             self.assertEqual(rpc_collect.provider_availability(public)["status"], "ready")
             self.assertEqual(rpc_collect.transport_settings(public),
@@ -76,10 +75,11 @@ class PublicRpcTests(unittest.TestCase):
             self.assertEqual(rpc_collect.provider_availability(self.args())["reason"], "rpc_configuration_invalid")
         with patch.dict(os.environ, {}, clear=True):
             self.assertEqual(rpc_collect.provider_availability(self.args(provider="drpc"))["reason"], "drpc_key_missing")
-            for args in (self.args(allow_network=False), self.args(cost_policy=None)):
-                self.assertEqual(rpc_collect.provider_availability(args)["status"], "invocation_required")
-                with self.assertRaises(ValueError):
-                    rpc_collect.transport_settings(args)
+            args = self.args(allow_network=False)
+            self.assertEqual(rpc_collect.provider_availability(args)["status"], "invocation_required")
+            with self.assertRaises(ValueError):
+                rpc_collect.transport_settings(args)
+            self.assertEqual(rpc_collect.provider_availability(self.args(cost_policy=None))["status"], "ready", "a cost policy is optional on the public default")
 
     def test_cli_start_reaches_public_transport_and_failed_retry_preserves_ledger(self):
         with tempfile.TemporaryDirectory() as td, patch.dict(os.environ, {}, clear=True):

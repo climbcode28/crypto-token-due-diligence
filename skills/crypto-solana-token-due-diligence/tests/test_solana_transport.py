@@ -80,7 +80,11 @@ class TransportTests(unittest.TestCase):
                 self.assertNotIn("secret", json.dumps(result))
         with patch.dict(os.environ, {"SOLANA_RPC_URL": "https://lb.drpc.live/solana", "DRPC_API_KEY": "secret-key"}, clear=True):
             result = transport.provider_availability(args)
-            self.assertEqual(result["reason"], "paid_usage_not_authorized")
+            self.assertEqual(result["reason"], "free_policy_selects_paid_endpoint")  # the explicit free policy, not a missing consent, blocks
+            self.assertNotIn("secret-key", json.dumps(result))
+            args.cost_policy = None
+            result = transport.provider_availability(args)
+            self.assertEqual(result["status"], "ready")  # the configured key is the standing authorization
             self.assertNotIn("secret-key", json.dumps(result))
 
     def test_secret_echoes_are_redacted_before_durable_storage(self):
