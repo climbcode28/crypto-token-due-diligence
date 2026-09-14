@@ -283,13 +283,14 @@ def capture_attempt(item, out, timeout=20, max_bytes=16_000_000, opener=None, wr
     return record
 
 
-def capture(items, out, timeout=20, max_bytes=16_000_000, workers=4, session=None, operation="web_capture"):
+def capture(items, out, timeout=20, max_bytes=16_000_000, workers=4, session=None, operation="web_capture", retries=1):
     out = Path(out)
     out.mkdir(parents=True, exist_ok=True)
     integer(workers, "workers", 1)
     need(workers <= 4, "at most four concurrent captures")
     timeout = seconds(timeout, "capture timeout")
     integer(max_bytes, "capture byte cap", 1)
+    integer(retries, "capture retries", 0)
     seen = set()
     for item in items:
         need(isinstance(item, dict) and re.fullmatch(r"[A-Za-z0-9_-]{1,60}", str(item.get("id"))) and isinstance(item.get("url"), str), "capture items need id and url")
@@ -309,7 +310,7 @@ def capture(items, out, timeout=20, max_bytes=16_000_000, workers=4, session=Non
         deadline = time.monotonic() + max(0, row[0] - time.time())
         acquire = lambda: prepaid_acquire(path)
     with ThreadPoolExecutor(max_workers=workers) as executor:
-        return list(executor.map(lambda item: capture_one(item, out, timeout, max_bytes, acquire=acquire, deadline=deadline), items))
+        return list(executor.map(lambda item: capture_one(item, out, timeout, max_bytes, retries=retries, acquire=acquire, deadline=deadline), items))
 
 
 def register(draft_root, records, lane=None, default_address=None):

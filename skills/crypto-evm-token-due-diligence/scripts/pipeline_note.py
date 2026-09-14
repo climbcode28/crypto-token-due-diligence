@@ -230,6 +230,12 @@ def build_pipeline_note(facts, draft, run=None):
         if launch.get("nfpm_position_ids"):
             text += f" Liquidity position NFT(s) {', '.join(str(i) for i in launch['nfpm_position_ids'])} were minted."
         evidence = [launch["evidence"], launch["evidence"].replace("receipt-", "tx-", 1), "runtime"]
+        if creation.get("tx_source") == "sourcify_deployment":
+            text += " The creation transaction was named by Sourcify's deployment record because the explorer named none" + ("; the explorer's creator field is unknown." if not creation.get("creator") else ".")
+            if "sourcify-correspondence" in ((facts.get("source") or {}).get("evidence") or []):
+                evidence.append("sourcify-correspondence")
+        if creation.get("deployment_tx_conflict"):
+            text += f" Sourcify's deployment record names a different transaction ({creation['deployment_tx_conflict']}); the two sources disagree and the conflict is unresolved."
         for a in facts.get("architecture") or []:
             if a["address"] in (launch.get("to"), creation.get("creator")):
                 evidence.append((a.get("evidence") or {}).get("runtime"))

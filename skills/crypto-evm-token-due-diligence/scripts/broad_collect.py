@@ -321,7 +321,7 @@ class Pipeline:
         else:
             self.discovery["dexscreener"] = {"status": "unsupported_chain_slug"}
         items.append({"id": "sourcify-correspondence", "purpose": "Verified source, ABI and compiler output",
-                      "url": f"https://sourcify.dev/server/v2/contract/{self.target['chain_id']}/{self.target['address']}?fields=compilation,sources,runtimeBytecode,stdJsonInput,stdJsonOutput,abi"})
+                      "url": f"https://sourcify.dev/server/v2/contract/{self.target['chain_id']}/{self.target['address']}?fields=compilation,sources,runtimeBytecode,stdJsonInput,stdJsonOutput,abi,deployment"})
         explorer = None
         if self.explorer != "none":
             for candidate in self.registry.get("explorers", []):
@@ -356,12 +356,14 @@ class Pipeline:
         else:
             records = self.fetch(items, out)
         by_id = {r["id"]: r for r in records}
+        by_id = self.retry_explorer_address(by_id, out)
         for key, rid in (("dexscreener", "dexscreener-pairs"), ("sourcify", "sourcify-correspondence"), ("explorer", "explorer-address")):
             record = by_id.get(rid)
             if record is None:
                 continue
             ok = record.get("http_status") == 200 and not record.get("failure_category")
-            self.discovery[key] = {"status": "ok" if ok else (record.get("failure_category") or "http_" + str(record.get("http_status"))),
+            prior = self.discovery.get(key) if isinstance(self.discovery.get(key), dict) else {}  # the explorer retry's record survives
+            self.discovery[key] = {**prior, "status": "ok" if ok else (record.get("failure_category") or "http_" + str(record.get("http_status"))),
                                    "url": record["url"], "captured_at_utc": record["captured_at_utc"], "bytes": record.get("bytes", 0)}
             if key == "explorer" and explorer:
                 self.discovery[key]["name"] = explorer["name"]
@@ -381,6 +383,16 @@ class Pipeline:
                 self.abi = body.get("abi") if isinstance(body, dict) else None
                 self.discovery[key]["compiler"] = mapping(mapping(body).get("compilation")).get("compilerVersion")
                 self.discovery[key]["contract"] = mapping(mapping(body).get("compilation")).get("fullyQualifiedName")
+                deployment = mapping(mapping(body).get("deployment"))
+                tx = str(deployment.get("transactionHash") or "").lower()
+                deployer = str(deployment.get("deployer") or "").lower()
+                block = str(deployment.get("blockNumber") or "")
+                if re.fullmatch(r"0x[0-9a-f]{64}", tx):
+                    # Sourcify's deployment record names the creation transaction independently of the explorer.
+                    self.sourcify_deployment = {"tx": tx, "deployer": deployer if re.fullmatch(r"0x[0-9a-f]{40}", deployer) and int(deployer, 16) else None}
+                    self.discovery[key]["deployment_tx"] = tx
+                    if block.isdigit():
+                        self.discovery[key]["deployment_block"] = int(block)
             elif key == "explorer" and isinstance(body, dict):
                 tx = str(body.get("creation_transaction_hash") or body.get("creation_tx_hash") or "").lower()
                 creator = str(body.get("creator_address_hash") or "").lower()
@@ -388,7 +400,18 @@ class Pipeline:
                                  "creator": creator if re.fullmatch(r"0x[0-9a-f]{40}", creator) and int(creator, 16) else None,
                                  "is_verified": body.get("is_verified") if isinstance(body.get("is_verified"), bool) else None,
                                  "proxy_type": str(body.get("proxy_type"))[:40] if body.get("proxy_type") else None}
+                if self.creation["tx"]:
+                    self.creation["tx_source"] = "explorer_address" + ("_retry" if self.discovery[key].get("retried") else "")
                 self.discovery[key].update(self.creation)
+        deployment = getattr(self, "sourcify_deployment", None)
+        if deployment and not self.creation.get("tx"):
+            # The explorer did not name the creation transaction (a failed page or an unindexed contract): Sourcify's
+            # deployment record supplies it, so the creation receipt, the launch signer, the launch-window scan and the
+            # position custodian probe survive an explorer outage. The explorer's creator field stays unknown.
+            self.creation = {**self.creation, "tx": deployment["tx"], "tx_source": "sourcify_deployment", "deployer": deployment["deployer"]}
+            self.discovery.setdefault("explorer", {})["creation_from"] = "sourcify_deployment"
+        elif deployment and self.creation.get("tx") and deployment["tx"] != self.creation["tx"]:
+            self.creation["deployment_tx_conflict"] = deployment["tx"]  # two sources disagree: recorded, never silently resolved
         token_record = by_id.get("explorer-token")
         if token_record and token_record.get("http_status") == 200 and token_record.get("raw"):
             try:
@@ -554,6 +577,46 @@ class Pipeline:
         addr = str(item.get("hash") or "").lower()
         return {"address": addr if re.fullmatch(r"0x[0-9a-f]{40}", addr) else None, "is_contract": item.get("is_contract"),
                 "name": item.get("name"), "is_verified": item.get("is_verified")}
+
+    RETRYABLE = ("server_error", "timeout", "throttled")  # the fetcher's own failure categories for a 5xx, a timeout and a 429
+
+    def retry_explorer_address(self, by_id, out):
+        """One more attempt at the explorer's address page after a two-second pause when it failed transiently (a 5xx, a
+        timeout or a rate limit): the creation transaction hangs on this one request. The live fetcher already gives the
+        first attempt its own quick transient retry; this attempt is exactly one charged request. A 404, an access denial
+        or a run whose every capture got no response (the host denied the network) is never retried."""
+        record = by_id.get("explorer-address")
+        if record is None or not getattr(self, "explorer_base", None):
+            return by_id
+        ok = record.get("http_status") == 200 and not record.get("failure_category")
+        status = record.get("failure_category") or "http_" + str(record.get("http_status"))
+        if ok or status not in self.RETRYABLE:
+            return by_id
+        attempted = [r for r in by_id.values() if r.get("url")]
+        if attempted and all(r.get("failure_category") in NO_RESPONSE for r in attempted):
+            return by_id  # nothing answered anywhere: head_failure names the denial; a retry would only spend its timeout
+        if self.session is not None and self.fetch is not None and not self.session.acquire("discovery_web"):
+            self.discovery.setdefault("explorer", {})["retry"] = "budget_exhausted"
+            return by_id
+        if not self.synthetic:
+            time.sleep(2)
+        item = {"id": "explorer-address-retry", "url": record["url"], "purpose": "Creation transaction and creator (one retry after a transient failure)"}
+        if self.fetch is None:
+            from web_capture import capture
+            records = capture([item], out, timeout=15, session=self.session, operation="discovery_web", retries=0)
+        else:
+            records = self.fetch([item], out)
+        again = next((r for r in records if r["id"] == item["id"]), None)
+        if again is None:
+            self.discovery.setdefault("explorer", {})["retry"] = "not_captured"
+            return by_id
+        again_ok = again.get("http_status") == 200 and not again.get("failure_category")
+        self.discovery.setdefault("explorer", {})["retry"] = "ok" if again_ok else (again.get("failure_category") or "http_" + str(again.get("http_status")))
+        self.discovery["explorer"]["first_attempt"] = status
+        if again_ok:
+            self.discovery["explorer"]["retried"] = True
+            return {**by_id, "explorer-address": {**again, "id": "explorer-address"}}
+        return by_id
 
     def parse_explorer_extras(self, by_id, out):
         """Counters, the top indexed holders and the most recent indexed transfers (Blockscout API v2 shapes)."""
@@ -1482,6 +1545,13 @@ def summary_lines(facts):
         lines.append("getters: " + json.dumps(getters, default=str)[:900])
     lines.append(f"source: {facts['source']}")
     lines.append(f"discovery: {json.dumps(facts['discovery'], default=str)[:600]}")
+    creation = facts.get("creation") or {}
+    creation_explorer = facts.get("discovery", {}).get("explorer") if isinstance(facts.get("discovery", {}).get("explorer"), dict) else {}
+    if creation.get("tx") or creation.get("deployment_tx_conflict"):
+        lines.append(f"creation: tx={creation.get('tx')} source={creation.get('tx_source')} creator={creation.get('creator')} signer={creation.get('signer')}"
+                     + (f" deployer={creation['deployer']} (Sourcify" + ("; the explorer's creator is unknown)" if not creation.get("creator") else ")") if creation.get("deployer") else "")
+                     + (f" explorer_first_attempt={creation_explorer.get('first_attempt')} retry={creation_explorer.get('retry')}" if creation_explorer.get("retry") else "")
+                     + (f" | conflict: Sourcify's deployment record names {creation['deployment_tx_conflict']}; unresolved" if creation.get("deployment_tx_conflict") else ""))
     if facts["links"]["websites"] or facts["links"]["socials"]:
         lines.append("links: " + json.dumps(facts["links"])[:400])
     lines.append("evidence aliases: token reads are token-<getter>, runtime, metadata-<field>, token-eip1967-<slot>; rows below start with their alias prefix")
@@ -1581,7 +1651,7 @@ def brief(run, lane, minutes, allow_partial=False):
     for key, value in (("RUN", str(run.resolve())), ("SKILL_DIR", skill_dir), ("CHAIN_ID", str(target["chain_id"])), ("ADDRESS", target["address"]),
                        ("PIN_NUMBER", str(pin["number"])), ("PIN_TIME", str(pin["timestamp_utc"])), ("POOLS", pools), ("LINKS", links),
                        ("FACTS", facts_lines), ("CUTOFF_UTC", cutoff), ("MINUTES", str(minutes)),
-                       ("CREATION_TX", str((facts or {}).get("creation", {}).get("tx") or "unknown")), ("CREATOR", str((facts or {}).get("creation", {}).get("creator") or "unknown")),
+                       ("CREATION_TX", str((facts or {}).get("creation", {}).get("tx") or "unknown")), ("CREATOR", str((facts or {}).get("creation", {}).get("creator") or ((facts or {}).get("creation", {}).get("deployer") and (facts["creation"]["deployer"] + " (deployer per Sourcify's deployment record; the explorer's creator is unknown)")) or "unknown")),
                        ("EXPLORERS", ", ".join(e["name"] + " " + e["base"] for e in presets.registry(target["chain_id"]).get("explorers", [])) or "none registered"),
                        ("USER_FOCUS", user_focus_section(intake, lane))):
         filled = filled.replace("{{" + key + "}}", value)

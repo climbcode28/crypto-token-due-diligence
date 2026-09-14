@@ -166,6 +166,7 @@ def fake_fetch(items, out):
                      "info": {"websites": [{"url": "https://project.invalid"}], "socials": [{"type": "twitter", "url": "https://x.com/synthetic"}]}}]
         elif item["id"] == "sourcify-correspondence":
             body = {"chainId": str(CHAIN), "address": TOKEN, "compilation": {"compilerVersion": "0.8.26", "fullyQualifiedName": "Token.sol:Token"},
+                    "deployment": {"transactionHash": CREATION_TX, "blockNumber": "90", "transactionIndex": "0", "deployer": CAROL},
                     "abi": [{"type": "function", "name": "launchFactory", "inputs": [], "outputs": [{"type": "address"}], "stateMutability": "view"},
                             {"type": "function", "name": "maxTxAmount", "inputs": [], "outputs": [{"type": "uint256"}], "stateMutability": "view"},
                             {"type": "function", "name": "treasury", "inputs": [], "outputs": [{"type": "address"}], "stateMutability": "view"},
@@ -173,7 +174,7 @@ def fake_fetch(items, out):
                             {"type": "function", "name": "owner", "inputs": [], "outputs": [{"type": "address"}], "stateMutability": "view"},
                             {"type": "function", "name": "paused", "inputs": [], "outputs": [{"type": "bool"}], "stateMutability": "view"},
                             {"type": "function", "name": "transfer", "inputs": [{"type": "address"}], "outputs": [], "stateMutability": "nonpayable"}]}
-        elif item["id"] == "explorer-address":
+        elif item["id"] in ("explorer-address", "explorer-address-retry"):
             body = {"is_contract": True, "creation_transaction_hash": CREATION_TX, "creator_address_hash": CAROL, "is_verified": True}
         elif item["id"] == "explorer-token":
             body = {"holders": "1234"}
@@ -216,14 +217,14 @@ def fake_fetch(items, out):
 
 
 class BroadCollectTests(unittest.TestCase):
-    def run_pipeline(self, root, rpc=None, queue=False, headroom=None, reserve=0, presets=None):
+    def run_pipeline(self, root, rpc=None, queue=False, headroom=None, reserve=0, presets=None, fetch=None):
         session = Investigation.create(root / "session.sqlite", 200, 600, request_ceiling=300, timeout_ceiling=900, limit_basis="analyst_safety")
         cache = Cache(root / "cache.sqlite")
         rpc = rpc or PipelineRpc()
         try:
             intake(root / "draft", {"chain_id": CHAIN, "address": TOKEN}, "Synthetic pipeline question", "All authority material", True)
             pipeline = Pipeline(root, {"chain_id": CHAIN, "address": TOKEN}, "Synthetic pipeline question", "All authority material",
-                                rpc, session, cache, "synthetic", fetch=fake_fetch, synthetic=True, registry=REGISTRY)
+                                rpc, session, cache, "synthetic", fetch=fetch or fake_fetch, synthetic=True, registry=REGISTRY)
             facts = pipeline.run_all()
             if queue:  # what main() does after the lane charges: start runs its own queue and rewrites the facts
                 from broad_collect import run_recommended, remaining_recommendations
@@ -641,6 +642,109 @@ class BroadCollectTests(unittest.TestCase):
             custodians = [a for a in facts["actors"].values() if a.get("role") == "position_custodian"]
             self.assertEqual([a["address"] for a in custodians], [LOCKER])
             self.assertEqual(custodians[0]["getters"]["unlockTime"]["decoded"]["int"], 2000000000)
+
+    def test_creation_transaction_survives_an_explorer_outage(self):
+        def failing(fail_ids, status=500, category="server_error", rewrite=None):
+            def fetch(items, out):
+                records = fake_fetch([i for i in items if i["id"] not in fail_ids], out)
+                for i in items:
+                    if i["id"] in fail_ids:
+                        records.append({"id": i["id"], "url": i["url"], "final_url": i["url"], "purpose": i.get("purpose"), "http_status": status, "captured_at_utc": "2026-01-01T00:00:00Z",
+                                        "failure_category": category, "content_type": "text/plain", "host": "synthetic.invalid", "raw": None, "bytes": 0, "sha256": None})
+                if rewrite:
+                    rewrite(out)
+                return records
+            return fetch
+        # Healthy explorer: the creation comes from its address page, nothing is retried, and the request count is unchanged.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "run"
+            root.mkdir()
+            facts, rpc, status = self.run_pipeline(root)
+            self.assertEqual((facts["creation"]["tx"], facts["creation"]["tx_source"], facts["creation"]["creator"]), (CREATION_TX, "explorer_address", CAROL))
+            self.assertNotIn("retry", facts["discovery"]["explorer"])
+            self.assertEqual(status["started_attempts"], 113)
+        # A transient 500 on the address page: one retry after the pause recovers the creation and the run proceeds unchanged.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "run"
+            root.mkdir()
+            facts, rpc, status = self.run_pipeline(root, fetch=failing({"explorer-address"}))
+            ex = facts["discovery"]["explorer"]
+            self.assertEqual((ex["status"], ex["first_attempt"], ex["retry"], ex.get("retried")), ("ok", "server_error", "ok", True))
+            self.assertEqual((facts["creation"]["tx"], facts["creation"]["tx_source"], facts["creation"]["creator"]), (CREATION_TX, "explorer_address_retry", CAROL))
+            self.assertEqual(status["started_attempts"], 114, "the retry is one charged discovery request")
+            self.assertEqual(len(rpc.calls), 102)
+        # The explorer down for both attempts: Sourcify's deployment record names the creation transaction, so the creation receipt,
+        # the launch signer, the custodian probe and the launch-window scan all survive; the explorer's creator field stays unknown.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "run"
+            root.mkdir()
+            facts, rpc, status = self.run_pipeline(root, fetch=failing({"explorer-address", "explorer-address-retry"}))
+            ex = facts["discovery"]["explorer"]
+            self.assertEqual((ex["status"], ex["retry"], ex["creation_from"], ex.get("retried")), ("server_error", "server_error", "sourcify_deployment", None))
+            c = facts["creation"]
+            self.assertEqual((c["tx"], c["tx_source"], c.get("creator"), c["deployer"], c["signer"]), (CREATION_TX, "sourcify_deployment", None, CAROL, CAROL))
+            self.assertEqual(facts["discovery"]["sourcify"]["deployment_block"], 90)
+            self.assertEqual(status["started_attempts"], 113, "one retry; no explorer creator balance to read")
+            self.assertEqual([r["role"] for r in facts["receipts"]][:1], ["creation"])
+            summary = "\n".join(summary_lines(facts))
+            self.assertIn(f"creation: tx={CREATION_TX} source=sourcify_deployment creator=None signer={CAROL} deployer={CAROL} (Sourcify", summary)
+            self.assertIn(CAROL + " (deployer per Sourcify's deployment record", brief(root, "project", 4))
+            from pipeline_note import write_and_compose
+            write_and_compose(root)
+            launch = next(f for f in read_json(root / "notes" / "pipeline.json")["findings"] if f["id"] == "pipeline-launch-execution")
+            self.assertIn("named by Sourcify's deployment record because the explorer named none; the explorer's creator field is unknown", launch["text"])
+            self.assertIn("sourcify-correspondence", launch["evidence"], "the Sourcify capture is cited by its registered evidence id")
+            self.assertEqual([p["id"] for p in facts["positions"]], [7])
+            self.assertEqual([a["address"] for a in facts["actors"].values() if a.get("role") == "position_custodian"], [LOCKER])
+            self.assertIn("phase4b", {col["name"] for col in facts["collections"]})
+            self.assertTrue(any("launch window" in q["reason"] for q in facts["recommended_presets"] if q["preset"] == "logs"))
+            self.assertEqual(facts["discovery"]["sourcify"]["deployment_tx"], CREATION_TX)
+        # A rate limit is transient too (the fetcher reports it as throttled); a 404 or a DNS failure is not, so no retry is spent and Sourcify supplies the creation.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "run"
+            root.mkdir()
+            facts, rpc, status = self.run_pipeline(root, fetch=failing({"explorer-address"}, status=429, category="throttled"))
+            self.assertEqual((facts["discovery"]["explorer"]["first_attempt"], facts["discovery"]["explorer"]["retry"], facts["creation"]["tx_source"]), ("throttled", "ok", "explorer_address_retry"))
+        for code, category in ((404, "not_found"), (None, "dns_resolution")):
+            with tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp) / "run"
+                root.mkdir()
+                facts, rpc, status = self.run_pipeline(root, fetch=failing({"explorer-address"}, status=code, category=category))
+                self.assertNotIn("retry", facts["discovery"]["explorer"])
+                self.assertEqual((facts["discovery"]["explorer"]["status"], facts["creation"]["tx_source"]), (category, "sourcify_deployment"))
+                self.assertEqual(status["started_attempts"], 112, "no retry is spent, and without the explorer's creator field its balance is not read")
+        # The retry helper alone: a refused discovery budget is recorded, and a run whose every capture got no response is never retried.
+        from types import SimpleNamespace
+        from broad_collect import Pipeline
+        class NoBudget:
+            def acquire(self, kind):
+                return False
+        failed = {"id": "explorer-address", "url": "https://explorer.invalid/x", "http_status": 500, "failure_category": "server_error"}
+        with tempfile.TemporaryDirectory() as tmp:
+            stub = SimpleNamespace(session=NoBudget(), fetch=fake_fetch, explorer_base="https://explorer.invalid", discovery={}, synthetic=True, RETRYABLE=Pipeline.RETRYABLE)
+            self.assertEqual(Pipeline.retry_explorer_address(stub, {"explorer-address": failed}, Path(tmp))["explorer-address"], failed)
+            self.assertEqual(stub.discovery["explorer"]["retry"], "budget_exhausted")
+            calls = []
+            stub = SimpleNamespace(session=None, fetch=lambda items, out: calls.append(items) or fake_fetch(items, out), explorer_base="https://explorer.invalid", discovery={}, synthetic=True, RETRYABLE=Pipeline.RETRYABLE)
+            denied = {k: {"id": k, "url": f"https://{k}.invalid/x", "http_status": None, "failure_category": "dns_resolution"} for k in ("dexscreener-pairs", "sourcify-correspondence")}
+            Pipeline.retry_explorer_address(stub, {**denied, "explorer-address": {**failed, "failure_category": "timeout", "http_status": None}}, Path(tmp))
+            self.assertEqual((calls, stub.discovery, sorted(Path(tmp).iterdir())), ([], {}, []), "every capture failed before any response: the denial is diagnosed, nothing is retried or written")
+        # Two sources naming different transactions is recorded, never silently resolved.
+        def other_deployment(out):
+            path = out / "sourcify-correspondence.raw"
+            body = json.loads(path.read_bytes())
+            body["deployment"]["transactionHash"] = hh("another deployment")
+            path.write_bytes(json.dumps(body).encode())
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "run"
+            root.mkdir()
+            facts, rpc, status = self.run_pipeline(root, fetch=failing(set(), rewrite=other_deployment))
+            self.assertEqual((facts["creation"]["tx"], facts["creation"]["tx_source"], facts["creation"]["deployment_tx_conflict"]), (CREATION_TX, "explorer_address", hh("another deployment")))
+            self.assertIn("| conflict: Sourcify's deployment record names " + hh("another deployment") + "; unresolved", "\n".join(summary_lines(facts)))
+            from pipeline_note import write_and_compose
+            write_and_compose(root)
+            launch = next(f for f in read_json(root / "notes" / "pipeline.json")["findings"] if f["id"] == "pipeline-launch-execution")
+            self.assertIn("Sourcify's deployment record names a different transaction", launch["text"])
 
     def test_position_custodian_keeps_its_actor_row_in_a_receipt_heavy_run(self):
         transfer = topic("Transfer(address,address,uint256)")

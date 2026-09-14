@@ -1,9 +1,10 @@
 {
-  "workflow_version": "3.5.0",
-  "backend_engine_version": "3.8.0",
+  "workflow_version": "3.5.1",
+  "backend_engine_version": "3.8.1",
   "reporting_engine_version": "2.6.2",
   "date": "2026-09-13",
   "changes": [
+    "Runbook: the creation transaction comes from the explorer's address page (retried once on a transient failure) or from Sourcify's deployment record; no step or command changes. Backend 3.8.1.",
     "Step 4: start already ran its recommended queue (preset-run lines); the coordinator runs only a deferred row and adds a preset only for a receipt hash a lane found or a contract the user named. Backend 3.8.0.",
     "Rating rules gain the listed-LP-holders clause; step 4 wording unchanged (the queue now starts with positions for GoPlus-listed unread LP ids). Backend 3.7.0.",
     "Step 4: run the printed recommended presets in order (usually none or one); Safe modules/guard, custodian getters and sale receipts are pipeline reads, so a preset is added only for a receipt hash a lane found or a contract the user named. Backend 3.6.0.",

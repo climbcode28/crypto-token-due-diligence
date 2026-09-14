@@ -10,7 +10,7 @@ is a new dated directory under the project's ignored `research/` folder.
 | Step | Minute | One turn each | What you get |
 | --- | --- | --- | --- |
 | 0 | 0:00 | Read the provider policy excerpt (injected at load in Claude Code; `python3 "$SKILL_DIR/scripts/provider_context.py" --policy` in Codex). | Which RPC to use and with which flags. |
-| 1 | 0:10 | `broad_collect.py start` (below). It runs discovery (Dexscreener, Sourcify, explorer creation/holders/transfers/counters), four pinned phases, the source match, the launch signer's explorer activity, writes `facts.json`, composes the **pipeline note** (its own factual findings), pre-charges both lanes, writes both briefs and prints two spawn prompts. | The whole standard collection, its recommended presets and the factual half of the report in one process, usually 20–120 s. |
+| 1 | 0:10 | `broad_collect.py start` (below). It runs discovery (Dexscreener, Sourcify with its deployment record, explorer creation/holders/transfers/counters; a transient failure of the explorer's address page gets one more attempt after a two-second pause, and Sourcify's deployment record supplies the creation transaction when the explorer cannot), four pinned phases, the source match, the launch signer's explorer activity, writes `facts.json`, composes the **pipeline note** (its own factual findings), pre-charges both lanes, writes both briefs and prints two spawn prompts. | The whole standard collection, its recommended presets and the factual half of the report in one process, usually 20–120 s. |
 | 2 | 0:30–1:30 | Spawn **both** lanes in **one** message with the two printed one-line prompts (`Read the file …/lanes/<lane>/brief.md and follow it exactly …`). Do not paste or retype the brief and do not read the facts first; every minute the lanes start late is a minute added to the run. | Two lanes working from a self-contained brief; they self-validate their notes with `compose --check` before returning. |
 | 3 | 1:30–3:30 | Read the printed summary (or `bundle_assemble.py facts "$RUN/draft"`). `start` already ran its recommended queue after charging the lanes (`preset-run` lines: `positions --ids` for GoPlus-listed LP positions the pipeline had not read, largest share first; the bounded log scans and the positions they printed; unprobed listed sells) and prints only the rows it deferred for time or budget. Run those **in one shell call, sequentially** (presets share the run's session and draft files; parallel processes would race). If the creation transaction is unknown and a lane reports it, add `receipts --tx` and then `positions --ids` from that receipt. | Decoded controls, pools, quotes, balances, positions, receipts, actors with evidence aliases. |
 | 4 | 4:00–4:30 | Lane notes land in `$RUN/notes/`. Compose **both** in one shell call, sequentially (joined with `;`, never as parallel tool calls: the notes share one draft file): `bundle_assemble.py compose "$RUN/draft" "$RUN/notes/liquidity.json" --lane liquidity` and the same for project. If a lane is absent at 4:30, run its minimum checklist yourself in one `web_capture.py --out "$RUN/lanes/<lane>"` batch, write `$RUN/notes/<lane>.json` with `"lane": "<lane>"` and compose it `--lane <lane>`. | Findings, coverage and scope merged; capture files registered as evidence. |
@@ -221,7 +221,12 @@ shares or call the selected sample a global top ten. The existing finalize respo
 `reading_checklist` keeps non-summary findings and gaps visible during the usual report
 read. Neither change adds a call, research lane, preset or agent turn.
 
-When the explorer answers (Blockscout's API does, to the fetcher's browser-like agent), the
+When the explorer answers (Blockscout's API does, to the fetcher's browser-like agent; a 5xx,
+timeout or rate limit on its address page gets one more charged attempt after a two-second
+pause on top of the fetcher's own quick retry, and when it still names no creation transaction
+Sourcify's deployment record does, the `creation:` summary line and `creation.tx_source` saying
+which, the explorer's creator field then unknown and a disagreement between the two printed
+as a conflict), the
 pipeline reads and decodes without any coordinator turn: the creation receipt at its own pin
 (mint, pool seed, initial buy, position NFTs), the launch position's owner and its owner's
 Safe signers and threshold, counter-asset reserves per pool, QuoterV2 quotes, the ten largest
