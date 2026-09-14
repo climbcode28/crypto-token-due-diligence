@@ -32,7 +32,7 @@ Stop collection at min(receipt +480, deadline −120), reserving two minutes for
 validation and delivery. Lanes stop at min(receipt +300, deadline −120). Delayed
 routing/spawn/retries and helper/model latency consume this same wall-clock budget.
 
-One session permits at most 120 actual sends (160 on a keyed dRPC run) and 64 MiB, RPC concurrency
+One session permits at most 120 actual sends (240 on a keyed dRPC run) and 64 MiB, RPC concurrency
 three and public-web concurrency two per origin. Lanes each have fifteen reserved
 attempts; final checks and contingency remain reserved. Redirects, retries, failures
 and interrupted attempts count. Use the existing ledger; never refill by starting a

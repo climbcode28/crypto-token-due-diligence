@@ -23,8 +23,9 @@ alone, which may be the EVM skill's, records nothing; the reason is `drpc_key_mi
 the key and `--provider public` never uses it. `SOLANA_RPC_URL` only overrides the public root. The key goes only in
 `DRPC_API_KEY` (sent as a `Drpc-Key` header); a URL that carries it (a `dkey` parameter or a
 key path segment) is refused with `rpc_url_carries_credential`. A keyed endpoint drops the
-public tier's per-method windows, raises the session ceiling from 120 to 160 sends (the room a
-two-pool position census needs after the standard samples) but keeps the default 40-sends-per-10-seconds pacing; it
+public tier's per-method windows, raises the session ceiling from 120 to 240 sends (the room a
+two-pool position census and the lanes' follow-up leads need after the standard samples; recent runs
+spent about 150) but keeps the default 40-sends-per-10-seconds pacing; it
 answers the account census methods slowly (`getTokenLargestAccounts` and
 `getProgramAccounts` get a 20-second request timeout, other reads 5 seconds), and its load
 balancer may answer a read behind the pinned context slot. Such node lag is retried up to

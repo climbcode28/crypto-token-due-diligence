@@ -10,7 +10,7 @@ Both specialists work with public RPC by default. This repository ships no crede
 - A dRPC key in that file is the configuring user's standing authorization for bounded
   read-only research on that key: whenever the key is present the skills use dRPC for its
   matching network (EVM within the run's request ceiling, 400 by default; Solana within
-  the 160-send session ceiling) and otherwise fall back to public RPC. No per-run consent
+  the 240-send session ceiling) and otherwise fall back to public RPC. No per-run consent
   flag or question is needed; remove the key from the file to stop. Nothing here permits
   purchases, top-ups or plan changes, and never reuse someone else's key.
 - To opt out on one command, ask for the credential-free route explicitly: on Solana

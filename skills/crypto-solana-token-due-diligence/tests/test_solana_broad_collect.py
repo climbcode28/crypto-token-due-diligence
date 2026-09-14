@@ -289,11 +289,11 @@ class BroadTests(unittest.TestCase):
         self.assertEqual([k['attribution']['basis'] for k in creator['keys']],['metaplex_update_authority','metaplex_verified_creator'])
         self.assertNotIn(ZERO,[k['address'] for k in creator['keys']])
 
-    def test_keyed_runs_get_the_160_send_ceiling_and_public_runs_keep_120(self):
+    def test_keyed_runs_get_the_240_send_ceiling_and_public_runs_keep_120(self):
         from solana_session import KEYED_MAX_REQUESTS,PUBLIC_MAX_REQUESTS
         root,target,opts=self.setup_run();start(root,target,**opts);self.assertEqual(status(root)['max_requests'],PUBLIC_MAX_REQUESTS)
         root2,target,opts=self.setup_run();keyed={'url':'https://lb.drpc.org/solana','headers':{'Drpc-Key':'synthetic'},'provider':'drpc'}
-        start(root2,target,**{**opts,'config':keyed});s=status(root2);self.assertEqual(s['max_requests'],KEYED_MAX_REQUESTS);self.assertEqual((PUBLIC_MAX_REQUESTS,KEYED_MAX_REQUESTS),(120,160))
+        start(root2,target,**{**opts,'config':keyed});s=status(root2);self.assertEqual(s['max_requests'],KEYED_MAX_REQUESTS);self.assertEqual((PUBLIC_MAX_REQUESTS,KEYED_MAX_REQUESTS),(120,240),'the documented ceilings')
         self.assertEqual(json.loads((root2/'provider.json').read_text())['provider'],'drpc')
 
 if __name__=='__main__':unittest.main()
