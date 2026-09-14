@@ -535,10 +535,38 @@ class BroadCollectTests(unittest.TestCase):
             draft["evidence"] += [owner_row, pos_row]
             later = positions_from_draft(root, draft, facts)
             self.assertEqual([(p["id"], p["owner"], p["liquidity"], p["pool"], p["source"]) for p in later], [(12, BOB, 5 * 10 ** 17, POOL, "preset")])
+            pool = next(p for p in facts["pools"] if p["pair"] == POOL)
+            self.assertEqual((later[0]["in_range"], later[0]["pct_of_pool_active_liquidity"]), (True, round(5 * 10 ** 17 / pool["liquidity"] * 100, 4)), "a full-range preset position gets start's own share arithmetic")
             note = build_pipeline_note(facts, draft, run=root)
             custody = next(f for f in note["findings"] if f["id"] == "pipeline-launch-position-custody")
             self.assertIn("verified as position 12", custody["text"])
             self.assertNotIn("Unread listed position ids", custody["text"])
+            # A log scan also read a closed position (no liquidity, a pair no read pool has) whose id sorts first: it is counted, never
+            # described as custody, and the finding stays anchored on the pool so the validator keeps it (the AI run dropped it).
+            closed_owner = {**owner_row, "id": "c-abc123-positions-5-ownerOf", "artifact": "evidence/positions-5-ownerOf.json", "collection_provenance": {**owner_row["collection_provenance"], "evidence_id": "positions-5-ownerOf"}}
+            (root / "draft" / closed_owner["artifact"]).write_text(json.dumps({"response": {"jsonrpc": "2.0", "id": "x", "result": word_address(CAROL)}}))
+            closed_words = [0, 0, int(TOKEN, 16), int(ALICE, 16), 500, 0, 100, 0, 0, 0, 0, 0]
+            closed_pos = {**owner_row, "id": "c-abc123-positions-5-positions", "artifact": "evidence/positions-5-positions.json", "collection_provenance": {**owner_row["collection_provenance"], "evidence_id": "positions-5-positions"}}
+            (root / "draft" / closed_pos["artifact"]).write_text(json.dumps({"response": {"jsonrpc": "2.0", "id": "y", "result": "0x" + "".join(format(w, "064x") for w in closed_words)}}))
+            draft["evidence"] += [closed_owner, closed_pos]
+            later = positions_from_draft(root, draft, facts)
+            self.assertEqual([(p["id"], p["pool"], p["liquidity"]) for p in later], [(5, None, 0), (12, POOL, 5 * 10 ** 17)])
+            note = build_pipeline_note(facts, draft, run=root)
+            custody = next(f for f in note["findings"] if f["id"] == "pipeline-launch-position-custody")
+            self.assertTrue(custody["text"].startswith("Position 7 is owned by"), "start's own canonical-pool position still leads: " + custody["text"][:120])
+            self.assertIn("Position 12 is owned by " + BOB, custody["text"])
+            self.assertIn("1 further position(s) read (5) hold no liquidity and match no read pool: closed or emptied, not custody.", custody["text"])
+            self.assertLess(custody["text"].index("Position 12"), custody["text"].index("1 further position(s)"), "closed positions are counted after the custody descriptions")
+            self.assertNotIn("Position 5 is owned", custody["text"])
+            self.assertTrue(custody.get("subject"), "anchored on a pool or custodian read at the pin")
+            self.assertIn("positions-5-positions", custody["evidence"])
+            # With every position closed (a drained pool after a rug) the emptied position and its owner are still the finding, anchored on the pool.
+            drained = {**facts, "positions": [{**p, "pool": None, "liquidity": 0, "in_range": None, "pct_of_pool_active_liquidity": None} for p in facts["positions"]]}
+            note = build_pipeline_note(drained, {**draft, "evidence": [e for e in draft["evidence"] if "positions-" not in json.dumps(e.get("collection_provenance"))]}, run=root)
+            custody = next(f for f in note["findings"] if f["id"] == "pipeline-launch-position-custody")
+            self.assertIn("Position 7 is owned by", custody["text"])
+            self.assertIn("holds no liquidity (closed or emptied)", custody["text"])
+            self.assertTrue(custody.get("subject"))
 
     def test_start_runs_the_recommended_queue_itself_and_chains_positions_from_the_log_scan(self):
         from pipeline_note import write_and_compose

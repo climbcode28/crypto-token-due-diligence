@@ -167,7 +167,7 @@ def archive_failed_attempt(run):
                 child.rename(dest / child.name)
     return dest
 
-PIPELINE_VERSION = "1.0.2"
+PIPELINE_VERSION = "1.0.3"
 POSITION_TOPICS = {topic("Transfer(address,address,uint256)"), topic("IncreaseLiquidity(uint256,uint128,uint256,uint256)")}
 SWAP_TOPICS = {topic("Swap(address,address,int256,int256,uint160,uint128,int24)"),  # Uniswap v3
                topic("Swap(address,uint256,uint256,uint256,uint256,address)"),  # Uniswap v2

@@ -6,7 +6,7 @@ from solana_common import sha
 from solana_facts import encoded
 from solana_pipeline_note import leading_pool
 
-VERSION='1.0.0'
+VERSION='1.0.1'
 LANE_ITEMS={'development_disclosure':('project',('delivery','audit_scope')),'utility_redemption_rights':('project',('economics',)),
  'reward_accounting_liveness':('project',('economics',))}
 PROGRAM_GAPS=('program_upgrade_authority_unresolved','program_control_not_observed')
@@ -97,7 +97,7 @@ def rule(dim,by_op,leads,checklists,facts_all=()):
         return True,'Signature history read for every attributed key ('+', '.join(k[:8]+'…' for k in keys)+'). Launch stage '+str(stage)+' with '+str(inits)+' verified initialization(s).',None
     if dim=='admin_treasury_reward_custody':
         if by_op.get('creator_activity'):return True,'Creator attribution and activity are typed facts (receipts, curve or metadata keys, sales and rebuys reconciled).',None
-        return False,'No creator activity fact: no attributed key or its receipts were not resolved.','creator_history'
+        return False,'No creator activity fact: no key is attributed by receipt, curve or metadata, so no history preset can run; the coordinator closes this surface by judgment on the sampled receipts or as an evidenced limit.','standard'
     if dim=='external_dependencies':
         if not pools:return False,'No pool program to read.','programs'
         open_=[d for d in pools if any(g in PROGRAM_GAPS for g in (d.get('gaps') or []))]

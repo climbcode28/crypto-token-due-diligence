@@ -17,7 +17,7 @@ from solana_facts import encoded,atomic,build,compact
 from solana_profile import regular,strict_json,PROFILE,DIMENSIONS,Evidence,validate_report
 from solana_compose import CHECKLISTS,empty_coverage,expand_finding,note_header,validate_imports,ComposeError,preflight
 
-VERSION='1.11.0'
+VERSION='1.12.0'
 ASSETS=Path(__file__).resolve().parents[1]/'assets'
 STAGES=('identity_discovery','related_accounts_controllers','pool_transaction_quote_dependencies','final_consistency_checks')
 PRESET_CAP=4  # coordinator-named presets per run beyond the recommended queue; the collection cutoff and request grants gate each one before this count does
@@ -259,18 +259,23 @@ def clmm_census_rows(root,pool,leads):
     return plans
 
 
+CENSUS_HEADERS=3  # ordinary getBlock headers per sample: one per distinct context slot, including recheck slots
+
+
+def census_cost(kind,n):
+    """Sends plus final-recheck reservations a census of n leads takes (collect_v2 reserves states + 2 per critical read + 1 per
+    sample). CLMM: the census read, one holder lookup per lead and one dependency batch planned from the census slice (genesis,
+    batch, headers). DLMM: the census read, a lead sample (its bin ids sit outside the slice) and the dependency batch."""
+    if kind=='raydium_clmm':return (1+n+(1+1+CENSUS_HEADERS))+4
+    return (1+(1+1+CENSUS_HEADERS)+(1+1+CENSUS_HEADERS))+(4+4)
+
+
 def position_census(root,config,sample,pool,kind,*,factory):
     """Count a concentrated pool's fixed-layout positions, sample the largest few in full, and say what was not counted.
     The census weight only orders leads; principal and custody come from the full position sample. A refused or
     oversized census (the public tier refuses program scans) is a stated gap, never an inference."""
     from solana_positions import census_read,census_leads,sampled_share,LEAD_CAP
-    HEADERS=3  # ordinary getBlock headers per sample: one per distinct context slot, including recheck slots
-    def cost(n):
-        # Sends plus final-recheck reservations (collect_v2 reserves states + 2 per critical read + 1 per sample). CLMM: the
-        # census read, one holder lookup per lead and one dependency batch planned from the census slice (genesis, batch,
-        # headers). DLMM: the census read, a lead sample (its bin ids sit outside the slice) and the dependency batch.
-        if kind=='raydium_clmm':return (1+n+(1+1+HEADERS))+4
-        return (1+(1+1+HEADERS)+(1+1+HEADERS))+(4+4)
+    cost=lambda n:census_cost(kind,n)
     s=Session(root);remaining=s.status()['remaining_requests'];mint=s.meta['target']['mint'];s.close()
     affordable=max([n for n in range(LEAD_CAP,0,-1) if cost(n)<=remaining-2],default=0)  # two sends stay free for contingency
     if not affordable:return [],{'status':'skipped','reason':'ordinary request grant too small for a position census ('+str(remaining)+' left, '+str(cost(1)+2)+' needed for one lead including the two-send margin)'}
@@ -341,7 +346,7 @@ def provider_diagnostics(root):
                 if c.get('status')=='sampled' and positions and not any(p.get('status')=='observed' for p in positions):
                     gap=next((g for p in positions for g in (p.get('gaps') or [])),None)
                     blocked.append({'pool':d.get('pool'),'adapter':d.get('adapter',{}).get('id'),'status':'sampled_unresolved','reason':'every sampled position stayed partial: '+str(gap)})
-        if blocked:rows.append({'stage':'collection','category':'position_census_unavailable','pools':blocked,'reason':'The position census for these concentrated pools was refused, not affordable after the standard samples, stopped early, or sampled without resolving a position (each entry says which), so their LP custody stays a stated gap; the public tier refuses program scans, a keyed endpoint answers them.'})
+        if blocked:rows.append({'stage':'collection','category':'position_census_unavailable','pools':blocked,'reason':'The position census for these concentrated pools was refused, not affordable after the standard samples, stopped early, or sampled without resolving a position (each entry says which), so their LP custody stays a stated gap; the public tier may refuse program scans, a keyed endpoint answers them.'})
     if any(f.endswith('_holderscan') for f in unresolved):
         rows.append({'stage':'collection','category':'holder_scan_failed','reason':'The bounded holder census already ran and failed, so a holders preset would repeat it; holder concentration stays an explicit gap for this run.'})
     # A pool whose every listed recent signature failed on chain yields no receipt although its history read succeeded.
@@ -628,6 +633,16 @@ def recommended_presets(root):
     if programs:
         out.append({'id':'rec-programs','kind':'programs','parameters':{'addresses':programs},'dimension':'external_dependencies','sends':6,
                     'reason':'a pool program or its ProgramData was not read, so upgrade authority is unresolved; the preset reads the program and its ProgramData metadata slice'})
+    # A concentrated pool whose position census start could not afford (the lanes' reservations were still held) is queued as a
+    # census row: the follow-up runs it on the released grant, so LP custody on that pool closes mechanically or its refusal is
+    # recorded; a census that was refused or ran already is never repeated.
+    from solana_positions import LAYOUTS as CENSUS_LAYOUTS
+    for n,lead in enumerate(leads):
+        census=lead.get('census') if isinstance(lead,dict) else None
+        if lead.get('adapter') in CENSUS_LAYOUTS and (census is None or census.get('status')=='skipped') and lead.get('pool'):
+            out.append({'id':'rec-census'+str(n),'kind':'census','parameters':{'adapter':lead['adapter'],'pool':lead['pool']},
+                        'dimension':'canonical_lp_principal_custody' if n==0 else 'side_pool_removal_risk','sends':census_cost(lead['adapter'],1),
+                        'reason':'the position census of '+lead['adapter']+' pool '+lead['pool'][:8]+'… was not affordable after the standard samples ('+str((census or {}).get('reason') or 'no census attempted')[:160]+'); it counts the pool\'s positions and samples the largest with their custody'})
     # Leads the lanes recorded become bounded presets too: a creator key a lane named gets a signature history, a signature a
     # lane named gets its receipt, so the coordinator's follow-up runs them mechanically instead of judging them.
     leads=lane_leads(root);sampled={d.get('signature') for d in by_op.get('transaction',[])}
@@ -911,6 +926,19 @@ def _collect(root,spec,config,*,factory=HttpTransport):
         from solana_common import base58_bytes
         addresses=[pubkey(a) for a in args['addresses']];pdas=[find_program_address([base58_bytes(a,32)],UPGRADEABLE)[0] for a in addresses]
         rows=account_batches([target['mint']]+addresses,prefix='programs',critical=True)+[read('programdata'+str(i//4),'getMultipleAccounts',[pdas[i:i+4],{**settings(),'dataSlice':{'offset':0,'length':45}}]) for i in range(0,len(pdas),4)]
+    elif kind=='census':
+        # start's own position census, run later on the grant the lanes released: the census read, the largest leads and their
+        # custody, written back to the lead so the importer files the positions on the pool exactly as a start census is filed.
+        from solana_positions import LAYOUTS as CENSUS_LAYOUTS
+        pool=pubkey(args['pool']);need(args.get('adapter') in CENSUS_LAYOUTS,'Census requires a concentrated pool adapter with a fixed position layout.')
+        need(pool in accounts,'Pool lead has not been captured.')
+        # Only one of this run's automatic leads whose census never ran (or was not affordable) can be censused: a census that
+        # ran or was refused is the named limit, and a later refusal must never erase positions the importer already files.
+        auto=root/'automatic-leads.json';auto_leads=strict_json(auto.read_bytes(),auto.name) if auto.exists() else []
+        lead=next((l for l in auto_leads if isinstance(l,dict) and l.get('pool')==pool and l.get('adapter')==args['adapter']),None)
+        need(lead is not None,'Census requires one of this run\'s automatic pool leads.')
+        need((lead.get('census') or {}).get('status') in (None,'skipped'),'Census already ran or was refused for this pool; its outcome is the named limit, never repeated.')
+        rows=[]
     elif kind=='quote':rows=quote_sample(args['adapter'],args['pool'],objects[accounts[args['pool']]])
     elif kind=='holders':rows=mint_baseline(target['mint'],largest=True)
     elif kind=='pool_activity':
@@ -919,7 +947,7 @@ def _collect(root,spec,config,*,factory=HttpTransport):
         need(type(limit) is int and 1<=limit<=25 and type(receipts) is int and 0<=receipts<=4,'Activity limit 1-25 signatures and at most four receipts.')
         need(type(probes) is int and receipts<=probes<=8,'Activity probes must be at least the receipts and at most eight.')
         rows=[]
-    else:raise ValueError('Supported presets: pool, positions, transactions, creator_history, programs, quote, holders, pool_activity.')
+    else:raise ValueError('Supported presets: pool, positions, transactions, creator_history, programs, quote, holders, pool_activity, census.')
     if not any(r['critical'] and target['mint'] in (r['params'][0] if r['method']=='getMultipleAccounts' else [r['params'][0]]) for r in rows):rows=mint_baseline(target['mint'],largest=False)+rows
     validate_plan(rows)
     s=Session(root)
@@ -941,6 +969,15 @@ def _collect(root,spec,config,*,factory=HttpTransport):
     finally:s.close()
     def run_preset():
         planned=rows
+        if kind=='census':
+            positions,census=position_census(root,config,ident,pool,args['adapter'],factory=factory)
+            path=root/'automatic-leads.json';leads=strict_json(path.read_bytes(),path.name) if path.exists() else []
+            for lead in leads:
+                if isinstance(lead,dict) and lead.get('pool')==pool and lead.get('adapter')==args['adapter']:lead['positions'],lead['census']=positions,census
+            atomic(path,encoded(leads))
+            need(census.get('status') not in ('skipped',),'Census not affordable: '+str(census.get('reason')))
+            need(census.get('status')!='unavailable','Census unavailable: '+str(census.get('reason')))
+            return census
         if lead_rows is not None:
             collect_sample(root,root,config,ident+'lead',lead_rows,factory=factory)
             planned=dependency_rows(root,pool,args['adapter'],lp_accounts=args.get('lp_accounts'),positions=args.get('positions'))

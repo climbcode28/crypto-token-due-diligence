@@ -4,8 +4,8 @@ This directory is the Claude Code project-skill copy of the canonical
 `skills/crypto-evm-token-due-diligence` at the project root. Claude Code loads it from
 `.claude/skills/`; Codex uses the canonical folder through the project-local
 `.agents/skills/crypto-evm-token-due-diligence` symlink. The maintainer keeps EVM project-only; recipients can opt into Personal installation with `install.sh`.
-Both carry EVM workflow 3.6.1, backend engine 3.9.1 and reporting engine 2.6.3
-(pipeline 1.0.2, note schema 1, investigation schema 3, source comparison 1.1.0). Both copies
+Both carry EVM workflow 3.6.2, backend engine 3.9.2 and reporting engine 2.6.3
+(pipeline 1.0.3, note schema 1, investigation schema 3, source comparison 1.1.0). Both copies
 use the same checks, procedures, thresholds, rules, schemas, strict profile, reviewed
 memories and regression fixtures. Live operations share one session across targets.
 

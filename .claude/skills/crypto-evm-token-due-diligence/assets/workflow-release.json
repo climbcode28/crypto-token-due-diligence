@@ -1,9 +1,10 @@
 {
-  "workflow_version": "3.6.1",
-  "backend_engine_version": "3.9.1",
+  "workflow_version": "3.6.2",
+  "backend_engine_version": "3.9.2",
   "reporting_engine_version": "2.6.3",
   "date": "2026-09-14",
   "changes": [
+    "Backend 3.9.2 / pipeline note 1.0.3: the LP custody finding survives for tokens whose positions come only from GoPlus or log-scan presets (ranked live canonical-pool positions, closed positions counted).",
     "The report states its RPC access route: start records provider.json, bundle assembly copies it into the manifest's context.access_route, and the rendered report prints it under Investigation context (backend 3.9.1, reporting 2.6.3).",
     "Provider policy: a configured dRPC key is the standing authorization; collectors take --provider auto --allow-network with no paid-use flags or consent question; step 1, the runbook's network and denial-recovery sections, the backend reference and docs/provider-setup.md say so; the documented start budget is 360 of the 400 ceiling. Backend 3.9.0.",
     "Runbook: the creation transaction comes from the explorer's address page (retried once on a transient failure) or from Sourcify's deployment record; no step or command changes. Backend 3.8.1.",
@@ -30,12 +31,12 @@
     "Chat delivery renders the four conclusions (technical exposure, credibility and maturity, token economics, research confidence) as four bullets, never one paragraph"
   ],
   "validation_scope": "Offline public-selection and clean-install tests plus specialist regression suites; live fresh-host acceptance outcomes and limitations are recorded separately in the review record.",
-  "previous_workflow_version": "3.6.0",
+  "previous_workflow_version": "3.6.1",
   "review_record": "../../../../docs/reviews/first-run-reliability.md",
   "completion_review_version": 2,
   "decision_review_version": 2,
   "source_comparison_version": "1.1.0",
-  "pipeline_version": "1.0.2",
+  "pipeline_version": "1.0.3",
   "note_schema_version": 1,
   "investigation_schema_version": 3
 }

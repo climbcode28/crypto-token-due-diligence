@@ -193,7 +193,9 @@ characters, `kind` and `parameters`:
 files under `$RUN/recommended-presets/`: `pool_activity` for the leading pool when no sale verified
 (indexer-listed trades probed first), `creator_history` for attributed keys without a history page,
 `programs` for a pool whose program or ProgramData stayed unread (it reads the ProgramData
-metadata slice too). `start` runs them itself, in order, through the same `collect` path
+metadata slice too), `census` for a concentrated pool whose position census `start` could not
+afford while the lanes' reservations were held (the follow-up runs it on the released grant, so
+LP custody on that pool closes mechanically or its refusal is recorded). `start` runs them itself, in order, through the same `collect` path
 (provider lock, cutoff, grant, `preset-requests/` ledger) and records each outcome in
 `presets_run`; a row is deferred, and stays printed, only when fewer than 120 s remain before
 the lane cutoff: run it with `collect "$RUN" --request <file>` and the same provider flags.
@@ -206,6 +208,7 @@ outside the list needs a hash or address the user or a lane named.
 | --- | --- |
 | `pool` | `adapter`, `pool` (must appear in this run's exact-mint discovery or captured accounts), optional `lp_accounts` (at most six); never re-read a pool `start` already sampled: the importer keeps the census batch, and the re-read adds nothing |
 | `positions` | `adapter`, `pool`, `positions` (at most six discovered supported leads; after the standard samples, `start` censuses a Raydium CLMM or Meteora DLMM pool's fixed-layout positions and samples up to four of the largest, fitted to the leftover grant and to one atomic batch, recorded as `position_census` on the pool fact; it is skipped with a reason when fewer than 13 (CLMM) or 21 (DLMM) requests remain, the two-send margin included, and when it runs it leaves only a two-send margin, so no coordinator preset can follow it) |
+| `census` | `adapter` (a fixed-position-layout adapter: Raydium CLMM, Meteora DLMM), `pool` (one of `start`'s automatic leads whose census did not run or was not affordable; any other pool, or a census that ran or was refused, is refused before any send); counts the pool's positions and samples the largest with their custody exactly as `start` does after the standard samples, and writes them back to the lead so the importer files them on the pool; queued as `rec-census<n>` when `start`'s census was not affordable, never when it ran or was refused |
 | `transactions` | `signatures` (at most two) |
 | `pool_activity` | `pool` (captured), optional `limit` (1–25 signatures, default 10), `receipts` (0–4 sampled swap receipts, default 2) and `probes` (receipts–8 signatures classified, default 4); indexer-listed trades captured by `start` (up to six sells and two buys) are probed before the chain listing |
 | `holders` | none: holder discovery (largest accounts or the bounded scan) plus the same-batch balance sample; it repeats what `start` already attempted, so use it only when `diagnostics` shows neither the largest-accounts read nor the bounded scan ran |

@@ -108,16 +108,23 @@ def receipts_from_draft(run, draft, facts):
     return out
 
 
+def _int24(word):
+    """A tick returned as a 256-bit word is a signed int24: values at or above 2**255 are negative."""
+    return word - 2 ** 256 if word >= 2 ** 255 else word
+
+
 def positions_from_draft(run, draft, facts):
-    """Positions read after start (the positions preset) join the pipeline's own: owner from ownerOf, liquidity and pair from
-    positions(), matched to the canonical pool by token pair; without a pool tick the share of active liquidity stays unknown."""
+    """Positions read after start (the positions preset) join the pipeline's own: owner from ownerOf, operator from getApproved,
+    liquidity, pair and ticks from positions(), matched to a read pool by token pair and fee; when that pool's tick and liquidity
+    were read at the pin the in-range flag and share of active liquidity follow start's own arithmetic, otherwise they stay
+    unknown."""
     import re
     known = {p.get("id") for p in facts.get("positions") or []}
     rows = {}
     for e in draft.get("evidence", []):
         # Imported rows carry a collection prefix on their id; the preset's alias survives in the provenance.
         alias = (e.get("collection_provenance") or {}).get("evidence_id") or str(e.get("id") or "")
-        m = re.fullmatch(r"(?:positions|pos)-(\d+)-(ownerOf|positions)", alias)
+        m = re.fullmatch(r"(?:positions|pos)-(\d+)-(ownerOf|positions|getApproved)", alias)
         if not m or e.get("kind") != "rpc" or e.get("observation_status", "ok") != "ok":
             continue
         pid = int(m.group(1))
@@ -129,16 +136,26 @@ def positions_from_draft(run, draft, facts):
             continue
         if not isinstance(result, str) or not re.fullmatch(r"0x[0-9a-fA-F]*", result):
             continue
-        row = rows.setdefault(pid, {"id": pid, "owner": None, "liquidity": None, "pool": None, "pct_of_pool_active_liquidity": None, "source": "preset", "evidence": {}})
+        row = rows.setdefault(pid, {"id": pid, "owner": None, "approved": None, "liquidity": None, "pool": None, "in_range": None, "pct_of_pool_active_liquidity": None, "source": "preset", "evidence": {}})
         words = [int(result[2 + 64 * i:66 + 64 * i], 16) for i in range((len(result) - 2) // 64)]
         if m.group(2) == "ownerOf" and words:
             row["owner"] = "0x" + format(words[0], "040x") if 0 < words[0] < 2 ** 160 else None
             row["evidence"]["owner"] = alias
+        elif m.group(2) == "getApproved" and words:
+            row["approved"] = "0x" + format(words[0], "040x") if 0 < words[0] < 2 ** 160 else None
+            row["approved_raw"] = words[0]
+            row["evidence"]["approved"] = alias
         elif m.group(2) == "positions" and len(words) >= 8:
             token0, token1, fee, liquidity = "0x" + format(words[2], "040x"), "0x" + format(words[3], "040x"), words[4], words[7]
-            row.update(liquidity=liquidity, token0=token0, token1=token1, fee=fee)
+            lower, upper = _int24(words[5]), _int24(words[6])
+            row.update(liquidity=liquidity, token0=token0, token1=token1, fee=fee, tickLower=lower, tickUpper=upper)
             row["evidence"]["positions"] = alias
-            row["pool"] = next((p["pair"] for p in facts.get("pools") or [] if {p.get("token0"), p.get("token1")} == {token0, token1} and p.get("fee") == fee), None)
+            pool = next((p for p in facts.get("pools") or [] if {p.get("token0"), p.get("token1")} == {token0, token1} and p.get("fee") == fee), None)
+            row["pool"] = pool["pair"] if pool else None
+            tick = ((pool or {}).get("slot0") or {}).get("tick")
+            if pool and isinstance(tick, int) and pool.get("liquidity"):
+                row["in_range"] = lower <= tick < upper
+                row["pct_of_pool_active_liquidity"] = round(liquidity / pool["liquidity"] * 100, 4) if row["in_range"] else 0.0
     return [rows[pid] for pid in sorted(rows) if rows[pid]["owner"] or rows[pid]["liquidity"] is not None]
 
 
@@ -246,20 +263,38 @@ def build_pipeline_note(facts, draft, run=None):
                                  execution={"result": "success" if launch["status"] == 1 else "reverted"}))
 
     # ---- launch position custody ----------------------------------------------------------
-    positions = facts.get("positions") or []
+    # Positions that hold liquidity in the canonical pool are described first (start's own reads before a later preset's, larger
+    # first), then positions in other read pools; a position with no liquidity and no read pool is closed or emptied and is
+    # counted, never described as custody, so the finding is always anchored on a pool or custodian that was read at the pin.
+    # A pool id (v4 state view) is no address and has no runtime read, so it can never anchor the finding.
+    canonical_pool = next((p for p in facts.get("pools") or [] if p.get("read") == "v3" and p.get("target_in_pool")), None) \
+        or next((p for p in facts.get("pools") or [] if not p.get("is_pool_id")), None)
+    canonical_pair = (canonical_pool or {}).get("pair")
+    all_positions = facts.get("positions") or []
+    live = [p for p in all_positions if p.get("pool") or (p.get("liquidity") or 0) > 0]
+    closed = [p for p in all_positions if not p.get("pool") and p.get("liquidity") == 0]
+    unread = [p for p in all_positions if not p.get("pool") and p.get("liquidity") is None]
+    positions = sorted(live, key=lambda p: (0 if canonical_pair and p.get("pool") == canonical_pair else 1 if p.get("pool") else 2,
+                                            1 if p.get("source") == "preset" else 0, -(p.get("liquidity") or 0), p.get("id") or 0))
+    # With no live position the closed or unread ones are described (start's own first): an emptied launch position and its
+    # custodian are the finding, not a silence.
+    described = positions[:3] if positions else sorted(closed + unread, key=lambda p: (1 if p.get("source") == "preset" else 0, p.get("id") or 0))[:3]
     owners = facts.get("owners") or {}
-    if positions:
+    if described:
         parts, evidence = [], []
         actors = facts.get("actors") or {}
-        for pos in positions[:3]:
+        for pos in described:
             owner = pos.get("owner")
             owner_code = next((a.get("code_bytes") for a in actors.values() if a.get("address") == owner), None)
             kind = "a code-bearing address" if owner_code else "a no-code address" if owner_code == 0 else "an address of unread code"
             share = pos.get("pct_of_pool_active_liquidity")
             approved = pos.get("approved") or ("none" if pos.get("approved_raw") == 0 else "unavailable")
+            standing = ("holds no liquidity (closed or emptied)" if pos.get("liquidity") == 0 and not pos.get("pool")
+                        else "its positions() read did not answer (unread, not absent)" if pos.get("liquidity") is None and not pos.get("pool")
+                        else f"{_pct(share)} of the pool's active liquidity at the pin")
             parts.append(f"Position {pos['id']} is owned by {owner or 'an unread owner address'} ({kind}), approved operator {approved}, "
                          f"{'in range' if pos.get('in_range') else 'out of range' if pos.get('in_range') is False else 'range unknown'}, "
-                         f"{_pct(share)} of the pool's active liquidity at the pin.")
+                         f"{standing}.")
             ev = pos.get("evidence") or {}
             evidence += [ev.get("owner"), ev.get("positions"), ev.get("approved")]
             if pos.get("pool"):
@@ -279,6 +314,14 @@ def build_pipeline_note(facts, draft, run=None):
                     parts.append(f"Every probed custodian getter reverted ({', '.join(reverted)}); withdrawal terms are not exposed under those names.")
                 elif owner_actor.get("role") == "position_custodian" and owner_actor.get("getters_read") is False:
                     parts.append("The custodian's withdrawal getters were not read (the collection did not run); their terms are unread, not absent.")
+        rest_closed = [p for p in closed if p not in described]
+        rest_unread = [p for p in unread if p not in described]
+        if rest_closed:
+            parts.append(f"{len(rest_closed)} further position(s) read ({', '.join(str(p.get('id')) for p in rest_closed[:6])}{'…' if len(rest_closed) > 6 else ''}) hold no liquidity and match no read pool: closed or emptied, not custody.")
+            evidence += [(p.get("evidence") or {}).get("positions") for p in rest_closed[:6]]
+        if rest_unread:
+            parts.append(f"{len(rest_unread)} listed position(s) ({', '.join(str(p.get('id')) for p in rest_unread[:6])}{'…' if len(rest_unread) > 6 else ''}) were not read: their positions() call did not answer, so they are unread, not absent.")
+            evidence += [(p.get("evidence") or {}).get("owner") for p in rest_unread[:6]]
         for name, o in owners.items():
             if o.get("safe_owners"):
                 parts.append(f"{name} is owned by {o['address']}; {_owners_text(o)}.")
@@ -291,13 +334,15 @@ def build_pipeline_note(facts, draft, run=None):
             parts.append(f"GoPlus counts {g.get('lp_holder_count') or 'an unknown number of'} LP holders and lists {len(g['lp_holders'])} (third-party claim; {g.get('lp_holders_verified')} verified against positions the pipeline read): {listed}."
                          + (f" Unread listed position ids: {', '.join(str(i) for i in g['unread_lp_nft_ids'])}." if g.get("unread_lp_nft_ids") else ""))
             evidence.append(g.get("evidence"))
-        first_owner = positions[0].get("owner")
+        first_owner = described[0].get("owner")
         owner_actor = next((a for a in actors.values() if a.get("address") == first_owner), None)
-        subject = first_owner if owner_actor else (positions[0].get("pool") or None)
+        subject = first_owner if owner_actor else (described[0].get("pool") or canonical_pair)
         if subject and subject != first_owner:
             pool = next((p for p in facts.get("pools") or [] if p.get("pair") == subject), None)
             evidence.append((pool or {}).get("evidence", {}).get("runtime") or ((pool or {}).get("prefix", "pool1") + "-runtime"))
-        findings.append(_finding("pipeline-launch-position-custody", "canonical_lp_principal_custody", " ".join(parts), evidence, subject=subject))
+        # Without a custodian actor or an address-bearing pool read at the pin there is nothing the validator can bind the finding to.
+        if subject:
+            findings.append(_finding("pipeline-launch-position-custody", "canonical_lp_principal_custody", " ".join(parts), evidence, subject=subject))
 
     # ---- pool depth and quotes -------------------------------------------------------------
     pools = facts.get("pools") or []

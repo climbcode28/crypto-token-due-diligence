@@ -60,6 +60,10 @@ class ScaffoldTests(unittest.TestCase):
         self.assertEqual((no_receipt['closure']['boundary'],no_receipt['closure']['next_route']),('pending','transactions'));self.assertIn('No receipt was sampled',no_receipt['closure']['reason'])
         unusable=mechanical('historical_launch_integrity',launch,[fact('creator_activity',{'keys':[{'address':'K1'}]},usable=False),fact('history',{'address':'K1'})],[])
         self.assertEqual(unusable['closure']['boundary'],'pending');self.assertIn('unusable',unusable['closure']['reason'])
+        # With no attributable key the admin surface defers to judgment: no history preset could run.
+        admin=[{'id':'pipeline-admin-x','claim':'state_observation','strength':'bounded','dimension':'admin_treasury_reward_custody'}]
+        none_admin=mechanical('admin_treasury_reward_custody',admin,[fact('launch',{'stage':'launch_unverified','initializations':[]})],[])
+        self.assertEqual((none_admin['closure']['boundary'],none_admin['closure']['next_route']),('pending','standard'));self.assertIn('by judgment',none_admin['closure']['reason'])
         # A partial holders fact does not close concentration.
         holders=[{'id':'pipeline-holders-x','claim':'state_observation','strength':'bounded','dimension':'current_concentration'}]
         self.assertEqual(mechanical('current_concentration',holders,[fact('holders',{'status':'partial','gaps':['missing balances']})],[])['closure']['boundary'],'pending')

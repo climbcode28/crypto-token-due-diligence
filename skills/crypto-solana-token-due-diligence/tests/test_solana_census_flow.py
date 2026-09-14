@@ -3,7 +3,7 @@ import sys,unittest,unittest.mock,json,urllib.error,io,time,tempfile
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'scripts'));sys.path.insert(0,str(Path(__file__).resolve().parent))
 from broad_fixture import RichRpc,Web
 from concentrated_fixture import fixture as clmm_fixture
-from solana_broad_collect import start
+from solana_broad_collect import start,status
 from solana_common import b58encode
 import solana_session
 
@@ -32,6 +32,8 @@ class CensusFlowTests(unittest.TestCase):
         self.assertEqual(pool['position_coverage'],'sampled');self.assertEqual(pool['position_census']['positions_counted'],1)
         row=pool['positions'][0];self.assertEqual(row['status'],'observed',row.get('gaps'));self.assertEqual(row['custody']['spending_owner'],c['owner'])
         census_reads=[q for q in RichRpc.calls if q['method']=='getProgramAccounts' and q['params'][1]['filters'][0]['dataSize']==281];self.assertEqual(len(census_reads),1)
+        from solana_broad_collect import recommended_presets
+        self.assertNotIn('rec-census0',[q['id'] for q in recommended_presets(root)],'a census that ran in start is never queued')
         self.assertFalse([q for q in RichRpc.calls if str(q['id']).startswith('census0l_')],'a CLMM census plans its batch from the slice and needs no lead sample')
 
     def test_program_control_resolves_and_a_later_bare_pool_preset_keeps_census_positions(self):
@@ -108,6 +110,35 @@ class CensusFlowTests(unittest.TestCase):
         self.assertNotIn('programs',[q['kind'] for q in after['recommended_presets']])
         self.assertTrue(any(q['method']=='getMultipleAccounts' and q['params'][1].get('dataSlice')=={'offset':0,'length':45} and str(q['id']).startswith('rec-programs') for q in RichRpc.calls))
 
+    def test_a_census_start_could_not_afford_is_queued_and_the_follow_up_runs_it(self):
+        import solana_broad_collect
+        from solana_broad_collect import recommended_presets,follow_up,census_cost
+        from solana_scaffold import scaffold
+        root,target,c,opts=self.setup_run();opts={**opts,'received_at':time.time()-400,'deadline_at':time.time()+300}  # too close to the lane cutoff: start defers its queue
+        real=solana_broad_collect.position_census;calls=[]
+        def first_unaffordable(*a,**k):  # the standard-stage census finds the grant too small; the same census later runs for real
+            calls.append(1);return ([],{'status':'skipped','reason':'ordinary request grant too small for a position census (14 left, 13 needed for one lead including the two-send margin)'}) if len(calls)==1 else real(*a,**k)
+        with unittest.mock.patch.object(solana_broad_collect,'position_census',first_unaffordable):r=start(root,target,**opts)
+        rows=[d for d in r['diagnostics'] if d.get('category')=='position_census_unavailable'];self.assertEqual([(p['pool'],p['status']) for p in rows[0]['pools']],[(c['pool'],'skipped')])
+        self.assertIn(('rec-census0','deferred'),{(p['id'],p['status']) for p in r['presets_run']},r['presets_run'])
+        queue={q['id']:q for q in recommended_presets(root)};self.assertIn('rec-census0',queue,list(queue))
+        row=queue['rec-census0'];self.assertEqual((row['kind'],row['parameters'],row['dimension'],row['sends']),('census',{'adapter':'raydium_clmm','pool':c['pool']},'canonical_lp_principal_custody',census_cost('raydium_clmm',1)))
+        self.assertIn('not affordable after the standard samples',row['reason']);self.assertTrue(Path(row['request']).is_file())
+        facts=json.loads((root/'draft/facts.json').read_text())['facts'];pool=next(f['data'] for f in facts if f['operation']=='pool' and f['data']['pool']==c['pool']);self.assertEqual(pool['position_coverage'],'partial')
+        # Both lanes returned: the follow-up releases their reservations and runs the census row on that grant, no judgment involved.
+        for owner in ('liquidity','project'):
+            path=root/'draft/notes'/(owner+'.json');note=json.loads(path.read_text()) if path.exists() else scaffold(root/'draft',owner,True)
+            note['checklist']={k:{'status':'done','reason':'answered'} for k in note['checklist']};path.write_text(json.dumps(note))
+        with unittest.mock.patch.object(solana_broad_collect,'position_census',first_unaffordable):result=follow_up(root,opts['config'],factory=RichRpc)
+        self.assertEqual(result['lane_grants_released'],30);self.assertIn(('rec-census0','ran'),{(p['id'],p['status']) for p in result['presets_run']},result['presets_run'])
+        self.assertNotIn('rec-census0',[q['id'] for q in result['recommended_presets']],'a census that ran is never queued again')
+        leads=json.loads((root/'automatic-leads.json').read_text());lead=next(l for l in leads if l['pool']==c['pool'])
+        self.assertEqual(([p['position'] for p in lead['positions']],lead['census']['positions_counted'],lead['census']['sampled']),([c['position']],1,1))
+        facts=json.loads((root/'draft/facts.json').read_text())['facts'];pool=next(f['data'] for f in facts if f['operation']=='pool' and f['data']['pool']==c['pool'])
+        self.assertEqual((pool['position_coverage'],pool['positions'][0]['status'],pool['positions'][0]['custody']['spending_owner']),('sampled','observed',c['owner']))
+        note=json.loads((root/'draft/notes/coordinator.json').read_text());custody=next(x for x in note['coverage'] if x['dimension']=='canonical_lp_principal_custody')
+        self.assertEqual(custody['closure']['boundary'],'resolved',custody['closure']);self.assertEqual(sum(1 for q in RichRpc.calls if q['method']=='getProgramAccounts' and q['params'][1]['filters'][0]['dataSize']==281),1)
+
     def test_refused_census_is_a_named_diagnostic_and_the_pool_still_decodes(self):
         root,target,c,opts=self.setup_run();original=RichRpc.__call__
         def refusing(rpc,request):
@@ -120,6 +151,8 @@ class CensusFlowTests(unittest.TestCase):
         self.assertEqual(lead['positions'],[]);self.assertEqual(lead['census']['status'],'unavailable')
         facts=json.loads((root/'draft/facts.json').read_text())['facts'];pool=next(f['data'] for f in facts if f['operation']=='pool' and f['data']['pool']==c['pool'])
         self.assertEqual((pool['positions'],pool['position_coverage']),([],'partial'))
+        from solana_broad_collect import recommended_presets
+        self.assertNotIn('rec-census0',[q['id'] for q in recommended_presets(root)],'a refused census is a named limit, never re-queued')
 
 
     def extra_clmm_positions(self,c,values,specs):
