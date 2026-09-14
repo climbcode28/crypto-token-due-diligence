@@ -20,6 +20,16 @@ pretrade reserve spot ratio, and individual fee components distinct. This model
 includes curve/fee/rounding cost and excludes transaction execution and gas. A
 modeled quote is not an observed sale or guarantee.
 
+`start` captures the credential-free Jupiter lite quote (`GET
+https://lite-api.jup.ag/swap/v1/quote`, no taker) once per illustrative size, selling the
+mint into the leading pool's counter asset (WSOL for a launch curve); the importer types
+each as a `public_quote` fact and derives one `quote_ladder` per source and output mint:
+output per input unit at each size, each size's impact versus the smallest quoted size and
+the largest size's impact, with a size the provider could not quote named as a gap. The
+ladder compares quoted outputs; the provider's own `priceImpactPct` is retained verbatim and
+separately. Rate it with the exit-depth rule in
+[reporting-scenarios.md](reporting-scenarios.md#rating-rules).
+
 Optional captured public GET routes:
 
 - [Jupiter Swap V2 order](https://developers.jup.ag/docs/api-reference/swap/order):

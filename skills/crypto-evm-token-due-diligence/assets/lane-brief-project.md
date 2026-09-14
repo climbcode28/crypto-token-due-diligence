@@ -56,7 +56,13 @@ Coordinator facts already collected (do not re-fetch these; cite them by alias):
    source is present, versioned and matches the compiler shown in facts. Do not run code.
 3. **Audit claims.** If an audit is claimed, capture the auditor page or report link and
    record scope, date, version and whether the deployed address appears. "No audit found in
-   the searched sources" is a coverage statement, not a finding of fraud.
+   the searched sources" is a coverage statement, not a finding of fraud. Once the site, docs
+   and repository links were checked and none names a dated audit, also write that absence
+   as a finding on `development_disclosure` with `signal` `Potential Risk`, `claim`
+   `inference`, `strength` `inference`, `impact` `adverse`, a `severity`, `evidence`
+   `["runtime", <the capture ids you checked>]` and a `concern` whose `basis` is
+   `adverse_inference` (mechanism: unreviewed code; consequence: assurance rests on source
+   publication alone), beside the coverage entry below; it is not an `Unverified` gap.
 4. **Creator and launch history.** The facts block names the creation transaction and the
    launch signer when the explorer answered, and the pipeline captured the signer's
    transactions and token transfers (`doc-explorer-signer-*`, `creator-activity` line). Read
@@ -87,7 +93,7 @@ Coordinator facts already collected (do not re-fetch these; cite them by alias):
 - `topic`: `token_and_liquidity`, `real_work_vs_marketing`, `creator_trading_and_proceeds`,
   `prior_launches_and_identity`, `adoption_and_maturity`, `token_economics`.
   `signal`: `Good`, `Potential Risk`, `Bad`, `Unverified`. Give a topic/signal to at most
-  **two** findings; the coordinator selects the report's summary rows.
+  **three** findings (the audit-absence finding counts); the coordinator selects the report's summary rows.
 - `claim` (what kind of observation): `state_observation` (a pinned RPC read or captured
   page state), `source_analysis` (matched source), `historical_execution` (a receipt),
   `inference` (documents, indexers, anything you did not observe onchain), `coverage_gap`
@@ -175,10 +181,15 @@ costs the run a repair round. Signals:
      "signal": "Potential Risk", "claim": "inference", "strength": "inference", "confidence": "medium", "impact": "adverse", "severity": "low",
      "text": "Docs describe discretionary buybacks funded by protocol fees with no on-chain commitment; holders depend on operator policy.",
      "evidence": ["runtime", "docs-fees"],
-     "concern": {"basis": "adverse_inference", "mechanism": "Operator can stop or redirect buybacks at will", "consequence": "Holder benefit is a policy, not an entitlement"}}
+     "concern": {"basis": "adverse_inference", "mechanism": "Operator can stop or redirect buybacks at will", "consequence": "Holder benefit is a policy, not an entitlement"}},
+    {"id": "audit-absent", "dimension": "development_disclosure", "topic": "real_work_vs_marketing",
+     "signal": "Potential Risk", "claim": "inference", "strength": "inference", "confidence": "medium", "impact": "adverse", "severity": "medium",
+     "text": "The site, docs and linked repository name no dated audit of the deployed contracts; assurance rests on source publication alone.",
+     "evidence": ["runtime", "site-home", "docs-fees", "github-repo"],
+     "concern": {"basis": "adverse_inference", "mechanism": "No independent review of the deployed code was found", "consequence": "Defects or hidden powers would rest on the team's own review"}}
   ],
   "coverage": {
-    "development_disclosure": {"status": "partial", "gap": "No independent audit report found in the linked channels",
+    "development_disclosure": {"status": "partial", "gap": "No independent audit report found in the linked channels (the audit-absence finding above states it as Potential Risk)",
       "priority": "material", "decision_impact": "Assurance rests on source publication, not third-party review",
       "attempts": [{"check": "Site, docs and repository search for audit references", "outcome": "None referenced", "evidence": ["site-home", "docs-fees", "github-repo"]}],
       "boundary": "exhausted", "basis": "Linked official channels and repository were captured; none references an audit"},

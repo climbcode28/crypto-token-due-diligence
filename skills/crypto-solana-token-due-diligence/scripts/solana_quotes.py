@@ -13,7 +13,7 @@ from adapters import raydium_cpmm as cp
 from adapters.base import Sample
 from adapters.meteora_common import point,CLOCK
 
-VERSION='1.1.0'
+VERSION='1.2.0'
 SOURCES=('jupiter_v1_lite','jupiter_v2','raydium_quote')
 QUOTE_PARAMS={'jupiter_v1_lite':('inputMint','outputMint','amount','slippageBps'),'jupiter_v2':('inputMint','outputMint','amount','slippageBps'),'raydium_quote':('inputMint','outputMint','amount','slippageBps','txVersion')}
 # Route-shaping parameters a quote may carry; the capture layer still refuses credential-like names (e.g. anything containing 'token').
@@ -125,6 +125,56 @@ def estimate(target,adapter_id,pool,observations,input_atomic,*,slippage_bps=50)
             limitations=['captured state only','no mempool, landing, account-owner or wallet-specific execution guarantee','program upgrades/control changes remain separate'])
     except (ValueError,KeyError,TypeError) as exc:result['gaps'].append(str(exc))
     return result
+
+
+def percent(fraction,places=4):
+    """Signed half-up percentage display of a Fraction (a ladder impact may be negative when a larger size routes better)."""
+    scaled=fraction*100*10**places;sign='-' if scaled<0 else '';magnitude=abs(scaled)
+    rounded=(magnitude.numerator*2+magnitude.denominator)//(2*magnitude.denominator)
+    return sign+str(rounded//10**places)+'.'+str(rounded%10**places).zfill(places)
+
+
+def quote_ladder(target,policy,quotes,*,source,output_mint,missing=None):
+    """This run's read-only public quotes at the quote_sizes policy's illustrative sizes, one source and one output mint,
+    compared by size: output per input unit at each policy size and each size's shortfall against the smallest quoted size
+    (the EVM skill's impact versus the smallest quote). `policy` is the quote_sizes derivation output, `quotes` is
+    [(evidence id, public_quote object)] at policy sizes only (a lane quote at another size never joins the ladder) and
+    `missing` names why a policy size has no usable quote. Provider claims at illustrative sizes, never execution; the
+    provider's own impact field stays separate."""
+    target=target_identity(target);missing=missing or {}
+    need(isinstance(policy,dict) and policy.get('target',{}).get('mint')==target['mint'] and isinstance(policy.get('sizes'),list),'quote size policy for the exact mint required')
+    sizes=sorted({s['input_atomic'] for s in policy['sizes'] if isinstance(s,dict) and s.get('input_atomic')},key=int)
+    need(1<=len(sizes)<=3,'one to three policy sizes required');need(source in SOURCES,'unsupported quote source');pubkey(output_mint)
+    need(isinstance(quotes,list) and 1<=len(quotes)<=len(sizes),'one quote per policy size at most, at least one')
+    by_size={}
+    for item in quotes:
+        need(isinstance(item,(list,tuple)) and len(item)==2 and isinstance(item[1],dict) and item[1].get('kind')=='api_quote','public quote object required')
+        eid,q=item
+        need(q.get('input_mint')==target['mint'] and q.get('source')==source and q.get('output_mint')==output_mint,'ladder quotes must sell the exact mint through one source into one output mint')
+        need(q.get('input_atomic') in sizes and q['input_atomic'] not in by_size,'one quote per policy size')
+        by_size[q['input_atomic']]=(str(eid),q)
+    need(isinstance(missing,dict) and all(isinstance(k,str) and isinstance(v,str) for k,v in missing.items()) and set(missing)<=set(sizes)-set(by_size),'missing sizes must be policy sizes without a quote')
+    base=None;rows=[];gaps=[];quoted=0
+    for size in sizes:
+        row={'input_atomic':size,'quote':None,'output_atomic':None,'status':'not_captured','output_per_input':None,'impact_vs_smallest':None,'impact_vs_smallest_percent':None,'provider_price_impact_raw':None,'route_legs':0,'captured_at':None}
+        if size in by_size:
+            eid,q=by_size[size];ok=q.get('status')=='quoted' and q.get('output_atomic') is not None
+            row.update(quote=eid,output_atomic=q.get('output_atomic'),status=q.get('status'),provider_price_impact_raw=q.get('provider_price_impact_raw'),route_legs=len(q.get('route') or []),captured_at=q.get('captured_at'))
+            if ok:
+                rate=Fraction(amount(q['output_atomic']),amount(size));quoted+=1
+                if base is None:base=rate
+                impact=1-rate/base
+                row.update(output_per_input=_ratio(rate),impact_vs_smallest=_ratio(impact),impact_vs_smallest_percent=percent(impact))
+            else:gaps.append('size '+size+' not quoted ('+str(q.get('status'))+'): '+'; '.join(q.get('gaps') or ['no output'])[:200])
+        else:
+            row['reason']=missing.get(size,'not captured');gaps.append('size '+size+' not captured ('+row['reason']+')')
+        rows.append(row)
+    largest=rows[-1]
+    return {'schema_version':1,'kind':'quote_ladder','source':source,'target':target,'input_mint':target['mint'],'output_mint':output_mint,
+            'policy_basis':policy.get('basis'),'rows':rows,'sizes_requested':len(sizes),'sizes_quoted':quoted,'largest_size_quoted':largest['status']=='quoted' and largest['output_per_input'] is not None,
+            'largest_impact_vs_smallest':largest['impact_vs_smallest'],'largest_impact_vs_smallest_percent':largest['impact_vs_smallest_percent'],
+            'evidence':[by_size[s][0] for s in sizes if s in by_size],'gaps':gaps,'execution_observed':False,
+            'scope':'read-only provider quotes at the illustrative policy sizes; impact versus the smallest quoted size compares quoted output per input unit, never execution; the provider price-impact field is retained separately'}
 
 
 def quote_url(source,target,output_mint,input_atomic,*,slippage_bps=50):

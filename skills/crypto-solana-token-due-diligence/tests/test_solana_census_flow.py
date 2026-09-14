@@ -77,7 +77,8 @@ class CensusFlowTests(unittest.TestCase):
         from adapters import raydium_clmm
         accounts=program_accounts(raydium_clmm.PROGRAM,authority=key(93));program_only={raydium_clmm.PROGRAM:accounts[raydium_clmm.PROGRAM]}
         root,target,c,opts=self.setup_run();RichRpc.values.update(program_only)  # the program answers, its ProgramData does not exist yet
-        r=start(root,target,**opts)
+        opts={**opts,'received_at':time.time()-200,'deadline_at':time.time()+400}  # 100 s before the lane cutoff: start defers its queue to the coordinator
+        r=start(root,target,**opts);self.assertEqual([(q['kind'],q['status']) for q in r['presets_run'] if q['kind']=='programs'],[('programs','deferred')])
         def pool_fact():
             facts=json.loads((root/'draft/facts.json').read_text())['facts'];return next(f['data'] for f in facts if f['operation']=='pool' and f['data']['pool']==c['pool'])
         self.assertTrue({'program_upgrade_authority_unresolved','program_control_not_observed'}&set(pool_fact()['gaps']),pool_fact()['gaps'])

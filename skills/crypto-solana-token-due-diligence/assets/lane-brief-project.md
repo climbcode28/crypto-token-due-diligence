@@ -28,7 +28,11 @@ For audit truth, capture the actual dated audit/report and its named scope, code
 revision, product/deployment, unresolved findings and exclusions. A badge or project
 claim establishes only that it was published. Separate source publication, external
 hash statements, captured executable byte correspondence and independent reproducible
-build. Never claim an independent build merely from a third-party status page.
+build. Never claim an independent build merely from a third-party status page. When the
+docs, site and repository links were checked and no dated audit or immutable revision
+exists, state that absence as a `potential_risk` finding on development_disclosure (the
+rating rule in `references/reporting-scenarios.md`), with what was checked as its basis,
+not as an unverified gap; only an uncaptured site or refused repository stays unverified.
 
 For economics, describe observed supply/control terms, scheduled fees/rewards,
 utility/redemption rights, actual holder claims and dependencies. Distinguish protocol
@@ -57,7 +61,7 @@ request coordinator import/targeted presets where needed.
 
 Do not run RPC, read credentials, create scripts, spawn agents, change settings or
 registrations, compose/finalize, buy service access, or mutate another lane. Only the
-coordinator executes the bounded follow-up presets (the printed queue, at most four). A tool limitation,
+coordinator executes bounded follow-up presets (start already ran the derived queue; the coordinator adds at most four of its own). A tool limitation,
 cutoff or missing lane does not count as completed standard research.
 
 Write only the assigned `notes/project.json` and your owned lane files. Preserve its

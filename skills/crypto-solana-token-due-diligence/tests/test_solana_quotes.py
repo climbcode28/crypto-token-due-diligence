@@ -3,8 +3,9 @@ import copy
 import json
 import sys
 import unittest
+from fractions import Fraction
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'scripts'))
-from solana_quotes import size_policy,estimate,quote_url,public_quote
+from solana_quotes import size_policy,estimate,quote_url,public_quote,quote_ladder,percent
 from solana_common import TOKEN_PROGRAM,TOKEN_2022
 from pool_fixture import fixture,batch,key
 from meteora_fixture import clock
@@ -76,6 +77,32 @@ class QuoteTests(unittest.TestCase):
             self.assertNotIn('taker',url);self.assertNotIn('wallet',url);self.assertFalse(q['execution_observed'])
             if source=='jupiter_v2':self.assertEqual(q['price_impact_fraction'],{'numerator':'-1','denominator':'1000'})
             else:self.assertIsNone(q['price_impact_fraction'])
+
+    def test_quote_ladder_follows_the_size_policy_and_names_missing_sizes(self):
+        target,a,_=fixture();out=a['mints'][1]
+        policy={'target':target,'basis':'illustrative_USD_equivalents_floor_to_atomic_units','sizes':[{'input_atomic':'10000000'},{'input_atomic':'100000000'},{'input_atomic':'1000000000'}]}
+        def q(size,output,status='quoted',source='jupiter_v1_lite',mint=None):
+            return {'kind':'api_quote','source':source,'input_mint':mint or target['mint'],'output_mint':out,'input_atomic':str(size),'output_atomic':str(output) if output is not None else None,
+                    'status':status,'route':[{'pool':a['pool']}],'provider_price_impact_raw':'0.001','captured_at':'2026-09-13T00:00:00+00:00','gaps':[] if output is not None else ['provider reports execution error: 1']}
+        ladder=quote_ladder(target,policy,[('q3',q(10**9,45*10**7)),('q1',q(10**7,4995*10**3)),('q2',q(10**8,495*10**5))],source='jupiter_v1_lite',output_mint=out)
+        self.assertEqual([r['quote'] for r in ladder['rows']],['q1','q2','q3'],'rows follow the policy sizes whatever the input order')
+        self.assertEqual([r['impact_vs_smallest_percent'] for r in ladder['rows']],['0.0000','0.9009','9.9099'])
+        self.assertEqual(ladder['rows'][0]['output_per_input'],{'numerator':'999','denominator':'2000'});self.assertEqual(ladder['rows'][2]['impact_vs_smallest'],{'numerator':'11','denominator':'111'})
+        self.assertEqual((ladder['sizes_quoted'],ladder['sizes_requested'],ladder['largest_size_quoted'],ladder['largest_impact_vs_smallest_percent'],ladder['evidence'],ladder['gaps'],ladder['policy_basis']),(3,3,True,'9.9099',['q1','q2','q3'],[],policy['basis']))
+        self.assertFalse(ladder['execution_observed']);self.assertIn('never execution',ladder['scope'])
+        # A policy size with no usable quote is a named row: the smallest quoted size is the baseline, the missing one keeps its reason, and the largest size's impact still reads.
+        ladder=quote_ladder(target,policy,[('q1',q(10**7,4995*10**3)),('q3',q(10**9,5*10**8))],source='jupiter_v1_lite',output_mint=out,missing={'100000000':'capture http_error (http 429)'})
+        self.assertEqual([(r['status'],r.get('reason')) for r in ladder['rows']],[('quoted',None),('not_captured','capture http_error (http 429)'),('quoted',None)])
+        self.assertEqual((ladder['sizes_quoted'],ladder['sizes_requested'],ladder['largest_impact_vs_smallest_percent'],ladder['gaps']),(2,3,'-0.1001',['size 100000000 not captured (capture http_error (http 429))']))
+        # A quote the provider answered without a route keeps its status and gap; a missing largest size leaves largest_size_quoted false.
+        ladder=quote_ladder(target,policy,[('q1',q(10**7,4995*10**3)),('q2',q(10**8,None,status='quote_with_execution_error'))],source='jupiter_v1_lite',output_mint=out,missing={'1000000000':'not captured'})
+        self.assertEqual((ladder['sizes_quoted'],ladder['largest_size_quoted'],ladder['largest_impact_vs_smallest_percent'],len(ladder['gaps'])),(1,False,None,2))
+        self.assertIn('size 100000000 not quoted (quote_with_execution_error)',ladder['gaps'][0]);self.assertEqual(ladder['rows'][2]['status'],'not_captured')
+        self.assertEqual(percent(Fraction(-1,2000)),'-0.0500');self.assertEqual(percent(Fraction(1,3),2),'33.33')
+        for bad in ([],[('q1',q(10**7,1)),('q2',q(10**7,2))],[('q1',q(10**7,1)),('q2',q(10**8,2,source='jupiter_v2'))],[('q1',q(10**7,1,mint=key(9)))],[('q0',q(1000,500))]):
+            with self.assertRaises(ValueError):quote_ladder(target,policy,bad,source='jupiter_v1_lite',output_mint=out)
+        with self.assertRaises(ValueError):quote_ladder(target,policy,[('q1',q(10**7,1))],source='jupiter_v1_lite',output_mint=out,missing={'1000':'x'})  # only policy sizes can be missing
+        with self.assertRaises(ValueError):quote_ladder(target,{**policy,'target':{**target,'mint':key(9)}},[('q1',q(10**7,1))],source='jupiter_v1_lite',output_mint=out)
 
     def test_jupiter_lite_quote_accepts_reordered_benign_parameters_and_refuses_wallets(self):
         from solana_quotes import quote_request

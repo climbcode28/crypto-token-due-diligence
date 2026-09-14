@@ -3,6 +3,7 @@ import sys,os,tempfile,unittest,unittest.mock,time,json,copy
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'scripts'))
 from pool_fixture import key
 from broad_fixture import RichRpc,Web
+from test_solana_web_capture import Response
 import solana_session
 from solana_broad_collect import start,collect,status,STAGES
 from solana_profile import validate
@@ -83,7 +84,7 @@ class BroadTests(unittest.TestCase):
         from pool_fixture import key
         root,target,opts=self.setup_run();start(root,target,**opts)
         url=quote_url('jupiter_v1_lite',target,key(3),'1000');capture(root,[url],'liquidity',opener_factory=Web);refresh(root)
-        facts=json.loads((root/'draft/facts.json').read_text())['facts'];quote=next(f for f in facts if f['operation']=='public_quote')
+        facts=json.loads((root/'draft/facts.json').read_text())['facts'];quote=next(f for f in facts if f['operation']=='public_quote' and f['data']['input_atomic']=='1000')  # start's own ladder sizes sit beside it
         self.assertTrue(quote['usable']);self.assertEqual((quote['data']['source'],quote['data']['output_atomic'],quote['data']['provider_usd_value']),('jupiter_v1_lite','500','1.5'))
         self.assertFalse(quote['data']['execution_observed'])
 
@@ -561,8 +562,14 @@ class ImporterBoundaryTests(unittest.TestCase):
             RichRpc.receipts=bots;return root,target,opts,tx['transaction']['signatures'][0]
         root,target,opts,swap=seed();result=start(root,target,**opts);self.assertFalse(result['diagnostics'],result['diagnostics'])
         classification=json.loads((root/'receipt-classification.json').read_text())
-        self.assertEqual((classification['probed'],classification['selected'],classification['listings'][0]['listed'],classification['listings'][0]['indexed_candidates']),(6,0,8,0))
-        self.assertEqual(json.loads((root/'automatic-receipts.json').read_text()),[])
+        standard=[r for r in classification['rows'] if r['sample']=='receipts']
+        self.assertEqual((len(standard),sum(r['swap'] for r in standard),classification['listings'][0]['listed'],classification['listings'][0]['indexed_candidates']),(6,0,8,0))
+        # No sale verified, so start ran the recommended pool_activity preset itself: it probed the two listed signatures the
+        # standard window left and found the swap, so the sale is verified inside start without a coordinator turn.
+        activity=next(r for r in result['presets_run'] if r['kind']=='pool_activity');self.assertEqual((activity['status'],activity['error']),('ran',None))
+        self.assertEqual((classification['probed'],classification['selected']),(8,1));self.assertEqual([r['sample'] for r in classification['rows'] if r['swap']],['rec-activity'])
+        self.assertEqual([(r['sample'],r['signature']) for r in json.loads((root/'automatic-receipts.json').read_text())],[('rec-activity',swap)])
+        facts=json.loads((root/'draft/facts.json').read_text())['facts'];self.assertEqual(next(f['data']['verified_receipts'] for f in facts if f['operation']=='sales'),1)
         # The indexer lists the swap as a sell: it is probed first and the receipt verifies it, one probe instead of a missed window.
         root,target,opts,swap=seed()
         Web.trades=[{'id':'t1','type':'trade','attributes':{'tx_hash':swap,'kind':'sell','block_number':100,'tx_from_address':key(8)}},
@@ -582,24 +589,42 @@ class ImporterBoundaryTests(unittest.TestCase):
         try:
             pipeline=s.db.execute("SELECT count(*) FROM web_sources WHERE owner='ordinary' AND status='pending'").fetchone()[0]
         finally:s.close()
-        self.assertGreaterEqual(pipeline,4)  # discovery pages, the project link and the leading pool's trade feed
+        self.assertGreaterEqual(pipeline,9)  # discovery pages, the project link, the leading pool's trade feed and the three-size quote ladder
         urls=['https://lane.example/page'+str(n) for n in range(12)]
         result=capture(root,urls,'project',opener_factory=Web)
         self.assertEqual(len(result['captures']),12);self.assertEqual(result['unattempted'],[])
         self.assertEqual(capture(root,['https://lane.example/extra'],'liquidity',opener_factory=Web)['unattempted'][0]['status'],'unattempted_cap')
+        # The pipeline's own class is capped at sixteen, independently of the lanes' twelve.
+        more=capture(root,['https://pipeline.example/page'+str(n) for n in range(16-pipeline+1)],'ordinary',opener_factory=Web)
+        self.assertEqual((len(more['captures']),[r['status'] for r in more['unattempted']]),(16-pipeline,['unattempted_cap']))
 
-    def test_recommended_presets_follow_the_facts_and_shrink_as_presets_run(self):
-        from solana_broad_collect import collect
+    def test_start_runs_the_recommended_queue_itself_and_defers_it_only_near_the_lane_cutoff(self):
+        from solana_broad_collect import collect,recommended_presets
         root,target,opts=self.setup_run();result=start(root,target,**opts)
-        queue=result['recommended_presets'];kinds=[q['kind'] for q in queue]
-        # No receipt verified a sale, the metadata authority has no history page and the pool program was never read.
-        self.assertEqual(kinds,['pool_activity','creator_history','programs'])
+        # No receipt verified a sale, the metadata authority has no history page and the pool program was never read: start
+        # derived the three rows and ran them itself, in order, under the run's own grant, so nothing is left to recommend.
+        ran=result['presets_run'];self.assertEqual([(r['id'],r['kind'],r['status'],r['error']) for r in ran],[('rec-activity','pool_activity','ran',None),('rec-history','creator_history','ran',None),('rec-programs','programs','ran',None)])
+        self.assertEqual(result['recommended_presets'],[]);self.assertIn('rec-activity, rec-history, rec-programs already ran inside start',result['next']);self.assertIn('no preset remains recommended',result['next'])
+        self.assertEqual(sorted(p.stem for p in (root/'preset-requests').glob('*.json')),['rec-activity','rec-history','rec-programs'])
+        for r in ran:
+            spec=json.loads((root/'recommended-presets'/(r['id']+'.json')).read_text());self.assertEqual(set(spec),{'id','kind','parameters'});self.assertEqual(spec,json.loads((root/'preset-requests'/(r['id']+'.json')).read_text()))
+        self.assertEqual([r['sends'] for r in ran],[13,6,6]);self.assertTrue({'preset_rec-activity','preset_rec-history','preset_rec-programs'}<={x['phase'] for x in status(root)['phases']})
+        facts=json.loads((root/'draft/facts.json').read_text())['facts'];self.assertEqual({d['parameters']['address'] for d in json.loads((root/'draft/manifest.json').read_text())['derivations'] if d['operation']=='history'},{key(90),key(91)})
+        self.assertLessEqual(status(root)['started_attempts'],120)
+        # The recommended rows never count against the coordinator's four: four named presets still run and a fifth is refused.
+        for n in range(4):
+            named=collect(root,{'id':'named'+str(n),'kind':'programs','parameters':{'addresses':[target['mint']]}},opts['config'],factory=RichRpc);self.assertIsNone(named['preset_error'],named['preset_error'])
+        with self.assertRaisesRegex(ValueError,'Four coordinator'):collect(root,{'id':'named5','kind':'programs','parameters':{'addresses':[target['mint']]}},opts['config'],factory=RichRpc)
+        # Near the lane cutoff start defers the queue: the rows stay printed with their request files and the coordinator runs them.
+        root,target,opts=self.setup_run();opts={**opts,'received_at':time.time()-200,'deadline_at':time.time()+400}  # lane cutoff in 100 s, collection cutoff in 280 s
+        result=start(root,target,**opts);queue=result['recommended_presets'];kinds=[q['kind'] for q in queue]
+        self.assertEqual(kinds,['pool_activity','creator_history','programs']);self.assertEqual([(r['status'],r['error']) for r in result['presets_run']],[('deferred',None)]*3)
+        self.assertIn('lane cutoff',result['presets_run'][0]['reason']);self.assertIn('remaining recommended presets in order',result['next']);self.assertIn('lane cutoff',result['next'])
         self.assertEqual(queue[0]['parameters'],{'pool':RichRpc.pool['pool'],'limit':25,'receipts':2,'probes':6})
         self.assertEqual(queue[1]['parameters'],{'keys':[key(90),key(91)]});self.assertEqual(queue[2]['dimension'],'external_dependencies')  # update authority and verified creator
-        self.assertIn('recommended presets in order',result['next'])
         for q in queue:
             spec=json.loads(Path(q['request']).read_text());self.assertEqual(set(spec),{'id','kind','parameters'});self.assertIn('recommended-presets',q['request'])
-        self.assertFalse(list((root/'preset-requests').glob('*.json')) if (root/'preset-requests').exists() else [],'recommended requests are not leads until they run')
+        self.assertFalse(list((root/'preset-requests').glob('*.json')) if (root/'preset-requests').exists() else [],'deferred requests are not leads until they run')
         # Running the history recommendation from its request file removes it from the queue.
         spec=json.loads(Path(queue[1]['request']).read_text());after=collect(root,spec,opts['config'],factory=RichRpc)
         self.assertIsNone(after['preset_error']);self.assertEqual([q['kind'] for q in after['recommended_presets']],['pool_activity','programs'])
@@ -607,10 +632,9 @@ class ImporterBoundaryTests(unittest.TestCase):
         spec=json.loads(Path(after['recommended_presets'][0]['request']).read_text());self.assertEqual(spec['kind'],'pool_activity')
         again=collect(root,spec,opts['config'],factory=RichRpc);self.assertIsNone(again['preset_error'])
         self.assertEqual([q['kind'] for q in again['recommended_presets']],['programs'])
-        # The cap counts presets already run: four request files leave nothing to recommend.
-        from solana_broad_collect import recommended_presets
-        for n in range(2):(root/'preset-requests'/('pad'+str(n)+'.json')).write_text('{}')
-        self.assertEqual(recommended_presets(root),[])
+        # Four coordinator-named request files leave the recommended row in place: the cap bounds the coordinator, not the pipeline's own queue.
+        for n in range(4):(root/'preset-requests'/('pad'+str(n)+'.json')).write_text('{}')
+        self.assertEqual([q['kind'] for q in recommended_presets(root)],['programs'])
         # A verified sale removes the sellability recommendation.
         from transaction_fixture import fixture
         root,target,opts=self.setup_run();_,a,packet,_=fixture();tx=packet['response']['result']
@@ -620,6 +644,89 @@ class ImporterBoundaryTests(unittest.TestCase):
         # A focused run gets no queue and no request folder.
         root,target,opts=self.setup_run();focused=start(root,target,**{**opts,'scope':'focused','surfaces':['token_controls']})
         self.assertEqual(focused['recommended_presets'],[]);self.assertFalse((root/'recommended-presets').exists())
+
+    def test_start_rechecks_the_grant_per_row_names_refusals_and_credits_an_earlier_attempt(self):
+        import solana_broad_collect
+        from transaction_fixture import fixture
+        from solana_common import b58encode
+        from solana_transactions import SYSTEM
+        # A bot-dominated listing makes the activity row spend most of a small grant: the later rows are re-checked against the
+        # live session and deferred for budget instead of being started and refused mid-preset.
+        root,target,opts=self.setup_run();_,a,packet,_=fixture();tx=packet['response']['result']
+        tx['transaction']['message']['accountKeys']=[RichRpc.pool['pool'] if k==a['pool'] else k for k in tx['transaction']['message']['accountKeys']];tx['blockTime']=RichRpc.stamp
+        bots={}
+        for n in range(7):
+            other=copy.deepcopy(tx);sig=b58encode(bytes([60+n])*64);other['transaction']['signatures'][0]=sig
+            keys=other['transaction']['message']['accountKeys'];other['transaction']['message']['instructions'][a['swap_index']]['programIdIndex']=keys.index(SYSTEM);bots[sig]=other
+        RichRpc.receipts=bots;RichRpc.receipt=tx
+        # Measure what the standard stages spend (a deferred-queue start with the same seed), then leave exactly 17 sends: the
+        # 13-send activity row fits the initial filter and what it spends starves a later row.
+        probe=start(root,target,**{**opts,'received_at':time.time()-200,'deadline_at':time.time()+400});measured=status(root)
+        self.assertTrue(all(r['status']=='deferred' for r in probe['presets_run']));ceiling=measured['max_requests']-measured['remaining_requests']+17
+        root,target,opts=self.setup_run();RichRpc.receipts=bots;RichRpc.receipt=tx
+        with unittest.mock.patch.object(solana_broad_collect,'PUBLIC_MAX_REQUESTS',ceiling):result=start(root,target,**opts)
+        rows={r['id']:r for r in result['presets_run']};self.assertEqual(rows['rec-activity']['status'],'ran',rows)
+        deferred=[r for r in result['presets_run'] if r['status']=='deferred'];self.assertTrue(deferred,result['presets_run'])
+        self.assertTrue(all('leftover grant' in r['reason'] for r in deferred),deferred);self.assertLessEqual(status(root)['started_attempts'],ceiling)
+        self.assertEqual(result['recommended_presets'],[],'an unaffordable row is dropped, not re-offered');self.assertIn('deferred: rec-history: the leftover grant',result['next'])
+        # A row refused before its request is recorded is a named limit: it leaves the queue and next says so instead of asking for a rerun.
+        root,target,opts=self.setup_run();original=solana_broad_collect.collect
+        def refusing(root,spec,config,**kw):
+            if spec['id']=='rec-history':raise ValueError('Pool lead has not been captured.')
+            return original(root,spec,config,**kw)
+        with unittest.mock.patch.object(solana_broad_collect,'collect',refusing):result=start(root,target,**opts)
+        self.assertEqual([(r['id'],r['status']) for r in result['presets_run']],[('rec-activity','ran'),('rec-history','refused'),('rec-programs','ran')])
+        self.assertEqual(result['presets_run'][1]['error']['reason'],'Pool lead has not been captured.');self.assertFalse((root/'preset-requests/rec-history.json').exists())
+        self.assertEqual(result['recommended_presets'],[]);self.assertIn('rec-history was refused before any send (Pool lead has not been captured.)',result['next']);self.assertNotIn('rec-history already',result['next'])
+        # A start that died after its queue and before its result file credits the rows the earlier attempt ran.
+        root,target,opts=self.setup_run();start(root,target,**opts);(root/'start-result.json').unlink();again=start(root,target,**opts)
+        self.assertEqual([(r['id'],r['status'],r.get('reason')) for r in again['presets_run']],[(i,'ran','ran in an earlier attempt of this start') for i in ('rec-activity','rec-history','rec-programs')])
+        self.assertEqual(again['recommended_presets'],[]);self.assertIn('rec-activity, rec-history, rec-programs already ran inside start',again['next'])
+
+    def test_start_captures_a_three_size_jupiter_quote_ladder_under_sellability(self):
+        root,target,opts=self.setup_run();result=start(root,target,**opts);self.assertFalse(result['diagnostics'],result['diagnostics'])
+        quotes=[u for u in Web.calls if 'lite-api.jup.ag' in u];self.assertEqual(len(quotes),3)
+        facts=json.loads((root/'draft/facts.json').read_text())['facts']
+        public=sorted((f for f in facts if f['operation']=='public_quote'),key=lambda f:int(f['data']['input_atomic']))
+        # The quote_sizes derivation fixed $100/$1,000/$10,000 equivalents at the captured $2 price; each was quoted read-only into the lead pool's counter asset.
+        self.assertEqual([(f['usable'],f['data']['input_atomic'],f['data']['output_mint']) for f in public],[(True,'50000000',key(3)),(True,'500000000',key(3)),(True,'5000000000',key(3))])
+        ladder=next(f for f in facts if f['operation']=='quote_ladder');d=ladder['data']
+        self.assertTrue(ladder['usable']);self.assertEqual((ladder['category'],d['sizes_quoted'],d['sizes_requested'],d['largest_size_quoted'],d['source']),('quotes',3,3,True,'jupiter_v1_lite'))
+        self.assertEqual([r['impact_vs_smallest_percent'] for r in d['rows']],['0.0000','0.9009','9.9099']);self.assertEqual(d['largest_impact_vs_smallest_percent'],'9.9099')
+        self.assertEqual(d['rows'][2]['impact_vs_smallest'],{'numerator':'11','denominator':'111'});self.assertFalse(d['execution_observed']);self.assertEqual(d['gaps'],[])
+        self.assertIn('Read-only jupiter_v1_lite quotes at 3 of 3 illustrative sizes',ladder['summary']);self.assertIn('(baseline); 500000000 -> 247500000 (0.9009% vs smallest)',ladder['summary'])
+        m=json.loads((root/'draft/manifest.json').read_text());attempts=[a for a in m['attempts'] if a.get('source')=='lite-api.jup.ag']
+        self.assertEqual({(a['dimension'],a['owner']) for a in attempts},{('sellability_exit_depth','pipeline')});self.assertEqual(len(attempts),3)
+        note=json.loads((root/'draft/notes/pipeline.json').read_text());row=next(f for f in note['findings'] if f['id']=='pipeline-'+ladder['evidence_id'])
+        self.assertEqual((row['dimension'],row['claim']),('sellability_exit_depth','inference'))
+        # A lane quote at another size stays its own fact and never displaces a policy size: the ladder is bound to the quote_sizes policy.
+        from solana_broad_collect import capture
+        from solana_quotes import quote_url
+        from solana_import import refresh
+        capture(root,[quote_url('jupiter_v1_lite',target,key(3),'1000')],'liquidity',opener_factory=Web);refresh(root)
+        facts=json.loads((root/'draft/facts.json').read_text())['facts'];after=next(f for f in facts if f['operation']=='quote_ladder')['data']
+        self.assertEqual(([r['input_atomic'] for r in after['rows']],after['largest_impact_vs_smallest_percent']),(['50000000','500000000','5000000000'],'9.9099'))
+        self.assertEqual(sum(1 for f in facts if f['operation']=='public_quote'),4)
+        # A refused quote route is a stated capture limit: the other sizes still form the ladder and the missing size is a named row.
+        root,target,opts=self.setup_run();original=Web.open
+        def refusing(self_,request,timeout):
+            if 'lite-api.jup.ag' in request.full_url and 'amount=500000000&' in request.full_url:return Response(b'rate limited',429,{'Content-Type':'text/plain'})
+            return original(self_,request,timeout)
+        with unittest.mock.patch.object(Web,'open',refusing):result=start(root,target,**opts)
+        facts=json.loads((root/'draft/facts.json').read_text())['facts'];ladder=next(f for f in facts if f['operation']=='quote_ladder')
+        self.assertTrue(ladder['usable']);d=ladder['data'];self.assertEqual((d['sizes_quoted'],d['sizes_requested'],d['largest_size_quoted'],d['largest_impact_vs_smallest_percent']),(2,3,True,'9.9099'))
+        self.assertEqual([(r['input_atomic'],r['status']) for r in d['rows']],[('50000000','quoted'),('500000000','not_captured'),('5000000000','quoted')])
+        self.assertIn('429',d['rows'][1]['reason']);self.assertEqual(len(d['gaps']),1);self.assertIn('size 500000000 not captured',d['gaps'][0]);self.assertIn('2 of 3 illustrative sizes',ladder['summary']);self.assertIn('not captured (',ladder['summary'])
+        self.assertFalse(any(x.get('category')=='quote_capture_skipped' for x in result['diagnostics']));self.assertEqual(json.loads((root/'quote-ladder.json').read_text())['status'],'captured')
+        # A ladder start could not capture is a named diagnostic, not a silent absence.
+        import solana_quotes
+        root,target,opts=self.setup_run()
+        with unittest.mock.patch.object(solana_quotes,'quote_url',side_effect=ValueError('invalid quote inputs')):result=start(root,target,**opts)
+        skipped=[x for x in result['diagnostics'] if x.get('category')=='quote_capture_skipped'];self.assertEqual(len(skipped),1);self.assertIn('invalid quote inputs',skipped[0]['reason'])
+        self.assertFalse(any(f['operation']=='quote_ladder' for f in json.loads((root/'draft/facts.json').read_text())['facts']))
+        # Without a decodable pool lead there is nothing to sell into: the skip is recorded, and the missing pool facts already say why.
+        root,target,opts=self.setup_run();Web.pairs=[];result=start(root,target,**opts)
+        self.assertEqual(json.loads((root/'quote-ladder.json').read_text())['reason'],'no decodable pool lead; nothing to sell into');self.assertFalse([x for x in result['diagnostics'] if x.get('category')=='quote_capture_skipped'])
 
     def test_rugcheck_report_becomes_a_corroboration_fact_cross_checked_against_the_sample(self):
         from pool_fixture import key
@@ -658,7 +765,9 @@ class ImporterBoundaryTests(unittest.TestCase):
         self.assertIsNone(result.get('preset_error'),result.get('preset_error'))
         manifest=json.loads((root/'draft/manifest.json').read_text())
         rows=[d for d in manifest['derivations'] if d['operation']=='history']
-        self.assertEqual(len(rows),1);self.assertEqual((rows[0]['subject']['kind'],rows[0]['subject']['address'],rows[0]['parameters']['address']),('wallet',wallet,wallet))
+        # start's own history preset covered both attributed keys; the coordinator's named preset repeats the wallet, one row per address.
+        self.assertEqual({d['parameters']['address'] for d in rows},{key(90),key(91)})
+        self.assertTrue(all((d['subject']['kind'],d['subject']['address'])==('wallet',d['parameters']['address']) for d in rows),rows)
 
     def test_run_keeps_its_provider_and_degraded_reads_are_diagnosed(self):
         from solana_broad_collect import run_provider,check_config,provider_diagnostics,collect

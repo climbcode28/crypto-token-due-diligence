@@ -93,8 +93,11 @@ class Web:
         elif 'geckoterminal' in url:value={'data':[]}
         elif 'lite-api.jup.ag' in url:
             from urllib.parse import urlsplit,parse_qsl
-            q=dict(parse_qsl(urlsplit(url).query));out=q['outputMint']
-            value={'inputMint':q['inputMint'],'outputMint':out,'inAmount':q['amount'],'outAmount':'500','otherAmountThreshold':'497','slippageBps':int(q['slippageBps']),'swapMode':'ExactIn',
-                   'priceImpactPct':'0.0012','contextSlot':100,'swapUsdValue':'1.5','routePlan':[{'swapInfo':{'ammKey':RichRpc.pool['pool'],'label':'Raydium','inputMint':q['inputMint'],'outputMint':out,'inAmount':q['amount'],'outAmount':'500','feeAmount':'3','feeMint':q['inputMint']},'percent':100}]}
+            from solana_accounts import decode_mint
+            q=dict(parse_qsl(urlsplit(url).query));out=q['outputMint'];amount=int(q['amount']);scale=10**decode_mint(RichRpc.values[RichRpc.target['mint']])['decimals']
+            # Half the input back, less a shortfall that grows with the size in whole tokens: 50 tokens quote at 0.4995, 5000 at 0.45.
+            quoted=str(amount*5//10-amount*(amount//scale)//100000);threshold=str(int(quoted)*997//1000)
+            value={'inputMint':q['inputMint'],'outputMint':out,'inAmount':q['amount'],'outAmount':quoted,'otherAmountThreshold':threshold,'slippageBps':int(q['slippageBps']),'swapMode':'ExactIn',
+                   'priceImpactPct':'0.0012','contextSlot':100,'swapUsdValue':'1.5','routePlan':[{'swapInfo':{'ammKey':RichRpc.pool['pool'],'label':'Raydium','inputMint':q['inputMint'],'outputMint':out,'inAmount':q['amount'],'outAmount':quoted,'feeAmount':'3','feeMint':q['inputMint']},'percent':100}]}
         else:value={'mint':RichRpc.target['mint'],'claim':'Dated public project description; runtime remains separately verified.'}
         return Response(json.dumps(value).encode())

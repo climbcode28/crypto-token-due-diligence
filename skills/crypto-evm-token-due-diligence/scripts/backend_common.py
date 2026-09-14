@@ -10,7 +10,7 @@ from validate_bundle import (Invalid, address, digest, file_in, integer, need,
                              quantity, read_json, sha)
 from rpc_wire import validate_response
 
-ENGINE_VERSION = "3.7.0"
+ENGINE_VERSION = "3.8.0"
 # Public explorers and RPC front doors (Cloudflare) challenge generic client signatures and
 # Chrome-style agents that lack Chrome's client hints; a Safari-style agent is answered normally.
 BROWSER_USER_AGENT = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) "
@@ -40,6 +40,15 @@ def write_new(path, value):
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("xb") as stream:
         stream.write(canonical(value))
+
+
+def replace_json(path, value):
+    """Atomically replace a JSON file start already wrote (a temp file beside it, then rename), so a reader never sees a half-written file."""
+    import os
+    path = Path(path)
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_bytes(canonical(value))
+    os.replace(tmp, path)
 
 
 def label(value):

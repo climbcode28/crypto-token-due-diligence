@@ -7,7 +7,7 @@ from solana_facts import describe,scan,LIMIT_KEYS,ATTENTION_KEYS
 
 VERSION='1.3.1'
 LABELS={'good':'✅ Good','potential_risk':'🟡 Potential Risk','bad':'🔴 Bad','unverified':'⚪ Unverified'}
-PUBLICATION_OPS={'discovery_pools','repository_metadata','repository_revision','repository_tree','public_quote','rugcheck'}
+PUBLICATION_OPS={'discovery_pools','repository_metadata','repository_revision','repository_tree','public_quote','rugcheck','quote_ladder'}
 PUBLICATION_DETAIL_LINES=40
 
 

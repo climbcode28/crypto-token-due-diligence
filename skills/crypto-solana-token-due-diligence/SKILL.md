@@ -85,7 +85,7 @@ analyst arithmetic. Use compact facts and named presets; raw evidence is for dis
    identity; collects discovery, related controls and material pool/transaction/quote
    dependencies with consistency rechecks; builds facts, pipeline findings, an honest
    draft and three note scaffolds; prints a compact facts summary, `diagnostics` and
-   two pointer prompts. Typical wall clock is one to two minutes. Collection commands
+   two pointer prompts. Typical wall clock is one to three minutes, presets included. Collection commands
    need outbound network; in a sandboxed host request it for the exact command first
    (Codex: escalated permissions). A `blocked` start (`network_unavailable` or
    `identity_unavailable`) writes no lane pointers: follow its `next` action, retain its
@@ -100,10 +100,10 @@ analyst arithmetic. Use compact facts and named presets; raw evidence is for dis
 3. **Facts/presets:** judge from the printed summary; run `solana_facts.py --category`
    only for an omitted material detail. Exact holder aggregates, pool reserves,
    position principal, custody controls and execution reconciliation are computed
-   from typed evidence. Run the printed `recommended_presets` in order (request files
-   under `$RUN/recommended-presets/`; up to four presets per run) while the cutoff and
-   grant allow; add a preset only for a hash or address the user or a lane named, never a
-   bare `pool` re-read. Lane self-checks import own captures; `refresh` only after outside captures.
+   from typed evidence. `start` already ran its recommended presets (`presets_run`);
+   run a printed `recommended_presets` row only when start deferred it, with
+   `collect "$RUN" --request <file>` and the same flags. Add up to four presets of your own
+   only for a hash or address the user or a lane named, never a bare `pool` re-read. Lane self-checks import own captures; `refresh` only after outside captures.
 4. **Note:** edit the scaffolded `$RUN/draft/notes/coordinator.json`: assign a signal
    to each pipeline finding, add your own findings for adverse concerns and lane
    conclusions, replace every `TODO`, resolve cross-lane conflicts, fill the eleven
@@ -181,7 +181,7 @@ account/receipt counts, custody exclusions, LP principal versus fees, named
 controllers and bypass paths, quote versus execution, economics/rights, assurance
 levels and the original focus. Describe receipt counts as the verification sample,
 never total market activity; lead with evidenced broad activity and its source.
-Untested larger-trade price impact is a research limit, not evidence of selling
+Impact beyond the quoted ladder sizes is a research limit, not evidence of selling
 difficulty. Use computed holder totals, never mental addition.
 
 Then a **Conclusions** block of exactly four bullets, one or two sentences each, never

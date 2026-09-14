@@ -10,9 +10,9 @@ is a new dated directory under the project's ignored `research/` folder.
 | Step | Minute | One turn each | What you get |
 | --- | --- | --- | --- |
 | 0 | 0:00 | Read the provider policy excerpt (injected at load in Claude Code; `python3 "$SKILL_DIR/scripts/provider_context.py" --policy` in Codex). | Which RPC to use and with which flags. |
-| 1 | 0:10 | `broad_collect.py start` (below). It runs discovery (Dexscreener, Sourcify, explorer creation/holders/transfers/counters), four pinned phases, the source match, the launch signer's explorer activity, writes `facts.json`, composes the **pipeline note** (its own factual findings), pre-charges both lanes, writes both briefs and prints two spawn prompts. | The whole standard collection and the factual half of the report in one process, usually 20–90 s. |
+| 1 | 0:10 | `broad_collect.py start` (below). It runs discovery (Dexscreener, Sourcify, explorer creation/holders/transfers/counters), four pinned phases, the source match, the launch signer's explorer activity, writes `facts.json`, composes the **pipeline note** (its own factual findings), pre-charges both lanes, writes both briefs and prints two spawn prompts. | The whole standard collection, its recommended presets and the factual half of the report in one process, usually 20–120 s. |
 | 2 | 0:30–1:30 | Spawn **both** lanes in **one** message with the two printed one-line prompts (`Read the file …/lanes/<lane>/brief.md and follow it exactly …`). Do not paste or retype the brief and do not read the facts first; every minute the lanes start late is a minute added to the run. | Two lanes working from a self-contained brief; they self-validate their notes with `compose --check` before returning. |
-| 3 | 1:30–3:30 | Read the printed summary (or `bundle_assemble.py facts "$RUN/draft"`). Run the printed recommended presets (usually none or one; at most four while at least 150 s remain before the deadline) **in one shell call, sequentially** (they share the run's session and draft files; parallel processes would race). The queue leads with `positions --ids` for GoPlus-listed LP positions the pipeline has not read (largest share first) when any exist. If the creation transaction is unknown and a lane reports it, add `receipts --tx` and then `positions --ids` from that receipt. | Decoded controls, pools, quotes, balances, positions, receipts, actors with evidence aliases. |
+| 3 | 1:30–3:30 | Read the printed summary (or `bundle_assemble.py facts "$RUN/draft"`). `start` already ran its recommended queue after charging the lanes (`preset-run` lines: `positions --ids` for GoPlus-listed LP positions the pipeline had not read, largest share first; the bounded log scans and the positions they printed; unprobed listed sells) and prints only the rows it deferred for time or budget. Run those **in one shell call, sequentially** (presets share the run's session and draft files; parallel processes would race). If the creation transaction is unknown and a lane reports it, add `receipts --tx` and then `positions --ids` from that receipt. | Decoded controls, pools, quotes, balances, positions, receipts, actors with evidence aliases. |
 | 4 | 4:00–4:30 | Lane notes land in `$RUN/notes/`. Compose **both** in one shell call, sequentially (joined with `;`, never as parallel tool calls: the notes share one draft file): `bundle_assemble.py compose "$RUN/draft" "$RUN/notes/liquidity.json" --lane liquidity` and the same for project. If a lane is absent at 4:30, run its minimum checklist yourself in one `web_capture.py --out "$RUN/lanes/<lane>"` batch, write `$RUN/notes/<lane>.json` with `"lane": "<lane>"` and compose it `--lane <lane>`. | Findings, coverage and scope merged; capture files registered as evidence. |
 | 5 | 4:30–6:00 | `bundle_assemble.py scaffold "$RUN/draft"` writes `$RUN/notes/coordinator.json` with scope entries, a `signals` skeleton for every pipeline finding, all eleven coverage keys (lane results prefilled), the decision and text skeleton, alias hints and `TODO` markers. Edit it: give each pipeline finding its topic and signal, add your own findings (adverse concerns, lane conclusions), replace every `TODO`. Then `bundle_assemble.py finalize "$RUN/draft" --out "$RUN/report" --note "$RUN/notes/coordinator.json"`. | Compose → check → freeze → deliver in one process, or every note-level error at once. |
 | 6 | 6:00–7:00 | Fix note errors once if needed (the error text names the field and the allowed values; it is the specification, never read `compose.py`); write the chat answer from `report.md`. `finalize` marks `composed` and `delivered` for you. | Completed report and a 300–600-word answer. |
@@ -157,7 +157,7 @@ pools, holders or trades, and each ask must end as a finding (inference for docu
 judgements) or a coverage attempt. The scaffold echoes `user_focus` so the verdict answers it.
 
 Run it in the background when the host supports it, or in the foreground: it finishes in
-about 15–90 s. It creates `$RUN/notes/`, `$RUN/lanes/liquidity/` and `$RUN/lanes/project/`,
+about 15–120 s, its recommended presets included. It creates `$RUN/notes/`, `$RUN/lanes/liquidity/` and `$RUN/lanes/project/`,
 charges 20 web requests to each lane, writes `$RUN/lanes/<lane>/brief.md`, and ends its
 output with two `… lane -> Read the file … brief.md …` prompts. Those prompts are step 2,
 verbatim. (`--no-lanes` skips the charges and briefs for a focused question;
@@ -256,8 +256,12 @@ python3 "$SKILL_DIR/scripts/broad_collect.py" collect --run "$RUN" --preset pool
 ```
 
 `facts.json` and `recommended-presets.json` carry `recommended_presets` (`work-plan.json` keeps the
-validator's plan shape), and `start` prints them as `recommended preset N [dimension]: collect … |
-reason` lines: when the identified positions cover less than 80% of the canonical pool's active
+validator's plan shape). `start` derives the queue, charges the lanes, then runs the queue itself under
+the session's remaining seconds (150 s headroom) and requests, chaining a log scan's `then` step (up to
+six printed position ids the pipeline has not read; a positions row is trimmed to the ids the remaining
+requests can cover and the rest printed as a deferred row); `facts.presets_run` and the `preset-run` lines
+record each collection, status and attempt count, and only a row deferred for time or budget is printed
+as `recommended preset N [dimension]: collect … | reason`. The rows are: when the identified positions cover less than 80% of the canonical pool's active
 liquidity, a bounded `logs` scan of the position manager's IncreaseLiquidity events over the
 10,000 blocks from the token's creation block (launch-locked positions are added near launch)
 and, only when that window is disjoint from it, a second scan of the 10,000 blocks before the pin
@@ -266,7 +270,7 @@ enumeration); the logs rows print `token_ids`, which feed `positions --ids` for 
 back at the canonical pool; and `receipts` for indexer-listed sells at the canonical pool that were
 not probed when no sale verified (discovery captures GeckoTerminal's recent trades for the canonical
 pool; listed sells fill the remaining sale-candidate slots, and one slot always goes to the most
-recent listed sell when the explorer named two, since a wallet-to-pool transfer can be a liquidity add). Run them in order; the pipeline itself already reads every owner's
+recent listed sell when the explorer named two, since a wallet-to-pool transfer can be a liquidity add). A row that ran without closing its gap is the named limit, never re-queued. The pipeline itself already reads every owner's
 Safe signers, threshold, module page and guard slot (`owners[*].safe_modules`, `safe_guard`,
 `safe_guard_read`, `safe_modules_truncated`) and, in a second bounded collection (`phase4b`), the
 withdrawal getters of every position custodian with code (`actors[*].role == "position_custodian"`

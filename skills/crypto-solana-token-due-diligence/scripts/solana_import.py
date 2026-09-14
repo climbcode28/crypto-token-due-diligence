@@ -340,12 +340,29 @@ class Importer:
                     if op:self.derive('repo-'+sha(eid.encode())[:16],op,{'capture':eid,'repository':repo})
         # Captured public quotes (a lane's Jupiter lite/keyed capture) become typed quote facts for the exact mint.
         from solana_quotes import quote_request
-        for eid,o in list(self.obs.items()):
-            if o['kind']!='document' or o['status']!='ok':continue
+        quote_ids={};quote_gaps={}  # (source, output mint, size) -> usable quote derivation, or why none exists
+        for eid,o in sorted(self.obs.items(),key=lambda item:(item[1]['captured_at'],item[0])):  # capture order, then id: deterministic
+            if o['kind']!='document':continue
             try:source,request=quote_request(o['source']['capture']['url'])
             except (ValueError,KeyError,TypeError):continue
             if request['input_mint']!=target['mint']:continue
-            self.derive('quote-'+sha(eid.encode())[:16],'public_quote',{'capture':eid,'source':source,'output_mint':request['output_mint'],'input_atomic':request['input_atomic'],'slippage_bps':request['slippage_bps']})
+            key=(source,request['output_mint'],request['input_atomic']);record=o['source']['capture']
+            if o['status']!='ok':
+                quote_gaps.setdefault(key,'capture '+str(o['status'])+(' (http '+str(record['http_status'])+')' if record.get('http_status') else ''));continue
+            qid='quote-'+sha(eid.encode())[:16];before=len(self.errors)
+            if self.derive(qid,'public_quote',{'capture':eid,'source':source,'output_mint':request['output_mint'],'input_atomic':request['input_atomic'],'slippage_bps':request['slippage_bps']}):quote_ids.setdefault(key,qid)
+            else:quote_gaps.setdefault(key,'quote not usable: '+str(self.errors[before]['reason']) if len(self.errors)>before else 'quote not usable')
+        # One ladder per (source, output mint), bound to the quote_sizes policy: only a quote at a policy size joins it (a lane quote
+        # at another size stays its own fact and can never displace a policy size), and a policy size without a usable quote is a
+        # named row, so sellability carries a measured impact across the three illustrative sizes or says which size is missing.
+        if 'auto-sizes' in self.objects:
+            policy=[s['input_atomic'] for s in self.objects['auto-sizes'].get('sizes',[]) if isinstance(s,dict) and s.get('input_atomic')]
+            groups={}
+            for (source,output_mint,size),qid in quote_ids.items():
+                if size in policy:groups.setdefault((source,output_mint),{})[size]=qid
+            for (source,output_mint),by_size in sorted(groups.items()):
+                missing={size:quote_gaps.get((source,output_mint,size),'not captured') for size in policy if size not in by_size}
+                self.derive('ladder-'+sha((source+output_mint).encode())[:16],'quote_ladder',{'sizes':'auto-sizes','quotes':[by_size[s] for s in policy if s in by_size],'source':source,'output_mint':output_mint,'missing':missing})
         txs=[]
         for eid,c in list(self.checked.items()):
             if c['status']=='ok' and self.objects[eid]['request']['method']=='getTransaction':

@@ -17,7 +17,7 @@ from pathlib import Path
 
 import presets
 from sale_decode import decode_sale
-from backend_common import Cache, Invalid, address, integer, need, quantity, read_json, sha, stamp, write_new
+from backend_common import Cache, Invalid, address, canonical, integer, need, quantity, read_json, replace_json, sha, stamp, write_new
 from evm_decode import classify_clone
 from facts import DEAD, SELECTORS, TRANSFER, account_code_kind, holder_summary, decimal_string, decode_result, summarize_row, transfers
 from keccak import selector, topic
@@ -910,6 +910,10 @@ class Pipeline:
         """Uncached discovery read; not imported as pinned evidence (a receipt needs its own pin)."""
         need(isinstance(tx_hash, str) and re.fullmatch(r"0x[0-9a-f]{64}", tx_hash), "transaction hash must be 32 lowercase hex bytes")
         root = self.run / ("lookup-" + tx_hash[2:10])
+        n = 2
+        while root.exists():  # a hash looked up earlier in this run (a sale candidate) gets its own directory; evidence is never overwritten
+            root = self.run / ("lookup-" + tx_hash[2:10] + "-" + str(n))
+            n += 1
         collector = Collector(root, self.cache, self.transport, self.endpoint_label, max_requests=2, timeout=self.remaining_timeout(20), session=self.session)
         collector.root.mkdir(parents=True)
         collector.target = self.target
@@ -1148,6 +1152,10 @@ class Pipeline:
                 custodians.setdefault(presets.label("pos-owner-" + position["owner"][2:8]), position["owner"])
         known = {self.target["address"], DEAD, *architecture_addresses} - set(custodians.values())
         actors = {k: v for k, v in actors.items() if v not in known}
+        # Position custodians lead the bounded list: a receipt-heavy run (three receipts with six transfers each) must never
+        # push a custodian past the ten-actor cap, or its withdrawal getters would go unread (a live PONS run did exactly that).
+        custodian_addrs = set(custodians.values())
+        actors = {**{k: v for k, v in actors.items() if v in custodian_addrs}, **actors}
         seen = set()
         unique = {}
         for name, addr in actors.items():
@@ -1168,7 +1176,6 @@ class Pipeline:
                              "evidence": "actor-" + presets.label(name)}
         # A position custodian is matched by address (its actor row may carry a receipt or transfer label); one with code
         # answers its withdrawal getters in a second bounded collection, an EOA owner has none to answer.
-        custodian_addrs = set(custodians.values())
         probe = {name: addr for name, addr in unique.items() if addr in custodian_addrs and (details[name]["code_bytes"] or 0) > 0}
         for name, addr in unique.items():
             if addr in custodian_addrs:
@@ -1418,8 +1425,9 @@ def decode_module_page(raw):
 
 
 def recommended_presets(facts):
-    """Presets the coordinator should run next, derived from the facts. Empty when the standard reads covered the routes:
-    Safe modules and guard, locker getters, position custody and sale receipts are read by the pipeline itself."""
+    """Presets derived from the facts, run by start itself (run_recommended) and printed for the coordinator when one was
+    deferred. Empty when the standard reads covered the routes: Safe modules and guard, locker getters, position custody and
+    sale receipts are read by the pipeline itself. Each row carries the exact `command` and the same request as `params`."""
     out = []
     pin = (facts.get("pin") or {}).get("number")
     pools = facts.get("pools") or []
@@ -1427,7 +1435,7 @@ def recommended_presets(facts):
     if unread:
         ids = unread[:6]
         out.append({"preset": "positions", "dimension": "canonical_lp_principal_custody",
-                    "command": f'collect --run "$RUN" --preset positions --ids {",".join(str(i) for i in ids)}',
+                    "command": f'collect --run "$RUN" --preset positions --ids {",".join(str(i) for i in ids)}', "params": {"preset": "positions", "ids": ids},
                     "reason": f"GoPlus lists {len(unread)} LP position ids the pipeline has not read; reading them verifies the listed LP holders' custody and shares on chain"})
     canonical = next((p for p in pools if p.get("read") == "v3" and p.get("target_in_pool")), None)
     nfpm = next((a["address"] for a in facts.get("architecture") or [] if a.get("label") == "nfpm"), None)
@@ -1442,8 +1450,10 @@ def recommended_presets(facts):
         if not windows or windows[0][2] < max(0, pin - span):
             windows.append(("recent window", max(0, pin - span), pin))
         for label, frm, to in windows[:2]:
+            increase = topic("IncreaseLiquidity(uint256,uint128,uint256,uint256)")
             out.append({"preset": "logs", "dimension": "canonical_lp_principal_custody",
-                        "command": f'collect --run "$RUN" --preset logs --contract {nfpm} --topic {topic("IncreaseLiquidity(uint256,uint128,uint256,uint256)")} --from-block {frm} --to-block {to}',
+                        "command": f'collect --run "$RUN" --preset logs --contract {nfpm} --topic {increase} --from-block {frm} --to-block {to}',
+                        "params": {"preset": "logs", "contract": nfpm, "topic": increase, "from_block": frm, "to_block": to, "window": label},
                         "then": 'collect --run "$RUN" --preset positions --ids <the token_ids the logs rows print; keep the ids whose positions read back at the canonical pool>',
                         "reason": f"identified positions cover {covered}% of the canonical pool's active liquidity; {label} of {to - frm + 1} blocks (eth_getLogs ranges are capped at {span + 1}), a sample of liquidity adds, never an enumeration"})
     verified = any(s.get("verified") for s in facts.get("sales") or [])
@@ -1451,7 +1461,7 @@ def recommended_presets(facts):
     pending = [tx for tx in (facts.get("indexed") or {}).get("indexed_sells") or [] if tx not in probed][:2]
     if not verified and pending:
         out.append({"preset": "receipts", "dimension": "sellability_exit_depth",
-                    "command": f'collect --run "$RUN" --preset receipts --tx {",".join(pending)}',
+                    "command": f'collect --run "$RUN" --preset receipts --tx {",".join(pending)}', "params": {"preset": "receipts", "tx": pending},
                     "reason": "no sale verified yet; these indexer-listed sells at the canonical pool were not probed"})
     return out[:4]
 
@@ -1537,11 +1547,16 @@ def summary_lines(facts):
             lines.append("goplus-lp-holders: " + lp)
     elif g.get("status"):
         lines.append(f"goplus: {g.get('status')} (third-party token security not available for this run)")
+    for r in facts.get("presets_run") or []:
+        head = f"preset-run {r['preset']} {r['status']}" + (f" [{r['collection']}] attempts={r.get('attempts')} elapsed={r.get('elapsed_seconds')}s" if r.get("collection") else "")
+        lines.append(head + f" | {r['command']}" + (f" | chained from the {r['chained_from']}" if r.get("chained_from") else "") + (f" | trimmed from {r['trimmed_from']} ids to fit the remaining requests" if r.get("trimmed_from") else "")
+                     + (f" | {r['reason']}" if r.get("reason") else ""))
     recommended = facts.get("recommended_presets") or []
     for n, r in enumerate(recommended, 1):
         lines.append(f"recommended preset {n} [{r['dimension']}]: {r['command']} | {r['reason']}" + (f" | then: {r['then']}" if r.get("then") else ""))
     if not recommended:
-        lines.append("recommended presets: none; the standard reads covered custody, Safe modules/guard, custodian getters and sale receipts")
+        lines.append("recommended presets: none remain; start ran its queue itself" if facts.get("presets_run") else
+                     "recommended presets: none; the standard reads covered custody, Safe modules/guard, custodian getters and sale receipts")
     if facts.get("review"):
         lines.append("budget review: " + json.dumps(facts["review"]))
     return lines
@@ -1573,8 +1588,204 @@ def brief(run, lane, minutes, allow_partial=False):
     return filled
 
 
+PRESET_FIELDS = ("prefix", "tx", "ids", "manager", "contract", "signatures", "asset", "holders", "contracts", "topic", "from_block", "to_block", "version", "max_requests")
+
+
+def preset_args(params):
+    """The argparse-shaped request for a recommended row's `params` (the same request its printed command makes)."""
+    from types import SimpleNamespace
+    args = SimpleNamespace(preset=params["preset"], **{k: None for k in PRESET_FIELDS})
+    if params["preset"] == "positions":
+        args.ids = ",".join(str(i) for i in params["ids"])
+    elif params["preset"] == "logs":
+        args.contract, args.topic, args.from_block, args.to_block = params["contract"], params["topic"], params["from_block"], params["to_block"]
+    elif params["preset"] == "receipts":
+        args.tx = ",".join(params["tx"])
+    else:
+        raise Invalid("unsupported recommended preset " + str(params["preset"]))
+    return args
+
+
+def build_preset(pipeline, facts, args):
+    """The pinned plan for one preset request: (collection name, plan, query count, pins)."""
+    target = facts["target"]
+    head = facts["pin"]["number"]
+    pin = "current"
+    pins = {"current": head}
+    prefix = presets.label(args.prefix or args.preset)
+    required = {"receipts": "tx", "positions": "ids", "getters": "signatures", "balances": "holders", "architecture": "contracts", "logs": "contract", "pool": "contract"}
+    need(getattr(args, required[args.preset]) is not None, "--" + required[args.preset].replace("_", "-") + " is required for preset " + args.preset)
+    if args.preset in ("getters", "logs", "pool"):
+        need(args.contract is not None, "--contract is required for preset " + args.preset)
+    if args.preset == "logs":
+        need(args.from_block is not None and args.to_block is not None, "--from-block and --to-block are required for preset logs")
+    if args.preset == "receipts":
+        transactions = {}
+        for tx in args.tx.split(","):
+            tx = tx.strip().lower()
+            need(re.fullmatch(r"0x[0-9a-fA-F]{64}", tx), "transaction hash must be 32 bytes")
+            need(pipeline.session is None or pipeline.session.status()["remaining_requests"] >= 1, "request budget exhausted before the receipt lookup for " + tx)
+            block = pipeline.lookup_block(tx)
+            need(block is not None, "receipt not found for " + tx)
+            transactions[tx] = block
+        pins, queries = presets.receipt_queries(transactions)
+    elif args.preset == "positions":
+        ids = [integer(int(x), "token id") for x in args.ids.split(",")]
+        queries = presets.position_queries(prefix, pin, args.manager or (pipeline.registry.get("uniswap_v3") or {}).get("nonfungible_position_manager"), ids)
+    elif args.preset == "getters":
+        signatures = [s.strip() for s in args.signatures.split(",") if s.strip()]
+        queries = [presets.code(prefix + "-runtime", pin, args.contract)] + presets.getter_queries(prefix, pin, args.contract, signatures)
+        for sig in signatures:
+            pipeline.names[selector(sig)] = sig.split("(")[0]
+    elif args.preset == "balances":
+        holders = dict(item.split("=", 1) for item in args.holders.split(","))
+        queries = presets.balance_queries(prefix, pin, args.asset or target["address"], holders)
+    elif args.preset == "architecture":
+        contracts = dict(item.split("=", 1) for item in args.contracts.split(","))
+        queries = presets.architecture_queries(prefix, pin, contracts)
+    elif args.preset == "logs":
+        topics = [args.topic] if args.topic else []
+        queries = [presets.range_log_query(prefix + "-logs", pin, args.contract, topics, args.from_block, args.to_block)]
+    elif args.preset == "pool":
+        queries = presets.pool_queries(prefix, pin, args.contract, args.version or "v3")
+        queries += presets.balance_queries(prefix + "-bal", pin, target["address"], {"pool": args.contract})
+    else:
+        raise Invalid("unsupported preset")
+    plan = presets.plan(target, pins, queries)
+    name = "preset-" + prefix + "-" + sha(json.dumps(plan, sort_keys=True).encode())[:8]
+    return name, plan, len(queries), pins, prefix
+
+
+def collect_preset(run, pipeline, session, facts, name, plan, max_requests, prefix):
+    """One pinned preset collection imported into the draft: the same path for a coordinator `collect` and for start's own queue."""
+    from bundle_assemble import import_collection
+    write_new(run / (name + "-plan.json"), plan)
+    result = pipeline.collect(name, plan, max_requests=max_requests)
+    if result["status"] in ("complete", "partial"):
+        import_collection(run / "draft", run / name, bool(getattr(pipeline, "synthetic", False)))
+    names = read_json(run / "getter-names.json") if (run / "getter-names.json").is_file() else {}
+    names.update(pipeline.names)
+    (run / "getter-names.json").write_text(json.dumps(names, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+    decimals = facts.get("metadata", {}).get("decimals")
+    rows = [summarize_row(run / name, row, names, decimals) for row in result["evidence"] if not row["id"].startswith("sys-")]
+    if session.schema >= 3:
+        session.mark("preset_" + re.sub(r"[^A-Za-z0-9_]", "_", prefix)[:20])
+    return {"collection": name, "status": result["status"], "attempts": result["statistics"]["network_attempts"],
+            "elapsed_seconds": result["telemetry"]["elapsed_seconds"], "imported": result["status"] in ("complete", "partial"), "rows": rows}
+
+
+QUEUE_HEADROOM = 150  # seconds that must remain before the deadline for start to run a recommended preset itself (the SKILL's rule for presets)
+
+
+def preset_estimate(params):
+    """Requests a recommended row will spend, counted before anything is sent: its queries, one pin header and recheck per pin,
+    the chain check, and for receipts the uncached block lookup each hash needs first."""
+    if params["preset"] == "positions":
+        return 1 + 3 * len(params["ids"]) + 4
+    if params["preset"] == "logs":
+        return 1 + 4
+    if params["preset"] == "receipts":
+        return 5 * len(params["tx"]) + 2
+    raise Invalid("unsupported recommended preset " + str(params.get("preset")))
+
+
+def run_recommended(run, pipeline, session, facts, headroom=QUEUE_HEADROOM, reserve=0):
+    """Start's own execution of the recommended queue under the run's session, pin and provider: each row is the same
+    pinned collection its printed command would make, so a derived follow-up never waits for a coordinator turn or a
+    second paid-use approval. A row is deferred (left in the printed queue) when fewer than `headroom` seconds remain or
+    the leftover requests, less `reserve`, would not cover it; a logs row's `then` step is chained: up to six of the
+    position ids the scan printed that the pipeline has not read are read next. Returns (rows run or deferred, remaining)."""
+    ran = []
+    queue = list(facts.get("recommended_presets") or [])
+    read_ids = {p.get("id") for p in facts.get("positions") or []}
+    while queue:
+        row = queue.pop(0)
+        params = row.get("params")
+        entry = {"preset": row["preset"], "dimension": row.get("dimension"), "command": row["command"], "params": params, "collection": None, "status": None, "attempts": 0, "elapsed_seconds": None}
+        if row.get("chained_from"):
+            entry["chained_from"] = row["chained_from"]
+        if not params:
+            ran.append({**entry, "status": "deferred", "reason": "the row carries no structured request; run its command"})
+            continue
+        # The time and budget checks precede any send: a receipts row's block lookups are themselves charged requests.
+        try:
+            estimate = preset_estimate(params)
+        except (Invalid, KeyError, TypeError) as exc:
+            ran.append({**entry, "status": "failed", "reason": str(exc)[:160]})
+            continue
+        status = session.status()
+        if status["remaining_seconds"] < headroom:
+            ran.append({**entry, "status": "deferred", "reason": f"fewer than {headroom} s remained before the deadline; run its command only if time allows"})
+            continue
+        left = max(0, status["remaining_requests"] - reserve)
+        if left < estimate and params["preset"] == "positions" and (left - 5) // 3 >= 1:
+            # A positions row is trimmed to the ids the remaining requests can cover; the rest are printed as a deferred row.
+            fit = (left - 5) // 3
+            rest = {**params, "ids": params["ids"][fit:]}
+            ran.append({**entry, "params": rest, "command": f'collect --run "$RUN" --preset positions --ids {",".join(str(i) for i in rest["ids"])}', "status": "deferred",
+                        "reason": f"{len(rest['ids'])} of {len(params['ids'])} ids did not fit the {left} requests that remained after the lane charges"})
+            params = {**params, "ids": params["ids"][:fit]}
+            entry.update(params=params, command=f'collect --run "$RUN" --preset positions --ids {",".join(str(i) for i in params["ids"])}', trimmed_from=len(rest["ids"]) + fit)
+            estimate = preset_estimate(params)
+        if left < estimate:
+            ran.append({**entry, "status": "deferred", "reason": f"about {estimate} requests needed, {left} remain after the lane charges"})
+            continue
+        try:
+            args = preset_args(params)
+            name, plan, count, pins, prefix = build_preset(pipeline, facts, args)
+        except (Invalid, ValueError, KeyError, TypeError) as exc:
+            ran.append({**entry, "status": "failed", "reason": str(exc)[:160]})
+            continue
+        needed = count + 2 * len(pins) + 2
+        try:
+            result = collect_preset(run, pipeline, session, facts, name, plan, needed, prefix)
+        except (Invalid, ValueError, OSError, KeyError, TypeError) as exc:
+            ran.append({**entry, "status": "failed", "reason": str(exc)[:160]})
+            continue
+        ran.append({**entry, "collection": result["collection"], "status": result["status"], "attempts": result["attempts"], "elapsed_seconds": result["elapsed_seconds"],
+                    "rows": [{k: r.get(k) for k in ("alias", "status", "decoded")} for r in result["rows"]][:40]})
+        if params["preset"] == "positions":
+            read_ids.update(params["ids"])
+        elif params["preset"] == "logs" and result["status"] in ("complete", "partial"):
+            printed = [i for r in result["rows"] for i in ((r.get("decoded") or {}).get("token_ids") or [])]
+            ids = [i for i in dict.fromkeys(printed) if i not in read_ids][:6]
+            if ids:
+                queue.insert(0, {"preset": "positions", "dimension": row.get("dimension"), "params": {"preset": "positions", "ids": ids},
+                                 "command": f'collect --run "$RUN" --preset positions --ids {",".join(str(i) for i in ids)}', "chained_from": params.get("window", "log scan"),
+                                 "reason": f"positions the {params.get('window', 'log')} scan printed ({len(set(printed))} ids); the ones that read back at the canonical pool join the custody cross-check"})
+    return ran, queue
+
+
+def remaining_recommendations(run, facts, ran):
+    """The queue after start ran its rows: re-derived from the facts with the positions the presets read merged in, minus
+    every row start ran (a scan that did not close its gap is the named limit, not a loop) and plus the deferred rows."""
+    from bundle_assemble import read_draft
+    from pipeline_note import positions_from_draft
+    merged = dict(facts)
+    try:
+        later = positions_from_draft(run, read_draft(run / "draft"), facts)
+    except (Invalid, ValueError, OSError, KeyError, TypeError):
+        later = []
+    if later:
+        merged["positions"] = list(facts.get("positions") or []) + later
+        if (facts.get("goplus") or {}).get("status") == "ok":
+            merged["goplus"] = goplus_facts(facts["goplus"], merged["positions"], facts.get("top_holders"), facts.get("balances"), facts.get("pools"))
+    # A scan or receipts row that ran (whatever it closed) is done for its kind and surface, and a position id that was read
+    # (or reverted) is never offered again: a partial read or an open coverage gap is the named limit, never re-queued with a
+    # narrower command. Position ids nothing has read yet (the listed ids beyond a six-id row) are new work and stay offered.
+    ran_rows = [r for r in ran if r["status"] != "deferred"]
+    done = {(r["preset"], r["dimension"]) for r in ran_rows if r["preset"] != "positions"}
+    read_ids = {i for r in ran_rows if (r.get("params") or {}).get("preset") == "positions" for i in r["params"]["ids"]}
+    fresh = [r for r in recommended_presets(merged) if (r["preset"], r["dimension"]) not in done
+             and not (r["preset"] == "positions" and set((r.get("params") or {}).get("ids") or []) & read_ids)]
+    commands = {r["command"] for r in fresh}
+    for r in ran:
+        if r["status"] == "deferred" and r["command"] not in commands:
+            fresh.append({k: r[k] for k in ("preset", "dimension", "command", "params") if k in r} | {"reason": r.get("reason", "deferred by start")})
+    return fresh[:4]
+
+
 def preset_collect(args):
-    from bundle_assemble import import_collection, read_draft
     from investigation import Investigation
     run = Path(args.run)
     facts = read_json(run / "facts.json")
@@ -1590,63 +1801,9 @@ def preset_collect(args):
         transport = configured_transport(args)
         pipeline = Pipeline(run, target, facts.get("question", ""), "", transport, session, cache, args.endpoint_label)
         pipeline.pin = facts["pin"]
-        head = facts["pin"]["number"]
-        pin = "current"
-        pins = {"current": head}
-        prefix = presets.label(args.prefix or args.preset)
-        required = {"receipts": "tx", "positions": "ids", "getters": "signatures", "balances": "holders", "architecture": "contracts", "logs": "contract", "pool": "contract"}
-        need(getattr(args, required[args.preset]) is not None, "--" + required[args.preset].replace("_", "-") + " is required for preset " + args.preset)
-        if args.preset in ("getters", "logs", "pool"):
-            need(args.contract is not None, "--contract is required for preset " + args.preset)
-        if args.preset == "logs":
-            need(args.from_block is not None and args.to_block is not None, "--from-block and --to-block are required for preset logs")
-        if args.preset == "receipts":
-            transactions = {}
-            for tx in args.tx.split(","):
-                tx = tx.strip().lower()
-                need(re.fullmatch(r"0x[0-9a-fA-F]{64}", tx), "transaction hash must be 32 bytes")
-                block = pipeline.lookup_block(tx)
-                need(block is not None, "receipt not found for " + tx)
-                transactions[tx] = block
-            pins, queries = presets.receipt_queries(transactions)
-        elif args.preset == "positions":
-            ids = [integer(int(x), "token id") for x in args.ids.split(",")]
-            queries = presets.position_queries(prefix, pin, args.manager or (pipeline.registry.get("uniswap_v3") or {}).get("nonfungible_position_manager"), ids)
-        elif args.preset == "getters":
-            signatures = [s.strip() for s in args.signatures.split(",") if s.strip()]
-            queries = [presets.code(prefix + "-runtime", pin, args.contract)] + presets.getter_queries(prefix, pin, args.contract, signatures)
-            for sig in signatures:
-                pipeline.names[selector(sig)] = sig.split("(")[0]
-        elif args.preset == "balances":
-            holders = dict(item.split("=", 1) for item in args.holders.split(","))
-            queries = presets.balance_queries(prefix, pin, args.asset or target["address"], holders)
-        elif args.preset == "architecture":
-            contracts = dict(item.split("=", 1) for item in args.contracts.split(","))
-            queries = presets.architecture_queries(prefix, pin, contracts)
-        elif args.preset == "logs":
-            topics = [args.topic] if args.topic else []
-            queries = [presets.range_log_query(prefix + "-logs", pin, args.contract, topics, args.from_block, args.to_block)]
-        elif args.preset == "pool":
-            queries = presets.pool_queries(prefix, pin, args.contract, args.version or "v3")
-            queries += presets.balance_queries(prefix + "-bal", pin, target["address"], {"pool": args.contract})
-        else:
-            raise Invalid("unsupported preset")
-        plan = presets.plan(target, pins, queries)
-        name = "preset-" + prefix + "-" + sha(json.dumps(plan, sort_keys=True).encode())[:8]
-        write_new(run / (name + "-plan.json"), plan)
-        result = pipeline.collect(name, plan, max_requests=args.max_requests or (len(queries) + 2 * len(pins) + 2))
-        if result["status"] in ("complete", "partial"):
-            import_collection(run / "draft", run / name, False)
-        names = read_json(run / "getter-names.json") if (run / "getter-names.json").is_file() else {}
-        names.update(pipeline.names)
-        (run / "getter-names.json").write_text(json.dumps(names, sort_keys=True, indent=2) + "\n", encoding="utf-8")
-        decimals = facts.get("metadata", {}).get("decimals")
-        rows = [summarize_row(run / name, row, names, decimals) for row in result["evidence"] if not row["id"].startswith("sys-")]
-        if session.schema >= 3:
-            session.mark("preset_" + re.sub(r"[^A-Za-z0-9_]", "_", prefix)[:20])
-        print(json.dumps({"collection": name, "status": result["status"], "attempts": result["statistics"]["network_attempts"],
-                          "elapsed_seconds": result["telemetry"]["elapsed_seconds"], "imported": result["status"] in ("complete", "partial"),
-                          "rows": rows, "session": session.status()}, sort_keys=True, default=str)[:20000])
+        name, plan, count, pins, prefix = build_preset(pipeline, facts, args)
+        result = collect_preset(run, pipeline, session, facts, name, plan, args.max_requests or (count + 2 * len(pins) + 2), prefix)
+        print(json.dumps({**result, "session": session.status()}, sort_keys=True, default=str)[:20000])
         status_code = 0 if result["status"] == "complete" else 2
     finally:
         cache.close()
@@ -1771,6 +1928,15 @@ def main():
                                 web=not args.no_web, synthetic=bool(args.fixture))
             facts = pipeline.run_all()
             lanes = None if args.no_lanes else prepare_lanes(args.run, session)
+            if lanes and facts.get("recommended_presets"):
+                # The lanes are charged first; start then runs its own queue on what is left, so a derived follow-up never
+                # costs a coordinator turn or a second paid-use approval. The facts carry every outcome.
+                ran, _ = run_recommended(args.run, pipeline, session, facts)
+                facts["presets_run"] = ran
+                facts["recommended_presets"] = remaining_recommendations(args.run, facts, ran)
+                facts["session"] = session.status()
+                replace_json(args.run / "facts.json", facts)
+                replace_json(args.run / "recommended-presets.json", facts["recommended_presets"])
         finally:
             cache.close()
             session.close()

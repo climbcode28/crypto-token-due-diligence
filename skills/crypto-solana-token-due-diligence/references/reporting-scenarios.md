@@ -49,6 +49,16 @@ run or whose sources answered nothing (its `gap_basis` says which).
   under a lock or program custody with no reachable withdrawal path; `potential_risk` when
   identified custody covers a minority of active liquidity or a custodian can withdraw, stating
   the covered share; `bad` when a single unlocked owner can remove most of it.
+- **Exit depth (sellability_exit_depth):** the `quote_ladder` fact (read-only Jupiter quotes
+  at the three `quote_sizes` policy sizes, selling into the leading pool's counter asset) is
+  rated from its own fields, never from a row's `provider_price_impact_raw`: `good` when
+  `largest_size_quoted` is true, `largest_impact_vs_smallest_percent` is at most 5 and a sale
+  is verified (`sales.verified_receipts`) or the captured trade feed lists trades;
+  `potential_risk` when that figure exceeds 5 or any row's `status` is not `quoted` (the row's
+  `reason` names the missing capture or route), stating the figure; `unverified` only when no
+  ladder fact exists (the `quote_capture_skipped` diagnostic or `quote-ladder.json` names why;
+  cite any `public_quote` facts individually when quotes exist without a ladder). Quotes are
+  provider claims at illustrative sizes, never execution; impact beyond them stays a stated limit.
 - **Policies (utility_redemption_rights, token economics):** a published discretionary buyback,
   burn or revenue policy without on-chain execution evidence is `potential_risk` (discretion is
   the observed concern); with verified rebuys or burns it may be `good` for the executed part.

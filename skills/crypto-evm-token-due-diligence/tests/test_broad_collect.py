@@ -135,6 +135,10 @@ class PipelineRpc:
             result = self.call(params[0]["to"], params[0]["data"])
         elif method == "eth_getStorageAt":
             result = word_address(GUARD) if params[0] == SAFE and params[1].lower() == GUARD_SLOT else abi(0)
+        elif method == "eth_getLogs":
+            increase = topic("IncreaseLiquidity(uint256,uint128,uint256,uint256)")
+            result = [{"address": NFPM, "topics": [increase, abi(7)], "data": "0x", "blockNumber": hex(90), "blockHash": hh(90), "transactionHash": CREATION_TX, "transactionIndex": "0x0", "logIndex": "0x2", "removed": False},
+                      {"address": NFPM, "topics": [increase, abi(15)], "data": "0x", "blockNumber": hex(92), "blockHash": hh(92), "transactionHash": hh("liquidity add"), "transactionIndex": "0x0", "logIndex": "0x0", "removed": False}]
         elif method == "eth_getTransactionReceipt":
             result = self.receipt() if params[0] == CREATION_TX else self.sale_receipt() if params[0] == SELL_TX else None
         elif method == "eth_getTransactionByHash":
@@ -212,7 +216,7 @@ def fake_fetch(items, out):
 
 
 class BroadCollectTests(unittest.TestCase):
-    def run_pipeline(self, root, rpc=None):
+    def run_pipeline(self, root, rpc=None, queue=False, headroom=None, reserve=0, presets=None):
         session = Investigation.create(root / "session.sqlite", 200, 600, request_ceiling=300, timeout_ceiling=900, limit_basis="analyst_safety")
         cache = Cache(root / "cache.sqlite")
         rpc = rpc or PipelineRpc()
@@ -221,6 +225,15 @@ class BroadCollectTests(unittest.TestCase):
             pipeline = Pipeline(root, {"chain_id": CHAIN, "address": TOKEN}, "Synthetic pipeline question", "All authority material",
                                 rpc, session, cache, "synthetic", fetch=fake_fetch, synthetic=True, registry=REGISTRY)
             facts = pipeline.run_all()
+            if queue:  # what main() does after the lane charges: start runs its own queue and rewrites the facts
+                from broad_collect import run_recommended, remaining_recommendations
+                if presets is not None:
+                    facts["recommended_presets"] = presets
+                ran, _ = run_recommended(root, pipeline, session, facts, reserve=reserve, **({"headroom": headroom} if headroom is not None else {}))
+                facts["presets_run"] = ran
+                facts["recommended_presets"] = remaining_recommendations(root, facts, ran)
+                (root / "facts.json").write_bytes(canonical(facts))
+                (root / "recommended-presets.json").write_bytes(canonical(facts["recommended_presets"]))
             status = session.status()
         finally:
             cache.close()
@@ -526,6 +539,92 @@ class BroadCollectTests(unittest.TestCase):
             self.assertIn("verified as position 12", custody["text"])
             self.assertNotIn("Unread listed position ids", custody["text"])
 
+    def test_start_runs_the_recommended_queue_itself_and_chains_positions_from_the_log_scan(self):
+        from pipeline_note import write_and_compose
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "run"
+            root.mkdir()
+            facts, rpc, status = self.run_pipeline(root, queue=True)
+            ran = facts["presets_run"]
+            # The GoPlus-listed unread position first, then the launch-window scan, then the ids the scan printed that no read covered (7 was the pipeline's own).
+            self.assertEqual([(r["preset"], r["status"]) for r in ran], [("positions", "complete"), ("logs", "complete"), ("positions", "complete")], ran)
+            self.assertIn("--ids 12", ran[0]["command"])
+            self.assertIn("--ids 15", ran[2]["command"])
+            self.assertEqual(ran[2]["chained_from"], "launch window")
+            self.assertTrue(all(r["collection"].startswith("preset-") and (root / r["collection"] / "collection.json").is_file() for r in ran), ran)
+            self.assertEqual([r["decoded"] for r in ran[1]["rows"] if r["decoded"]], [{"logs": 2, "token_ids": [7, 15], "token_ids_total": 2}])
+            self.assertEqual(facts["recommended_presets"], [], "a scan that did not close the coverage gap is the named limit, never re-queued")
+            self.assertEqual(read_json(root / "recommended-presets.json"), [])
+            self.assertEqual([p["phase"] for p in status["phases"]][-3:], ["preset_positions", "preset_logs", "preset_positions"])
+            self.assertEqual(len(rpc.calls), 102 + 16, "three preset collections at the run's pin: each costs its chain check, pin header and recheck (3) plus its queries; the position manager's code read is a cache hit, so a one-position read is three calls and the scan one")
+            summary = "\n".join(summary_lines(facts))
+            self.assertIn("preset-run positions complete [preset-positions-", summary)
+            self.assertIn("recommended presets: none remain; start ran its queue itself", summary)
+            self.assertEqual(len(read_draft(root / "draft")["collections"]), 8)
+            write_and_compose(root)
+            custody = next(f for f in read_json(root / "notes" / "pipeline.json")["findings"] if f["id"] == "pipeline-launch-position-custody")
+            self.assertIn("verified as position 12", custody["text"])
+            self.assertNotIn("Unread listed position ids", custody["text"])
+        # Without enough time before the deadline every row is deferred: the printed queue keeps the rows and says why.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "run"
+            root.mkdir()
+            facts, rpc, status = self.run_pipeline(root, queue=True, headroom=10 ** 6)
+            self.assertEqual([(r["preset"], r["status"]) for r in facts["presets_run"]], [("positions", "deferred"), ("logs", "deferred")])
+            self.assertEqual([q["command"] for q in facts["recommended_presets"]], [r["command"] for r in facts["presets_run"]])
+            self.assertTrue(all("params" in q for q in facts["recommended_presets"]), "a re-derived row keeps its structured request")
+            self.assertEqual(len(rpc.calls), 102, "a deferred row costs nothing")
+        # Too few requests after the lane charges defers every row before anything is sent, with the estimate named.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "run"
+            root.mkdir()
+            facts, rpc, status = self.run_pipeline(root, queue=True, reserve=10 ** 6)
+            self.assertEqual([r["status"] for r in facts["presets_run"]], ["deferred", "deferred"])
+            self.assertIn("about 8 requests needed", facts["presets_run"][0]["reason"])
+            self.assertEqual(len(rpc.calls), 102)
+        # Listed ids beyond a six-id row stay offered after the queue; an id that was read or reverted is never offered again.
+        from broad_collect import remaining_recommendations
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "run"
+            root.mkdir()
+            facts, rpc, status = self.run_pipeline(root)
+            ran = [{"preset": "positions", "dimension": "canonical_lp_principal_custody", "status": "partial", "command": "c1", "params": {"preset": "positions", "ids": [1, 2, 3, 4, 5, 6]}}]
+            listed = {**facts, "goplus": {**facts["goplus"], "unread_lp_nft_ids": [7, 8, 9, 10]}}
+            self.assertEqual([q["params"]["ids"] for q in remaining_recommendations(root, listed, ran) if q["preset"] == "positions"], [[7, 8, 9, 10]])
+            overlapping = {**facts, "goplus": {**facts["goplus"], "unread_lp_nft_ids": [3, 4, 7]}}
+            self.assertEqual([q for q in remaining_recommendations(root, overlapping, ran) if q["preset"] == "positions"], [], "a reverted or partially read id is the named limit, not a narrower re-queue")
+        # A positions row is trimmed to the ids the remaining requests can cover; the rest stay printed as a deferred row.
+        three = [{"preset": "positions", "dimension": "canonical_lp_principal_custody", "command": 'collect --run "$RUN" --preset positions --ids 12,15,16',
+                  "params": {"preset": "positions", "ids": [12, 15, 16]}, "reason": "synthetic"}]
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "run"
+            root.mkdir()
+            facts, rpc, status = self.run_pipeline(root, queue=True, presets=three, reserve=200 - 113 - 11)  # eleven requests left: two ids fit
+            ran = facts["presets_run"]
+            self.assertEqual([(r["preset"], r["status"], r["params"]["ids"]) for r in ran], [("positions", "deferred", [16]), ("positions", "complete", [12, 15])])
+            self.assertEqual((ran[1]["trimmed_from"], ran[1]["command"]), (3, 'collect --run "$RUN" --preset positions --ids 12,15'))
+            self.assertIn("1 of 3 ids did not fit the 11 requests", ran[0]["reason"])
+            self.assertEqual([q["params"]["ids"] for q in facts["recommended_presets"] if q["preset"] == "positions"], [[16]])
+            self.assertIn("trimmed from 3 ids to fit the remaining requests", "\n".join(summary_lines(facts)))
+            self.assertLessEqual(len(rpc.calls), 102 + 11)
+        # A receipts row is deferred before its block lookups are charged, and runs as a pinned receipt collection otherwise.
+        receipts = [{"preset": "receipts", "dimension": "sellability_exit_depth", "command": 'collect --run "$RUN" --preset receipts --tx ' + SELL_TX,
+                     "params": {"preset": "receipts", "tx": [SELL_TX]}, "reason": "synthetic"}]
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "run"
+            root.mkdir()
+            facts, rpc, status = self.run_pipeline(root, queue=True, headroom=10 ** 6, presets=receipts)
+            self.assertEqual([(r["preset"], r["status"]) for r in facts["presets_run"]], [("receipts", "deferred")])
+            self.assertEqual(len(rpc.calls), 102, "no block lookup is charged for a deferred receipts row")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "run"
+            root.mkdir()
+            facts, rpc, status = self.run_pipeline(root, queue=True, presets=receipts)
+            run = facts["presets_run"][0]
+            self.assertEqual((run["preset"], run["status"], run["collection"].startswith("preset-receipts-")), ("receipts", "complete", True), run)
+            self.assertEqual([c["method"] for c in rpc.calls[102:]].count("eth_getTransactionReceipt"), 1, "the uncached block lookup; the pinned receipt read is a cache hit from the pipeline's own sale probe")
+            self.assertEqual([q["preset"] for q in facts["recommended_presets"]], ["positions", "logs"], "the rows the override left unrun are re-derived; the receipts row is not")
+
     def test_position_custodian_is_matched_by_address_when_a_receipt_names_it_first(self):
         class LockerToRpc(PipelineRpc):
             def sale_receipt(self):
@@ -542,6 +641,30 @@ class BroadCollectTests(unittest.TestCase):
             custodians = [a for a in facts["actors"].values() if a.get("role") == "position_custodian"]
             self.assertEqual([a["address"] for a in custodians], [LOCKER])
             self.assertEqual(custodians[0]["getters"]["unlockTime"]["decoded"]["int"], 2000000000)
+
+    def test_position_custodian_keeps_its_actor_row_in_a_receipt_heavy_run(self):
+        transfer = topic("Transfer(address,address,uint256)")
+        def parties(first, count, tx, block, start):
+            return [{"address": TOKEN, "topics": [transfer, word_address("0x" + format(first + n, "02x") * 20), word_address(POOL)], "data": abi(10 ** 18),
+                     "transactionHash": tx, "blockHash": hh(block), "blockNumber": hex(block), "transactionIndex": "0x0", "logIndex": hex(start + n), "removed": False} for n in range(count)]
+        class BusyRpc(PipelineRpc):
+            def receipt(self):
+                receipt = super().receipt()  # six parties between the launch transfer and the position mint: the locker is not among the receipt's first six transfer parties
+                return {**receipt, "logs": receipt["logs"][:1] + parties(0xb0, 6, CREATION_TX, 90, 2) + receipt["logs"][1:]}
+            def sale_receipt(self):
+                receipt = super().sale_receipt()  # six more parties after the sale's own transfers keep the sale reconcilable
+                return {**receipt, "logs": receipt["logs"] + parties(0xa0, 6, SELL_TX, 95, 3)}
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "run"
+            root.mkdir()
+            facts, rpc, status = self.run_pipeline(root, rpc=BusyRpc())
+            # Ten more transfer parties (architecture addresses are filtered first) would push the locker past the ten-actor cap; the custodian leads the list instead.
+            custodians = [a for a in facts["actors"].values() if a.get("role") == "position_custodian"]
+            self.assertEqual([a["address"] for a in custodians], [LOCKER])
+            self.assertEqual(custodians[0]["getters"]["unlockTime"]["decoded"]["int"], 2000000000)
+            self.assertIn("phase4b", {c["name"] for c in facts["collections"]})
+            self.assertEqual(len(facts["actors"]), 10, "ten other parties fill the cap; the custodian still leads")
+            self.assertTrue(facts["sales"][0]["verified"], "the extra transfer logs do not disturb the sale reconciliation")
 
     def test_logs_rows_print_position_ids_for_the_positions_preset(self):
         from facts import summarize_row, INCREASE_LIQUIDITY_TOPIC

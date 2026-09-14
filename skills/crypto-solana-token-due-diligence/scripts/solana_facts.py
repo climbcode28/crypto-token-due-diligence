@@ -4,9 +4,9 @@ from pathlib import Path
 from solana_common import sha,need
 from solana_profile import Evidence,strict_json,regular,PROFILE
 
-VERSION='1.4.0'
+VERSION='1.5.0'
 CATEGORIES={'mint':'controls','controls':'controls','holders':'holders','program':'programs','controllers':'programs',
- 'pool':'pools','local_quote':'quotes','public_quote':'quotes','quote_sizes':'quotes','transaction':'transactions',
+ 'pool':'pools','local_quote':'quotes','public_quote':'quotes','quote_sizes':'quotes','quote_ladder':'quotes','transaction':'transactions',
  'sales':'transactions','rebuys':'transactions','history':'launch','launch':'launch','metadata':'launch','creator_activity':'creator',
  'inventory':'creator','prior_launches':'creator','source_assurance':'source_assurance',
  'discovery_pools':'maturity','repository_metadata':'maturity','repository_revision':'maturity','repository_tree':'maturity','rugcheck':'corroboration'}
@@ -70,7 +70,15 @@ def describe(operation,data):
         verified=data['verified_creators'];return ('Metaplex metadata: name '+json.dumps(data['name'])+', symbol '+json.dumps(data['symbol'])+', update authority '+data['update_authority']+(' (mutable)' if data['is_mutable'] else ' (immutable)')+'; '+str(len(data['creators']))+' creator entries, verified: '+(', '.join(verified) if verified else 'none')+'. Keys are attribution leads, not identities; the URI is text only.')
     if operation in ('sales','rebuys'):
         return 'Reconciled '+operation+' candidates in the supplied receipt sample. Counts describe this verification sample; indexed market activity and total actor history remain separate.'
-    if operation in ('local_quote','public_quote','quote_sizes'):
+    if operation=='public_quote':
+        return ('Read-only '+str(data.get('source'))+' quote: '+str(data.get('input_atomic'))+' atomic units of the mint -> '+str(data.get('output_atomic'))+' atomic units of '+str(data.get('output_mint'))
+                +' (status '+str(data.get('status'))+', provider price impact '+(str(data['provider_price_impact_raw']) if data.get('provider_price_impact_raw') is not None else (str(data['price_impact_fraction']['numerator'])+'/'+str(data['price_impact_fraction']['denominator'])) if isinstance(data.get('price_impact_fraction'),dict) else 'not reported')+'). A provider claim at one size; no trade was executed.')
+    if operation=='quote_ladder':
+        rows=data.get('rows') or [];first=next((r for r in rows if r.get('status')=='quoted'),None)
+        steps='; '.join(str(r.get('input_atomic'))+' -> '+((str(r.get('output_atomic'))+(' (baseline)' if r is first else ' ('+str(r.get('impact_vs_smallest_percent'))+'% vs smallest)')) if r.get('output_per_input') is not None else ('not captured ('+str(r.get('reason'))+')' if r.get('status')=='not_captured' else 'not quoted ('+str(r.get('status'))+')')) for r in rows)
+        return ('Read-only '+str(data.get('source'))+' quotes at '+str(data.get('sizes_quoted'))+' of '+str(data.get('sizes_requested'))+' illustrative sizes selling the mint into '+str(data.get('output_mint'))+': '+steps
+                +'. Largest size impact versus the smallest: '+str(data.get('largest_impact_vs_smallest_percent'))+'%. Quoted outputs are provider claims, not execution.')
+    if operation in ('local_quote','quote_sizes'):
         return 'Illustrative '+operation.replace('_',' ')+' with exact input/output units and retained fee/context limits. Estimate or source quote; no trade was executed.'
     if operation=='rugcheck':
         nets=data.get('insider_networks') or [];lead=nets[0] if nets else None

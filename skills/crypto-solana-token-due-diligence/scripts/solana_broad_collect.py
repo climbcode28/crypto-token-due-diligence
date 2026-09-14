@@ -17,10 +17,14 @@ from solana_facts import encoded,atomic,build,compact
 from solana_profile import regular,strict_json,PROFILE,DIMENSIONS,Evidence,validate_report
 from solana_compose import CHECKLISTS,empty_coverage,expand_finding,note_header,validate_imports,ComposeError,preflight
 
-VERSION='1.8.0'
+VERSION='1.9.0'
 ASSETS=Path(__file__).resolve().parents[1]/'assets'
 STAGES=('identity_discovery','related_accounts_controllers','pool_transaction_quote_dependencies','final_consistency_checks')
-PRESET_CAP=4  # named coordinator presets per run; the collection cutoff and request grants gate each one before this count does
+PRESET_CAP=4  # coordinator-named presets per run beyond the recommended queue; the collection cutoff and request grants gate each one before this count does
+LANE_HEADROOM=120  # seconds that must remain before the lane cutoff for start to run a recommended preset itself; later rows are deferred to the coordinator
+PIPELINE_SOURCE_CAP=16  # discovery, corroboration, trade-feed and quote captures the pipeline itself makes per run; the two lanes share their own twelve
+LANE_SOURCE_CAP=12
+QUOTE_SIZES=3  # the quote_sizes derivation's illustrative sizes, each quoted read-only through the public Jupiter route at start
 RECEIPT_PROBES=6  # recent signatures classified per run before the receipt budget is spent; indexer-listed trades go first
 
 
@@ -101,7 +105,7 @@ def capture(root,urls,owner='ordinary',*,dimension=None,opener_factory=None):
         existing={r['url']:dict(r) for r in s.db.execute('SELECT * FROM web_sources')} if s.db.execute("SELECT count(*) FROM sqlite_master WHERE name='web_sources'").fetchone()[0] else {}
         shared=[existing[u] for u in urls if u in existing]
         new=[u for u in urls if u not in existing]
-        rows=register_urls(s,new,owners={u:owner for u in new},dimensions={u:dimension for u in new} if dimension else None,cap=12) if new else []
+        rows=register_urls(s,new,owners={u:owner for u in new},dimensions={u:dimension for u in new} if dimension else None,cap=PIPELINE_SOURCE_CAP if owner=='ordinary' else LANE_SOURCE_CAP) if new else []
         # Existing ownership never changes and an existing capture is reused by reference.
         ids=[r['source_id'] for r in rows if r['status']=='pending']+[r['id'] for r in shared if r['owner']==owner and r['status']=='pending']
     finally:s.close()
@@ -463,6 +467,7 @@ def automatic_dependencies(root,config,factory,*,opener_factory=None):
             results.append({'pool':pool,'adapter':kind,'status':'sampled'})
         except (ValueError,KeyError,TypeError) as exc:results.append({'pool':pool,'adapter':kind,'status':'partial','reason':str(exc) if isinstance(exc,ValueError) else type(exc).__name__})
     atomic(Path(root)/'automatic-leads.json',encoded(automatic))
+    quote_capture(root,target,automatic,opener_factory=opener_factory)
     # A small recent candidate sample is not archive coverage or proof of selling.
     # Recent pool signatures are probed one at a time and classified before the receipt budget
     # is spent on headers: only receipts carrying a supported swap at the exact pool are sampled
@@ -521,10 +526,43 @@ def automatic_dependencies(root,config,factory,*,opener_factory=None):
     return results
 
 
+def quote_capture(root,target,leads,*,opener_factory=None):
+    """Three read-only Jupiter quotes at the illustrative sizes the quote_sizes derivation fixed, selling the exact mint into the
+    leading pool's counter asset (WSOL for a launch curve), filed under sellability: the importer types each as a public quote
+    and the ladder over them carries the measured impact across sizes, the EVM skill's quoter ladder. Provider claims, never
+    execution; a refused or missing quote is a stated capture limit."""
+    from solana_quotes import quote_url
+    from solana_transactions import WSOL
+    root=Path(root);outcome=root/'quote-ladder.json'
+    def skipped(reason,diagnostic=True):atomic(outcome,encoded({'status':'skipped','reason':reason,'diagnostic':diagnostic}));return None
+    if not leads:return skipped('no decodable pool lead; nothing to sell into',diagnostic=False)  # the missing pool facts already say so
+    if target['genesis_hash']!=MAINNET:return skipped('public quote routes serve mainnet only')
+    if not (root/'draft/facts.json').exists():return skipped('no facts yet; the quote_sizes policy is unresolved')
+    try:
+        facts=strict_json((root/'draft/facts.json').read_bytes(),'facts.json')['facts']
+        sizes=next((f['data']['sizes'] for f in facts if f['operation']=='quote_sizes' and f['usable']),[])
+    except (ValueError,KeyError,TypeError):sizes=[]
+    if not sizes:return skipped('no usable quote_sizes fact (the mint read or the captured price did not resolve)')
+    lead=leads[0]['pool'];counter=WSOL
+    for row in candidates(root,target):
+        if row['pool']==lead and target['mint'] in (row['base_mint'],row['quote_mint']):counter=row['quote_mint'] if row['base_mint']==target['mint'] else row['base_mint'];break
+    urls=[];refused=None
+    for size in sizes[:QUOTE_SIZES]:
+        try:
+            if size.get('input_atomic'):urls.append(quote_url('jupiter_v1_lite',target,counter,size['input_atomic']))
+        except ValueError as exc:refused=str(exc)
+    if not urls:return skipped('no policy size could be quoted ('+(refused or 'every size is unset')+')')
+    try:result=capture(root,list(dict.fromkeys(urls)),dimension='sellability_exit_depth',opener_factory=opener_factory)
+    except (ValueError,OSError,KeyError,TypeError) as exc:return skipped('capture refused: '+(str(exc) if isinstance(exc,ValueError) else type(exc).__name__))
+    atomic(outcome,encoded({'status':'captured','counter_mint':counter,'sizes':len(urls),'captures':[{'id':c.get('id'),'status':c.get('status'),'http_status':c.get('http_status')} for c in result.get('captures',[])],'unattempted':result.get('unattempted',[])}))
+    return result
+
+
 def recommended_presets(root):
-    """Presets the coordinator should run next, derived from the run's facts and leads: sellability when no sale verified,
-    creator history for attributed keys without a history page, program control for pools whose program stayed unread.
-    Request files are written under recommended-presets/ (never preset-requests/, which the importer reads as leads)."""
+    """Presets derived from the run's facts and leads, run by start itself (run_recommended) and printed for the coordinator
+    when one was deferred: sellability when no sale verified, creator history for attributed keys without a history page,
+    program control for pools whose program stayed unread. Request files are written under recommended-presets/ (never
+    preset-requests/, which the importer reads as leads)."""
     root=Path(root).resolve();out=[]
     if not (root/'draft/facts.json').exists():return out
     s=Session(root)
@@ -559,9 +597,10 @@ def recommended_presets(root):
         out.append({'id':'rec-programs','kind':'programs','parameters':{'addresses':programs},'dimension':'external_dependencies','sends':6,
                     'reason':'a pool program or its ProgramData was not read, so upgrade authority is unresolved; the preset reads the program and its ProgramData metadata slice'})
     # A row whose preset already ran is not repeated: what it left open is the named limit (gap_basis), not a queue item.
-    # Rows the leftover grant cannot pay for (two sends stay free) are dropped rather than refused turn by turn.
+    # Rows the leftover grant cannot pay for (two sends stay free) are dropped rather than refused turn by turn. The
+    # coordinator's four-preset cap does not bound this queue: its rows are the pipeline's own follow-ups (at most three,
+    # each bounded by the grant), and start runs them itself.
     out=[r for r in out if r['id'] not in ran and r['sends']<=remaining-2]
-    out=out[:max(0,PRESET_CAP-len(ran))]
     folder=root/'recommended-presets';folder.mkdir(exist_ok=True)
     for row in out:
         atomic(folder/(row['id']+'.json'),encoded({'id':row['id'],'kind':row['kind'],'parameters':row['parameters']}))
@@ -703,6 +742,11 @@ def start(root,target,*,question,received_at,deadline_at,focus=None,urls=None,sc
             s=Session(root);s.mark(name,{'state':'identity_unresolved' if not have_identity else 'omitted_focused_scope','surfaces':surfaces});s.close()
     result,error=stage(root,STAGES[3],lambda:refresh(root))
     if error:diagnostics.append(error)
+    if (root/'quote-ladder.json').exists():
+        # A skipped quote ladder is a coverage limit the coordinator must see, not a silent absence.
+        try:ladder=strict_json((root/'quote-ladder.json').read_bytes(),'quote-ladder.json')
+        except ValueError:ladder={}
+        if ladder.get('status')=='skipped' and ladder.get('diagnostic',True):diagnostics.append({'stage':STAGES[2],'category':'quote_capture_skipped','reason':ladder.get('reason')})
     diagnostics+=provider_diagnostics(root)
     if (root/'draft/manifest.json').exists():
         from solana_scaffold import write
@@ -710,18 +754,78 @@ def start(root,target,*,question,received_at,deadline_at,focus=None,urls=None,sc
             if not (root/'draft/notes'/(owner+'.json')).exists():
                 try:write(root/'draft',owner,synthetic)
                 except ValueError as exc:diagnostics.append({'stage':'scaffold','reason':str(exc)})
+    # start runs its own recommended queue (the pipeline's bounded follow-ups under this run's provider lock, cutoff and
+    # grant) so a coordinator never spends a turn or a second paid-use approval on a derived step; a deferred row stays printed.
+    recommended=recommended_presets(root);presets_run=[]
+    if scope=='broad' and recommended:presets_run=run_recommended(root,config,factory=factory,rows=recommended)
+    if scope=='broad':
+        # A start that died between rows resumes here: rows an earlier attempt already ran are on the ledger, not in the queue.
+        seen={r['id'] for r in presets_run};folder=root/'preset-requests';marks={m['phase']:m for m in status(root)['phases']}
+        for path in sorted(folder.glob('rec-*.json')) if folder.exists() else []:
+            try:spec=strict_json(path.read_bytes(),path.name)
+            except ValueError:continue
+            if path.stem in seen or not recommended_request(root,spec):continue
+            earlier=(marks.get('preset_'+path.stem) or {}).get('error')  # the session mark keeps the earlier attempt's outcome
+            presets_run.append({'id':path.stem,'kind':spec['kind'],'dimension':None,'sends':None,'error':earlier,'status':'partial' if earlier else 'ran','reason':'ran in an earlier attempt of this start'})
+        refused={r['id'] for r in presets_run if r['status']=='refused'}
+        recommended=[r for r in recommended_presets(root) if r['id'] not in refused]  # a refusal is the named limit; the row is not re-offered
     summary=None
     if (root/'draft/facts.json').exists():
         try:summary=compact(strict_json((root/'draft/facts.json').read_bytes(),'facts.json'),['controls','pools','holders','corroboration','quotes','transactions','programs','launch','maturity','source_assurance'],limit=6000)
         except (ValueError,KeyError,TypeError):summary=None
+    ran=[r['id'] for r in presets_run if r['status'] in ('ran','partial')];deferred=[r for r in presets_run if r['status']=='deferred'];refusals=[r for r in presets_run if r['status']=='refused']
+    if scope!='broad':next_text='Answer the focused request with its dependencies and limits; no final broad delivery.'
+    else:
+        next_text='Dispatch both pointers before a separate facts-reading step; '+('the recommended presets '+', '.join(r['id']+(' (partial)' if r['status']=='partial' else '') for r in presets_run if r['status'] in ('ran','partial'))+' already ran inside start (see presets_run); ' if ran else '')
+        next_text+=''.join(r['id']+' was refused before any send ('+str((r['error'] or {}).get('reason'))+'); ' for r in refusals)
+        if recommended:next_text+='run the remaining recommended presets in order with `collect <root> --request <file>` and the same provider flags ('+('; '.join(r['id']+': '+r['reason'] for r in deferred) if deferred else 'see presets_run')+'); '
+        elif deferred:next_text+='deferred: '+'; '.join(r['id']+': '+r['reason'] for r in deferred)+'; '
+        else:next_text+='no preset remains recommended; ' if presets_run else 'no preset is recommended; '
+        next_text+='then complete notes and compose.'
     # The two lane pointers lead the output so a coordinator dispatches them before reading the long facts summary,
     # which comes last; a truncated display still shows what must happen first.
-    recommended=recommended_presets(root)
-    output={'lane_pointers':pointers,'next':('Dispatch both pointers before a separate facts-reading step; then run the recommended presets in order with `collect <root> --request <file>` and the same provider flags, complete notes and compose.' if recommended else 'Dispatch both pointers before a separate facts-reading step; no preset is recommended; then complete notes and compose.') if scope=='broad' else 'Answer the focused request with its dependencies and limits; no final broad delivery.',
-      'recommended_presets':recommended,
+    output={'lane_pointers':pointers,'next':next_text,'recommended_presets':recommended,'presets_run':presets_run,
       'run':str(root),'draft':str(root/'draft'),'profile':PROFILE,'investigation_id':meta['investigation_id'],'research_status':'partial',
       'provider':provider,'diagnostics':diagnostics,'session':status(root),'collection':result or first,'facts_summary':summary}
     atomic(root/'start-result.json',encoded(output));return output
+
+
+def recommended_request(root,spec):
+    """True when spec is one of this run's recommended rows: the request file start wrote under recommended-presets/ with the
+    same id and content. Such a request never counts against the coordinator's cap."""
+    if not isinstance(spec,dict):return False
+    path=Path(root)/'recommended-presets'/(str(spec.get('id',''))+'.json')
+    try:return path.is_file() and strict_json(path.read_bytes(),path.name)==spec
+    except (ValueError,OSError):return False
+
+
+def run_recommended(root,config,*,factory=HttpTransport,rows=None):
+    """Start's own execution of the recommended queue: each row is the same bounded preset a coordinator `collect` would run,
+    under this run's provider lock, cutoff, grant and preset ledger, so a derived follow-up never waits for a coordinator
+    turn or a second paid-use approval. A row is deferred, and stays in the printed queue, when fewer than LANE_HEADROOM
+    seconds remain before the lane cutoff: the lanes are dispatched after start returns and still need their window.
+    Every outcome is recorded; a preset that failed is a named limit, never a retry."""
+    root=Path(root).resolve();rows=recommended_presets(root) if rows is None else rows;out=[]
+    for row in rows:
+        s=Session(root)
+        try:headroom=s.remaining_seconds('liquidity');remaining=s.status()['remaining_requests']
+        finally:s.close()
+        entry={'id':row['id'],'kind':row['kind'],'dimension':row.get('dimension'),'sends':row.get('sends'),'error':None};sends=row.get('sends') or 0
+        # The row's own sends take wall time too (public pacing is about two seconds a send at worst), and an earlier row may
+        # have spent the grant this row was filtered against: both are re-checked here, per row, against the live session.
+        if headroom<LANE_HEADROOM+2*sends:
+            out.append({**entry,'status':'deferred','reason':'fewer than '+str(LANE_HEADROOM)+' s would remain before the lane cutoff after its sends; run it with collect after dispatching the lanes'});continue
+        if sends>remaining-2:
+            out.append({**entry,'status':'deferred','reason':'the leftover grant ('+str(remaining)+' sends) cannot pay for its '+str(sends)+' sends and keep the two-send margin'});continue
+        request=root/'preset-requests'/(row['id']+'.json')
+        try:
+            spec=strict_json(Path(row['request']).read_bytes(),'preset request');result=collect(root,spec,config,factory=factory);error=result.get('preset_error')
+        except (ValueError,OSError,KeyError,TypeError,IndexError) as exc:
+            error={'category':type(exc).__name__,'reason':str(exc) if isinstance(exc,ValueError) else 'Preset refused before any send.'}
+        # A refusal before the request was recorded is deterministic (a missing lead, an invalid plan): a named limit, never a retry.
+        if error and not request.exists():out.append({**entry,'status':'refused','error':error});continue
+        out.append({**entry,'status':'partial' if error else 'ran','error':error})
+    return out
 
 
 def collect(root,spec,config,*,factory=HttpTransport):
@@ -731,7 +835,8 @@ def collect(root,spec,config,*,factory=HttpTransport):
 
 
 def _collect(root,spec,config,*,factory=HttpTransport):
-    """A coordinator follow-up preset (at most PRESET_CAP per run, usually from the recommended queue), serialized by the session."""
+    """One bounded follow-up preset serialized by the session: a recommended row (run by start, or by the coordinator when start
+    deferred it) or one of at most PRESET_CAP coordinator-named presets for a hash or address the user or a lane named."""
     from solana_presets import position_sample,historical_sample,creator_history,quote_sample
     root=Path(root).resolve();ident=label(spec['id']);need(len(ident)<=12,'Preset ID at most 12 characters.');s=Session(root)
     try:
@@ -779,7 +884,11 @@ def _collect(root,spec,config,*,factory=HttpTransport):
         with s.transaction():
             if path.exists():need(strict_json(path.read_bytes(),path.name)==spec,'Named preset changed.')
             else:
-                need(len(list(folder.glob('*.json')))<PRESET_CAP,'Four coordinator preset calls already used.')
+                named=0
+                for q in folder.glob('*.json'):
+                    try:named+=not recommended_request(root,strict_json(q.read_bytes(),q.name))
+                    except ValueError:named+=1  # an unreadable request file counts as a coordinator preset rather than blocking every later one
+                need(recommended_request(root,spec) or named<PRESET_CAP,'Four coordinator preset calls already used.')
                 # A new preset must not reuse a start sample id: pool_activity would resume that sample's classification as its
                 # own. Classification rows can exist without a sample plan (a refused reserve), so both records are checked.
                 probes_path=root/'receipt-classification.json';record=json.loads(probes_path.read_text()) if probes_path.exists() else {}

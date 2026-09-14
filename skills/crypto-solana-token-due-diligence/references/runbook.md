@@ -109,14 +109,18 @@ lanes and final broad delivery are omitted.
 Start performs identity/discovery, related accounts/controllers, material
 pool/transaction/quote dependencies and consistency checks under one durable ledger:
 initial mint/epoch/holder-discovery state, source candidates and project links, up to
-two pool candidates, required account/configuration state, sampled LP holdings, up to
-two recent pool receipts and known program authority metadata. When the public tier
+two pool candidates, required account/configuration state, sampled LP holdings, three
+read-only Jupiter quotes at the illustrative sizes the `quote_sizes` fact fixed (selling into
+the leading pool's counter asset; the `quote_ladder` fact under `quotes` states each size's
+output and its impact versus the smallest), up to two recent pool receipts and known
+program authority metadata. When the public tier
 refuses `getTokenLargestAccounts`, an SPL mint's holders are discovered with a bounded
 account scan instead; Token-2022 holdings keep an explicit gap. The helper waits out
 per-method rate windows itself. A curve PDA is only a candidate. All eight adapters
 (`raydium_amm_v4`, `raydium_cpmm`, `raydium_clmm`, `orca_whirlpool`, `meteora_dlmm`,
 `meteora_damm_v2`, `pump_curve`, `pumpswap`) remain distinct; unsupported layouts or
-missing positions/locks stay explicit. Typical wall clock is one to two minutes.
+missing positions/locks stay explicit. Typical wall clock is one to three minutes, its
+recommended presets included.
 
 Output, in this order: `lane_pointers` (dispatch these two lines first, before reading
 anything else), `next`, `research_status`, `diagnostics` (refused methods, unsent or
@@ -164,7 +168,10 @@ items. A missing lane or expired budget is never completed broad work.
 
 Presets spend the ordinary request grant that `start` left (`session.remaining_requests`
 in its output and in `status`); a preset that needs more is refused. The recommended queue
-already drops rows the leftover grant cannot pay for and rows whose preset ran.
+already drops rows the leftover grant cannot pay for and rows whose preset ran, and `start`
+runs it itself: `presets_run` in its output (and `start-result.json`) records each row's id,
+kind, dimension, status (`ran`, `partial` with its error, or `deferred` with the reason) so
+a derived follow-up never costs a coordinator turn or a second paid-use approval.
 
 Judge from `facts_summary`. For an omitted material detail:
 
@@ -176,20 +183,24 @@ Categories: `controls`, `pools`, `holders`, `corroboration`, `quotes`, `transact
 `programs`, `creator`, `launch`, `maturity`, `source_assurance`. Do not open raw manifests, do
 arithmetic by hand or fetch again to produce citations.
 
-The coordinator may run up to four presets while the collection cutoff and the ordinary
-grant allow: the printed recommended queue in its printed order, then a preset only for a
-hash or address the user or a lane named. Each is a small JSON file (data, not a
-script) with a stable `id` of at most 12 characters, `kind` and `parameters`:
+Beyond that queue the coordinator may run up to four presets of its own while the
+collection cutoff and the ordinary grant allow: a deferred recommended row first (it never
+counts against the four), then a preset only for a hash or address the user or a lane
+named. Each is a small JSON file (data, not a script) with a stable `id` of at most 12
+characters, `kind` and `parameters`:
 
 `start` (and every `collect`) derives `recommended_presets` from the facts and writes their request
 files under `$RUN/recommended-presets/`: `pool_activity` for the leading pool when no sale verified
 (indexer-listed trades probed first), `creator_history` for attributed keys without a history page,
 `programs` for a pool whose program or ProgramData stayed unread (it reads the ProgramData
-metadata slice too). Run them in order with
-`collect "$RUN" --request <file>` and the same provider flags; the list shrinks as they run and
-is capped by the four-preset limit; the printed list, not the folder, is authoritative (a satisfied row's
-file stays on disk). A focused run gets no queue. A preset outside the list needs a hash or address the
-user or a lane named.
+metadata slice too). `start` runs them itself, in order, through the same `collect` path
+(provider lock, cutoff, grant, `preset-requests/` ledger) and records each outcome in
+`presets_run`; a row is deferred, and stays printed, only when fewer than 120 s remain before
+the lane cutoff: run it with `collect "$RUN" --request <file>` and the same provider flags.
+The list shrinks as rows run (a row that ran without closing its gap leaves the queue: the
+open gap is the named limit, never a loop); the printed list, not the folder, is
+authoritative (a satisfied row's file stays on disk). A focused run gets no queue. A preset
+outside the list needs a hash or address the user or a lane named.
 
 | Kind | Parameters |
 | --- | --- |
@@ -212,7 +223,8 @@ python3 "$S/scripts/solana_broad_collect.py" collect "$RUN" --request "$RUN/pres
 Presets run sequentially under the same deadline, attempt/byte ceiling and reserved
 final capacity, and each refreshes facts (the draft becomes unjudged; analyst notes and
 corrections are preserved). An identical named request resumes; a changed one is
-refused; a fifth distinct preset is refused. Captures made outside a lane check need:
+refused; a fifth distinct coordinator-named preset is refused (recommended rows never
+count against the four). Captures made outside a lane check need:
 
 ```sh
 python3 "$S/scripts/solana_broad_collect.py" refresh "$RUN"
