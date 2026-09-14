@@ -6,7 +6,7 @@ from solana_common import sha
 from solana_facts import encoded
 from solana_pipeline_note import leading_pool
 
-VERSION='1.0.1'
+VERSION='1.1.0'
 LANE_ITEMS={'development_disclosure':('project',('delivery','audit_scope')),'utility_redemption_rights':('project',('economics',)),
  'reward_accounting_liveness':('project',('economics',))}
 PROGRAM_GAPS=('program_upgrade_authority_unresolved','program_control_not_observed')
@@ -44,7 +44,7 @@ def _pools_discovered(by_op):
     return {c.get('pool') for d in by_op.get('discovery_pools',[]) for c in d.get('candidates',[]) if c.get('pool')}
 
 
-def rule(dim,by_op,leads,checklists,facts_all=()):
+def rule(dim,by_op,leads,checklists,facts_all=(),lane_keys=()):
     """(resolved, reason, next_route) for one surface from the usable facts alone; findings and gaps are applied by mechanical()."""
     pools=by_op.get('pool',[]);by_pool={d.get('pool'):d for d in pools}
     # The leading pool is the pipeline note's (automatic lead, else discovery order, else fact order) so the custody row judges the
@@ -88,16 +88,25 @@ def rule(dim,by_op,leads,checklists,facts_all=()):
     if dim=='historical_launch_integrity':
         unusable=[f for f in facts_all if f.get('operation')=='creator_activity' and not f.get('usable')]
         if unusable and not by_op.get('creator_activity'):return False,'The creator activity fact is unusable; attribution and history cannot be read from it.','creator_history'
-        keys=[k.get('address') for d in by_op.get('creator_activity',[]) for k in d.get('keys',[]) if k.get('address')]
+        attributed=[k.get('address') for d in by_op.get('creator_activity',[]) for k in d.get('keys',[]) if k.get('address')]
+        # The creator keys a lane named (the same two the follow-up reads) stand in when the pipeline attributed none: the
+        # wording names the lane and its reason, so the attribution is traceable to the lane's source, never to a receipt.
+        named=lane_key_rows(lane_keys);keys=attributed or [r['value'] for r in named]
         histories={d.get('address') for d in by_op.get('history',[])};missing=[k for k in keys if k not in histories]
         launch=by_op.get('launch');stage=(launch[0].get('stage') if launch else None);inits=len((launch[0].get('initializations') or [])) if launch else 0
-        if not keys:return False,'No key is attributed by receipt, curve or metadata, so no launch history can be read; the coordinator closes this surface by judgment on the sampled receipts or as an evidenced limit.','standard'
-        if missing:return False,'Attributed key(s) without a signature history: '+', '.join(k[:8]+'…' for k in missing)+'.','creator_history'
+        if not keys:return False,'No key is attributed by receipt, curve or metadata and no lane named a creator key, so no launch history can be read; the coordinator closes this surface by judgment on the sampled receipts or as an evidenced limit.','standard'
+        if missing:return False,('Attributed key(s) without a signature history: '+', '.join(k[:8]+'…' for k in missing) if attributed else 'Creator key(s) a lane named without a signature history: '+named_text([r for r in named if r['value'] in missing]))+'.','creator_history'
         if not launch:return False,'No receipt was sampled, so the launch stage is unread.','transactions'
-        return True,'Signature history read for every attributed key ('+', '.join(k[:8]+'…' for k in keys)+'). Launch stage '+str(stage)+' with '+str(inits)+' verified initialization(s).',None
+        basis=('attributed by receipt, curve or metadata: '+', '.join(k[:8]+'…' for k in keys)) if attributed else ('not attributed by receipt, curve or metadata; '+named_text(named))
+        return True,'Signature history read for every creator key ('+basis+'). Launch stage '+str(stage)+' with '+str(inits)+' verified initialization(s).',None
     if dim=='admin_treasury_reward_custody':
         if by_op.get('creator_activity'):return True,'Creator attribution and activity are typed facts (receipts, curve or metadata keys, sales and rebuys reconciled).',None
-        return False,'No creator activity fact: no key is attributed by receipt, curve or metadata, so no history preset can run; the coordinator closes this surface by judgment on the sampled receipts or as an evidenced limit.','standard'
+        named=lane_key_rows(lane_keys)
+        if named:
+            histories={d.get('address') for d in by_op.get('history',[])};missing=[r for r in named if r['value'] not in histories]
+            if missing:return False,'Creator key(s) a lane named without a signature history: '+named_text(missing)+'.','creator_history'
+            return True,'No key is attributed by receipt, curve or metadata; a lane named creator key(s) '+named_text(named)+' and their signature histories were read (sales and rebuys are not reconciled against a lane-named key).',None
+        return False,'No creator activity fact: no key is attributed by receipt, curve or metadata and no lane named a creator key, so no history preset can run; the coordinator closes this surface by judgment on the sampled receipts or as an evidenced limit.','standard'
     if dim=='external_dependencies':
         if not pools:return False,'No pool program to read.','programs'
         open_=[d for d in pools if any(g in PROGRAM_GAPS for g in (d.get('gaps') or []))]
@@ -114,13 +123,13 @@ def rule(dim,by_op,leads,checklists,facts_all=()):
     return False,'Standard work remains.','standard'
 
 
-def mechanical(dim,findings,facts,attempt_ids,*,leads=None,checklists=None):
+def mechanical(dim,findings,facts,attempt_ids,*,leads=None,checklists=None,lane_keys=None):
     """The coverage row for one surface: checked/resolved when its route ran and answered and every finding on it is
     affirmative; otherwise partial/pending with the reason and the route that would close it."""
     findings=[f for f in findings if isinstance(f,dict)]
     gaps=[f['id'] for f in findings if f.get('claim')=='coverage_gap' or f.get('strength')=='unresolved']
     affirmative=[f for f in findings if f.get('claim')!='coverage_gap' and f.get('strength')!='unresolved']
-    resolved,reason,route=rule(dim,_by_op(facts),leads,checklists,facts)
+    resolved,reason,route=rule(dim,_by_op(facts),leads,checklists,facts,lane_keys or ())
     if resolved and gaps:resolved=False;reason='Open coverage-gap finding(s) '+', '.join(gaps[:4])+' keep this surface open although its route answered: '+reason;route='standard'
     elif resolved and not affirmative:resolved=False;reason='The route answered but no affirmative finding sits on this surface yet: '+reason;route='standard'
     if resolved:
@@ -157,6 +166,52 @@ def lane_findings_from_notes(root):
         if isinstance(note,dict) and isinstance(note.get('findings'),list):
             out+=[f for f in note['findings'] if isinstance(f,dict) and isinstance(f.get('id'),str) and isinstance(f.get('dimension'),str)]
     return out
+
+
+LANE_KEY_CAP=2  # creator keys the follow-up reads per run: the same two the rules count, in lane order (liquidity, then project)
+
+
+def lane_creator_leads(notes,mint=None):
+    """The creator keys the lanes named that the follow-up will read: `leads` rows of kind creator_key with a reason and a valid
+    key, the mint excluded, a note with more than four rows skipped (lane-check refuses it), deduplicated in lane order and
+    capped at LANE_KEY_CAP. Rows carry the owner and the lane's reason so a row or finding can say who named the key and why."""
+    from solana_common import pubkey
+    out=[]
+    for owner in ('liquidity','project'):
+        note=(notes or {}).get(owner)
+        rows=note.get('leads') if isinstance(note,dict) else None
+        if not isinstance(rows,list) or len(rows)>4:continue
+        for row in rows:
+            try:
+                if not (isinstance(row,dict) and row.get('kind')=='creator_key' and isinstance(row.get('reason'),str) and row['reason'].strip()):continue
+                value=pubkey(row['value'])
+            except (ValueError,KeyError,TypeError):continue
+            if value==mint or any(r['value']==value for r in out):continue
+            out.append({'value':value,'owner':owner,'reason':row['reason'].strip()[:300]})
+    return out[:LANE_KEY_CAP]
+
+
+def lane_creator_leads_from_notes(root,mint=None):
+    """The same, read from the lane notes on disk (draft/notes/<owner>.json) for the scaffold, the note sync, the pipeline note
+    and the follow-up's queue, so every reader selects the same keys."""
+    from pathlib import Path
+    from solana_profile import strict_json
+    notes={}
+    for owner in ('liquidity','project'):
+        path=Path(root)/'notes'/(owner+'.json')
+        try:notes[owner]=strict_json(path.read_bytes(),path.name) if path.exists() else None
+        except (ValueError,OSError):notes[owner]=None
+    return lane_creator_leads(notes,mint)
+
+
+def lane_key_rows(lane_keys):
+    """Normalise lane keys given as rows or bare addresses (tests) into rows."""
+    return [r if isinstance(r,dict) else {'value':r,'owner':'project','reason':None} for r in (lane_keys or []) if r]
+
+
+def named_text(rows):
+    """'K1… (liquidity lane: reason), K2… (project lane)' for a list of lane-key rows."""
+    return ', '.join(r['value'][:8]+'… ('+str(r.get('owner') or 'project')+' lane'+(': '+r['reason'][:90]+('…' if len(r['reason'])>90 else '') if r.get('reason') else '')+')' for r in rows)
 
 
 def checklists_from_notes(root):

@@ -59,6 +59,12 @@ class SessionTests(unittest.TestCase):
                 self.assertEqual(session.status()["started_attempts"], expected)
                 self.assertEqual(session.status()["response_bytes"], expected*5)
 
+    def test_a_bare_500_is_transient_like_its_gateway_siblings(self):
+        from solana_session import TRANSIENT
+        self.assertTrue({"http_500", "http_502", "http_503", "http_504", "timeout", "transport_failure", "http_429", "node_lag"} <= TRANSIENT)
+        self.assertNotIn("http_400", TRANSIENT)
+        self.assertNotIn("http_403", TRANSIENT)
+
     def test_lane_grants_release_to_the_ordinary_pool_once(self):
         session = self.create(max_requests=40, reservations={"liquidity": 6, "project": 5, "final": 3})
         spent = self.acquire(session, owner="liquidity")

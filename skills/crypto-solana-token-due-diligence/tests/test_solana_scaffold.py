@@ -64,10 +64,31 @@ class ScaffoldTests(unittest.TestCase):
         admin=[{'id':'pipeline-admin-x','claim':'state_observation','strength':'bounded','dimension':'admin_treasury_reward_custody'}]
         none_admin=mechanical('admin_treasury_reward_custody',admin,[fact('launch',{'stage':'launch_unverified','initializations':[]})],[])
         self.assertEqual((none_admin['closure']['boundary'],none_admin['closure']['next_route']),('pending','standard'));self.assertIn('by judgment',none_admin['closure']['reason'])
+        # A creator key the project lane named from the launch platform stands in for chain attribution once its history is read.
+        named=mechanical('admin_treasury_reward_custody',admin,[fact('launch',{'stage':'launch_unverified','initializations':[]})],[],lane_keys=['K9'])
+        self.assertEqual((named['closure']['boundary'],named['closure']['next_route']),('pending','creator_history'));self.assertIn('a lane named without a signature history: K9… (project lane)',named['closure']['reason'])
+        read=mechanical('admin_treasury_reward_custody',admin,[fact('launch',{'stage':'launch_unverified','initializations':[]}),fact('history',{'address':'K9'})],[],lane_keys=[{'value':'K9','owner':'liquidity','reason':'the launch API names this creator'}])
+        self.assertEqual(read['closure']['boundary'],'resolved');self.assertIn('K9… (liquidity lane: the launch API names this creator)',read['closure']['reason']);self.assertIn('lane-named key',read['closure']['reason'])
+        lane_launch=mechanical('historical_launch_integrity',launch,[fact('launch',{'stage':'launch_unverified','initializations':[]}),fact('history',{'address':'K9'})],[],lane_keys=['K9'])
+        self.assertEqual(lane_launch['closure']['boundary'],'resolved');self.assertIn('not attributed by receipt, curve or metadata; K9… (project lane)',lane_launch['closure']['reason'])
+        chain_first=mechanical('historical_launch_integrity',launch,[fact('launch',{'stage':'launch_unverified','initializations':[]}),fact('creator_activity',{'keys':[{'address':'K1'}]}),fact('history',{'address':'K1'})],[],lane_keys=['K9'])
+        self.assertEqual(chain_first['closure']['boundary'],'resolved');self.assertIn('attributed by receipt, curve or metadata',chain_first['closure']['reason']);self.assertNotIn('K9',chain_first['closure']['reason'])
         # A partial holders fact does not close concentration.
         holders=[{'id':'pipeline-holders-x','claim':'state_observation','strength':'bounded','dimension':'current_concentration'}]
         self.assertEqual(mechanical('current_concentration',holders,[fact('holders',{'status':'partial','gaps':['missing balances']})],[])['closure']['boundary'],'pending')
         self.assertEqual(mechanical('current_concentration',holders,[fact('holders',{'status':'sampled'})],[])['closure']['boundary'],'resolved')
+
+    def test_lane_creator_leads_select_exactly_what_the_follow_up_reads(self):
+        from solana_coverage import lane_creator_leads,LANE_KEY_CAP
+        from pool_fixture import key
+        mint=key(1);good=lambda v,reason='the launch record names this creator':{'kind':'creator_key','value':v,'reason':reason}
+        notes={'liquidity':{'leads':[good(key(11)),{'kind':'creator_key','value':'not-a-key','reason':'x'},{'kind':'creator_key','value':key(12)},{'kind':'signature','value':key(13),'reason':'a burn'}]},
+               'project':{'leads':[good(mint,'the mint itself'),good(key(11),'duplicate'),good(key(14),'platform page'),good(key(15),'a third key')]}}
+        rows=lane_creator_leads(notes,mint)
+        self.assertEqual([(r['value'],r['owner'],r['reason']) for r in rows],[(key(11),'liquidity','the launch record names this creator'),(key(14),'project','platform page')])
+        self.assertEqual(len(rows),LANE_KEY_CAP,'the mint, an invalid key, a reasonless row, a signature and a duplicate never count; the cap is the follow-up\'s')
+        self.assertEqual(lane_creator_leads({'project':{'leads':[good(key(20+i)) for i in range(5)]}},mint),[],'a note with more than four rows is refused by lane-check and counts nothing')
+        self.assertEqual(lane_creator_leads({'project':{'leads':'bad'},'liquidity':None},mint),[])
 
     def test_placeholders_cannot_complete(self):
         b=self.fixture();n=scaffold(b.root,allow_synthetic=True);n['research_status']='completed';save(b,n)

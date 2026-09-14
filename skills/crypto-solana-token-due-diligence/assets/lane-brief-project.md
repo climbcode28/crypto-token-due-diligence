@@ -69,6 +69,9 @@ Return exact repository/audit/program/creator leads with the captured source IDs
 creator key or a transaction signature you want read on chain in your note's `leads` list
 (at most four rows of `{"kind": "creator_key"|"signature", "value": "…", "reason": "…"}`);
 the coordinator's follow-up runs them mechanically, so never leave such a lead only in prose.
+When the chain attributes no creator (a Token-2022 mint without Metaplex metadata, no curve,
+no creator in the sampled receipts), the platform-named creator key you put in `leads` is
+what closes launch integrity and admin/treasury custody once its history is read.
 
 Do not run RPC, read credentials, create scripts, spawn agents, change settings or
 registrations, compose/finalize, buy service access, or mutate another lane. Only the

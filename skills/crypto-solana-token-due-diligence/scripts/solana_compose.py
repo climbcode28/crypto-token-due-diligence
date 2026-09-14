@@ -8,7 +8,7 @@ from solana_pipeline_note import build_note
 from solana_profile import (PROFILE,DIMENSIONS,AXES,Evidence,ProfileError,regular,strict_json,check,
     validate_report,findings as validate_findings,coverage as validate_coverage,decision as validate_decision)
 
-VERSION='1.4.0'
+VERSION='1.4.1'
 OWNERS=('coordinator','liquidity','project')
 CHECKLISTS={'liquidity':('discovery','custody','activity','exits','assigned_asks'),
  'project':('identity','delivery','audit_scope','economics','creator_history','contrary_evidence','assigned_asks')}
@@ -115,8 +115,10 @@ def preflight(e,report,digest):
 
 def assemble(root,note,*,lane_notes=None,allow_synthetic=False):
     root=Path(root).resolve();raw=regular(root,'manifest.json').read_bytes();m=strict_json(raw,'manifest.json');e=Evidence(root,m,allow_synthetic)
-    from solana_coverage import leads_for
-    facts=facts_build(root,allow_synthetic);pipeline=build_note(facts,leads_for(root));errors=[];note=copy.deepcopy(note)
+    from solana_coverage import leads_for,lane_creator_leads,lane_creator_leads_from_notes
+    # The lane notes composed here are the ones the keys are read from; on disk otherwise (the same files the follow-up read).
+    lane_keys=lane_creator_leads(lane_notes,m['target']['mint']) if lane_notes else lane_creator_leads_from_notes(root,m['target']['mint'])
+    facts=facts_build(root,allow_synthetic);pipeline=build_note(facts,leads_for(root),lane_keys);errors=[];note=copy.deepcopy(note)
     note_header(note,'coordinator',m,errors,'note')
     if note.get('research_status')=='completed':placeholders(note,'note',errors)
     rows=copy.deepcopy(pipeline['findings']);pipeline_rows={f['id']:f for f in rows}
@@ -195,7 +197,7 @@ def assemble(root,note,*,lane_notes=None,allow_synthetic=False):
         found=[f for f in rows if f['dimension']==dim];ids=[f['id'] for f in found];attempts=[a['id'] for a in m['attempts'] if a['dimension']==dim]
         given=supplied.get(dim)
         # An untouched prefilled row follows the facts, the lane checklists and every finding now on the surface; an edited row is the coordinator's.
-        row=mechanical(dim,found,facts['facts'],attempts,leads=leads,checklists=checklists) if given is None or untouched(given) else copy.deepcopy(given)
+        row=mechanical(dim,found,facts['facts'],attempts,leads=leads,checklists=checklists,lane_keys=lane_keys) if given is None or untouched(given) else copy.deepcopy(given)
         row['finding_ids']=ids;row['attempt_ids']=attempts;coverage_rows.append(row)
         ratings[dim]='concern' if any(f['signal'] in ('bad','potential_risk') for f in found) else 'not_applicable' if row['status']=='not_applicable' else 'no_issue_detected' if row['status']=='checked' and found and all(f['signal']=='good' for f in found) else 'unknown'
     summary=list(note.get('summary_ids',[]));decision=copy.deepcopy(note.get('decision'))

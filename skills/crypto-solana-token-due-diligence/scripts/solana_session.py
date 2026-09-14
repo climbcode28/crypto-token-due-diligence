@@ -12,7 +12,9 @@ import uuid
 from solana_common import need, target_identity
 
 SCHEMA = 1
-TRANSIENT = {"timeout", "transport_failure", "http_429", "http_502", "http_503", "http_504", "node_lag"}
+# A bare 500 from a load-balanced RPC front end is as transient as its 502/503/504 siblings (two live dRPC runs lost a history
+# read and an activity listing to one each); it earns the same single paced retry, never more.
+TRANSIENT = {"timeout", "transport_failure", "http_429", "http_500", "http_502", "http_503", "http_504", "node_lag"}
 NODE_LAG_RETRIES = 3  # a load-balanced backend behind the pinned context slot is retried after waiting out the slot gap
 PUBLIC_MAX_REQUESTS = 120  # sends per run on the credential-free public tier, whose windows and refusals bind first
 KEYED_MAX_REQUESTS = 240  # sends per run on a keyed dRPC endpoint: the standard stages, a two-pool position census and the lanes' follow-up leads

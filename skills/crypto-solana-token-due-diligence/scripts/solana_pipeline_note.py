@@ -4,7 +4,7 @@ from solana_facts import build,atomic,encoded
 from solana_profile import PROFILE
 from solana_common import sha,need
 
-VERSION='1.1.0'
+VERSION='1.2.0'
 DIMENSIONS={'controls':'token_controls','holders':'current_concentration','programs':'external_dependencies',
  'pools':'canonical_lp_principal_custody','quotes':'sellability_exit_depth','transactions':'sellability_exit_depth',
  'launch':'historical_launch_integrity','creator':'admin_treasury_reward_custody','maturity':'development_disclosure','source_assurance':'development_disclosure',
@@ -39,7 +39,7 @@ def leading_pool(facts,leads=None):
     return pools[0] if pools else None
 
 
-def findings(facts,leads=None):
+def findings(facts,leads=None,lane_keys=None):
     rows=[];lead=leading_pool(facts,leads)
     for fact in facts['facts']:
         op=fact['operation'];usable=fact['usable'];dim=DIMENSIONS[fact['category']]
@@ -77,20 +77,36 @@ def findings(facts,leads=None):
             'text':'Exact-mint discovery lists '+str(len(pools))+' pool; no side pool exists to sample. Indexed listings are publications, not proof that no other market exists.',
             'support':[{'evidence_id':f['evidence_id'],'subject':f['subject'],'role':'derivation'} for f in discovery],'counterevidence':[],
             'time_basis':{'kind':'mixed','sample_ids':first['sample_ids'],'stability':'not_asserted'},'limitations':['Discovery covers the indexers captured at start.'],'concern':None,'assertion':'observation'})
+    # A creator key a lane named in its leads, once its signature history was read, is evidence on the admin/treasury surface
+    # too (the pipeline attributed no key there): stated as its own observation that names the lane and its reason, so that
+    # surface can close on it instead of waiting for a judgment nothing supports.
+    from solana_coverage import lane_key_rows
+    attributed={k.get('address') for f in facts['facts'] if f['operation']=='creator_activity' and f['usable'] for k in ((f.get('data') or {}).get('keys') or [])}
+    by_key={r['value']:r for r in lane_key_rows(lane_keys)}
+    for f in facts['facts']:
+        d=f.get('data') if isinstance(f.get('data'),dict) else {}
+        if f['operation']=='history' and f['usable'] and d.get('address') in by_key and d.get('address') not in attributed:
+            row=by_key[d['address']];owner=str(row.get('owner') or 'project');reason=row.get('reason')
+            rows.append({'id':'pipeline-lanekey-'+sha(f['evidence_id'].encode())[:16],'owner':'pipeline','dimension':'admin_treasury_reward_custody','claim':'state_observation','strength':'bounded',
+                'confidence':'medium','impact':'informational','signal':None,'subject':f['subject'],'participants':[],
+                'text':'Creator key '+d['address']+' was named by the '+owner+' lane'+(' ('+reason[:200]+')' if reason else '')+', not attributed by receipt, curve or metadata; its signature history was read: '+str(len(d.get('signatures') or []))+' signature(s) over '+str(d.get('pages_attempted'))+' page(s), slots ('+str(d.get('start_slot'))+', '+str(d.get('end_slot'))+'], window '+('covered' if d.get('window_covered') else 'not fully covered')+'. Creator sales and rebuys are not reconciled against a lane-named key.',
+                'support':[{'evidence_id':f['evidence_id'],'subject':f['subject'],'role':'derivation'}],'counterevidence':[],
+                'time_basis':{'kind':'mixed','sample_ids':f['sample_ids'],'stability':'not_asserted'},
+                'limitations':['Lane attribution only ('+owner+' lane); no sampled receipt names this key.']+[str(r['path'])+': '+str(r['value']) for r in f.get('limits') or []],'concern':None,'assertion':'observation'})
     need(len(rows)<=500,'pipeline finding bound exceeded; narrow the selected dependency set')
     return rows
 
 
-def build_note(facts,leads=None):
+def build_note(facts,leads=None,lane_keys=None):
     return {'note_version':1,'pipeline_version':VERSION,'profile':PROFILE,'owner':'pipeline',
       'investigation_id':facts['investigation_id'],'target':facts['target'],'question':facts['question'],'focus':facts['focus'],
-      'manifest_sha256':facts['manifest_sha256'],'research_status':'partial','findings':findings(facts,leads),
+      'manifest_sha256':facts['manifest_sha256'],'research_status':'partial','findings':findings(facts,leads,lane_keys),
       'signal_assignments':{},'overrides':[],'coverage':[],'summary_ids':[],'decision':None,
       'limitations':['Machine-authored facts require analyst judgment; a sample is not a census and a quote is not execution.']}
 
 
 def generate(root,allow_synthetic=False,*,facts=None):
-    from solana_coverage import leads_for
-    root=Path(root).resolve();facts=build(root,allow_synthetic) if facts is None else facts;note=build_note(facts,leads_for(root))
+    from solana_coverage import leads_for,lane_creator_leads_from_notes
+    root=Path(root).resolve();facts=build(root,allow_synthetic) if facts is None else facts;note=build_note(facts,leads_for(root),lane_creator_leads_from_notes(root,facts['target']['mint']))
     need(not (root/'notes').is_symlink(),'refuse symlink notes directory')
     atomic(Path(root)/'facts.json',encoded(facts));atomic(Path(root)/'notes/pipeline.json',encoded(note));return note

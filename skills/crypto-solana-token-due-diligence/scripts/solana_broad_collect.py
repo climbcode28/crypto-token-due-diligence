@@ -645,8 +645,12 @@ def recommended_presets(root):
                         'reason':'the position census of '+lead['adapter']+' pool '+lead['pool'][:8]+'… was not affordable after the standard samples ('+str((census or {}).get('reason') or 'no census attempted')[:160]+'); it counts the pool\'s positions and samples the largest with their custody'})
     # Leads the lanes recorded become bounded presets too: a creator key a lane named gets a signature history, a signature a
     # lane named gets its receipt, so the coordinator's follow-up runs them mechanically instead of judging them.
+    from solana_coverage import lane_creator_leads_from_notes
     leads=lane_leads(root);sampled={d.get('signature') for d in by_op.get('transaction',[])}
-    lane_keys=list(dict.fromkeys(l['value'] for l in leads if l['kind']=='creator_key' and l['value'] not in seen_history and l['value']!=mint))[:2] if leads else []
+    # The same two keys the coverage rules count (lane order, mint excluded, capped): a key beyond that cap is never a row here
+    # and never a route there, so a row can only name creator_history when this queue can still read the key.
+    selected=[r['value'] for r in lane_creator_leads_from_notes(root/'draft',mint)]
+    lane_keys=[k for k in selected if k not in seen_history]
     if lane_keys:
         out.append({'id':'rec-lanekeys','kind':'creator_history','parameters':{'keys':lane_keys},'dimension':'historical_launch_integrity','sends':6,
                     'reason':'creator key(s) a lane named without a signature history: '+'; '.join(l['reason'] for l in leads if l['kind']=='creator_key' and l['value'] in lane_keys)[:300]})

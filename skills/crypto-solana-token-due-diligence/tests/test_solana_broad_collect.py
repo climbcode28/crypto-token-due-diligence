@@ -703,6 +703,13 @@ class ImporterBoundaryTests(unittest.TestCase):
         self.assertEqual(result['lane_grants_released'],30,'past the lane cutoff both lanes\' unspent reservations return to the ordinary pool');self.assertGreater(result['session']['started_attempts'],0)
         facts=json.loads((root/'draft/facts.json').read_text())['facts'];self.assertIn(key(95),{f['data'].get('address') for f in facts if f['operation']=='history'})
         self.assertEqual(len(result['leads']),2);self.assertTrue((root/'preset-requests/rec-lanekeys.json').exists())
+        # The chain attributed its own keys, so the launch row closes on them and never mentions the lane key; the lane key's history
+        # is still read and filed on the admin surface as a lane-named observation (extra evidence that holds nothing open).
+        rows={r['dimension']:r for r in json.loads((root/'draft/notes/coordinator.json').read_text())['coverage']}
+        self.assertNotIn(key(95)[:8],rows['historical_launch_integrity']['closure']['reason']);self.assertIn('Creator attribution and activity are typed facts',rows['admin_treasury_reward_custody']['closure']['reason'])
+        lanekey=[f for f in json.loads((root/'draft/notes/pipeline.json').read_text())['findings'] if f['id'].startswith('pipeline-lanekey-')]
+        self.assertEqual([f['dimension'] for f in lanekey],['admin_treasury_reward_custody']);self.assertIn(key(95),lanekey[0]['text'])
+        self.assertEqual(sum(1 for l in lanekey[0]['limitations'] if l.startswith('gaps:')),1,'the history fact\'s limits are carried once')
         # A malformed lead is refused by the lane's own self-check, never silently dropped from the queue.
         note['leads']=[{'kind':'wallet','value':key(95),'reason':'x'}];(root/'draft/notes/project.json').write_text(json.dumps(note))
         with self.assertRaises(ComposeError) as ctx:lane_check(root,'project',allow_synthetic=True)
@@ -765,6 +772,39 @@ class ImporterBoundaryTests(unittest.TestCase):
         sizes=next(f for f in facts if f['operation']=='quote_sizes')
         self.assertEqual((sizes['data']['basis'],sizes['data']['gaps']),('illustrative_USD_equivalents_floor_to_atomic_units',[]),'the size policy is judged as of the first captured quote, not the newest mint read')
         ladder=next(f for f in facts if f['operation']=='quote_ladder');self.assertEqual((ladder['usable'],ladder['data']['sizes_quoted'],ladder['data']['largest_impact_vs_smallest_percent']),(True,3,'9.9099'))
+
+    def test_a_lane_named_creator_closes_launch_and_admin_when_the_chain_attributes_none(self):
+        from transaction_fixture import fixture
+        from solana_broad_collect import follow_up
+        from solana_scaffold import scaffold
+        from solana_metadata import metadata_address
+        root,target,opts=self.setup_run();opts={**opts,'received_at':time.time()-400,'deadline_at':time.time()+300}
+        _,a,packet,_=fixture();tx=packet['response']['result'];tx['transaction']['message']['accountKeys']=[RichRpc.pool['pool'] if k==a['pool'] else k for k in tx['transaction']['message']['accountKeys']]
+        tx['blockTime']=RichRpc.stamp;RichRpc.receipt=tx  # a sampled receipt gives the launch fact; nothing in it names a creator
+        original=RichRpc.__call__;pda=metadata_address(target['mint'])
+        def no_metadata(rpc,request):  # a Token-2022 style mint without a Metaplex metadata account: the chain attributes no creator
+            result=original(rpc,request)
+            if request['method']=='getAccountInfo' and request['params'][0]==pda:result['result']['value']=None
+            return result
+        with unittest.mock.patch.object(RichRpc,'__call__',no_metadata):start(root,target,**opts)
+        facts=json.loads((root/'draft/facts.json').read_text())['facts'];self.assertFalse([f['operation'] for f in facts if f['operation'] in ('metadata','creator_activity')],'no chain attribution')
+        self.assertTrue([f for f in facts if f['operation']=='launch'])
+        rows={r['dimension']:r for r in json.loads((root/'draft/notes/coordinator.json').read_text())['coverage']}
+        self.assertEqual((rows['historical_launch_integrity']['closure']['next_route'],rows['admin_treasury_reward_custody']['closure']['next_route']),('standard','standard'))
+        self.assertFalse([f for f in json.loads((root/'draft/notes/pipeline.json').read_text())['findings'] if f['id'].startswith('pipeline-lanekey-')],'no lane, no lane-key finding')
+        # The project lane names the creator from the launch platform; the follow-up reads that key's history and both surfaces close on it.
+        note=scaffold(root/'draft','project',True);note['leads']=[{'kind':'creator_key','value':key(95),'reason':'the platform launch record names this creator'}]
+        note['checklist']={k:{'status':'done','reason':'answered'} for k in note['checklist']};(root/'draft/notes/project.json').write_text(json.dumps(note))
+        liq=scaffold(root/'draft','liquidity',True);liq['checklist']={k:{'status':'done','reason':'answered'} for k in liq['checklist']};(root/'draft/notes/liquidity.json').write_text(json.dumps(liq))
+        with unittest.mock.patch.object(RichRpc,'__call__',no_metadata):result=follow_up(root,opts['config'],factory=RichRpc)
+        self.assertIn(('rec-lanekeys','ran'),{(p['id'],p['status']) for p in result['presets_run']},result['presets_run'])
+        rows={r['dimension']:r for r in json.loads((root/'draft/notes/coordinator.json').read_text())['coverage']};launch=rows['historical_launch_integrity'];admin=rows['admin_treasury_reward_custody']
+        self.assertEqual((launch['closure']['boundary'],admin['closure']['boundary']),('resolved','resolved'),(launch['closure'],admin['closure']))
+        self.assertIn('(project lane: the platform launch record names this creator)',launch['closure']['reason']);self.assertIn('lane-named key',admin['closure']['reason'])
+        pipeline=json.loads((root/'draft/notes/pipeline.json').read_text());lanekey=[f for f in pipeline['findings'] if f['id'].startswith('pipeline-lanekey-')]
+        self.assertEqual(len(lanekey),1);self.assertEqual(lanekey[0]['dimension'],'admin_treasury_reward_custody');self.assertIn(key(95),lanekey[0]['text']);self.assertIn(lanekey[0]['id'],admin['finding_ids'])
+        self.assertIn('named by the project lane (the platform launch record names this creator)',lanekey[0]['text']);self.assertIn('slots (',lanekey[0]['text']);self.assertTrue(any('Lane attribution only (project lane)' in l for l in lanekey[0]['limitations']))
+        self.assertIn(lanekey[0]['id'],json.loads((root/'draft/notes/coordinator.json').read_text())['signal_assignments'],'its own judgment slot, not a restatement')
 
     def test_a_refused_quote_still_anchors_the_size_policy_time(self):
         from solana_broad_collect import capture,refresh

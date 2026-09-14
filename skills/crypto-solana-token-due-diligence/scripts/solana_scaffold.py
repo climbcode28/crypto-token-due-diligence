@@ -5,14 +5,14 @@ from solana_facts import build,encoded,atomic
 from solana_pipeline_note import build_note
 from solana_profile import PROFILE,DIMENSIONS,AXES,regular,strict_json,check
 from solana_compose import empty_coverage,CHECKLISTS
-from solana_coverage import mechanical,untouched,leads_for,checklists_from_notes,lane_findings_from_notes
+from solana_coverage import mechanical,untouched,leads_for,checklists_from_notes,lane_findings_from_notes,lane_creator_leads_from_notes
 
-VERSION='1.3.0'
+VERSION='1.3.1'
 
 
 def scaffold(root,owner='coordinator',allow_synthetic=False):
     check(owner in ('coordinator','liquidity','project'),'owner','Known owner required.')
-    root=Path(root).resolve();facts=build(root,allow_synthetic);m=strict_json(regular(root,'manifest.json').read_bytes(),'manifest.json');leads=leads_for(root);pipeline=build_note(facts,leads)
+    root=Path(root).resolve();facts=build(root,allow_synthetic);m=strict_json(regular(root,'manifest.json').read_bytes(),'manifest.json');leads=leads_for(root);lane_keys=lane_creator_leads_from_notes(root,m['target']['mint']);pipeline=build_note(facts,leads,lane_keys)
     note={'note_version':1,'profile':PROFILE,'owner':owner,'investigation_id':m['investigation_id'],'target':m['target'],
       'question':m['intake']['question'],'focus':m['intake']['focus'],'urls':m['intake']['urls'],'research_status':'partial','findings':[],
       'signal_assignments':{},'overrides':[],'coverage':[],'summary_ids':[],'decision':None,'limitations':[],
@@ -25,7 +25,7 @@ def scaffold(root,owner='coordinator',allow_synthetic=False):
         note['signal_assignments']={f['id']:{'signal':None,'input_digests':{r['evidence_id']:digests[r['evidence_id']] for r in f['support']}} for f in parents}
         # Each surface closes itself from the facts when its route ran and answered; the coordinator edits a row only to disagree.
         note['coverage']=[mechanical(dim,[f for f in pipeline['findings'] if f['dimension']==dim],facts['facts'],
-            [a['id'] for a in m['attempts'] if a['dimension']==dim],leads=leads,checklists=None) for dim in DIMENSIONS]
+            [a['id'] for a in m['attempts'] if a['dimension']==dim],leads=leads,checklists=None,lane_keys=lane_keys) for dim in DIMENSIONS]
         note['judgment_todo']=('TODO: review facts, assign signals, review the prefilled coverage rows (edit one only to disagree) and explicitly answer every original ask. '
             'Copy decision_template into decision; mitigations rows are {finding_id, status: unmitigated|partial|mitigated, text, evidence_ids}, '
             'actions rows are {kind: user_choice|risk_response, text}; a support whose subject is not the finding subject must be listed in participants; '
@@ -52,11 +52,11 @@ def sync_assignments(root):
         if entry is None:assignments[f['id']]={'signal':None,'input_digests':current};changed+=1
         elif isinstance(entry,dict) and entry.get('signal') is None and entry.get('input_digests')!=current:entry['input_digests']=current;changed+=1
     # Untouched coverage rows follow the facts and the lane notes on disk: a preset or a lane result that closed a surface closes its row.
-    leads=leads_for(root);checklists=checklists_from_notes(root) or None;lane=lane_findings_from_notes(root);rows=[]
+    leads=leads_for(root);checklists=checklists_from_notes(root) or None;lane=lane_findings_from_notes(root);lane_keys=lane_creator_leads_from_notes(root,m['target']['mint']);rows=[]
     for row in note.get('coverage',[]):
         if isinstance(row,dict) and untouched(row) and row.get('dimension'):
             fresh=mechanical(row['dimension'],[f for f in pipeline['findings']+lane if f.get('dimension')==row['dimension']],facts['facts'],
-                [a['id'] for a in m['attempts'] if a['dimension']==row['dimension']],leads=leads,checklists=checklists)
+                [a['id'] for a in m['attempts'] if a['dimension']==row['dimension']],leads=leads,checklists=checklists,lane_keys=lane_keys)
             if fresh!=row:changed+=1
             rows.append(fresh)
         else:rows.append(row)
