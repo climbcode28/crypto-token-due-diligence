@@ -743,6 +743,64 @@ class ImporterBoundaryTests(unittest.TestCase):
         pipeline=json.loads((root/'draft/notes/pipeline.json').read_text());side=[f for f in pipeline['findings'] if f['dimension']=='side_pool_removal_risk']
         self.assertEqual(len(side),1);self.assertIn('no side pool exists to sample',side[0]['text']);self.assertEqual(side[0]['claim'],'source_analysis')
 
+    def test_a_later_mint_re_read_keeps_the_quote_ladder_at_the_sizes_that_were_quoted(self):
+        from solana_broad_collect import collect,recommended_presets
+        from solana_scaffold import scaffold
+        root,target,opts=self.setup_run();opts={**opts,'deadline_at':time.time()+3000};start(root,target,**opts)
+        facts=json.loads((root/'draft/facts.json').read_text())['facts'];self.assertEqual(next(f for f in facts if f['operation']=='quote_ladder')['data']['sizes_quoted'],3)
+        # A lane-named creator key read six minutes later re-reads the mint for its pin; the captured $2 price is then older than the policy's five-minute window.
+        note=scaffold(root/'draft','project',True);note['leads']=[{'kind':'creator_key','value':key(95),'reason':'named by the project page'}];(root/'draft/notes/project.json').write_text(json.dumps(note))
+        spec=json.loads(Path(next(q for q in recommended_presets(root) if q['id']=='rec-lanekeys')['request']).read_text())
+        real=time.time;stamp=RichRpc.stamp;original=RichRpc.__call__
+        def later(rpc,request):  # the chain has moved on to slot 101 with a fresh header, so the re-read is a pinned, usable snapshot
+            result=original(rpc,request);m=request['method']
+            if m=='getBlock' and request['params'][0]==101:result['result'].update(blockhash=key(22),previousBlockhash=key(20),parentSlot=100,blockTime=stamp+330)
+            elif m=='getBlockTime' and request['params'][0]==101:result['result']=stamp+330
+            elif m in ('getAccountInfo','getMultipleAccounts'):result['result']['context']['slot']=101
+            return result
+        with unittest.mock.patch.object(RichRpc,'__call__',later),unittest.mock.patch.object(time,'time',lambda:real()+330):after=collect(root,spec,opts['config'],factory=RichRpc)
+        self.assertIsNone(after['preset_error']);facts=json.loads((root/'draft/facts.json').read_text())['facts']
+        self.assertEqual(next(f for f in facts if f['operation']=='controls')['data']['selection_scope'],'latest_retained_account_snapshot','the later read is the usable snapshot')
+        self.assertIn(key(95),{f['data'].get('address') for f in facts if f['operation']=='history'})
+        sizes=next(f for f in facts if f['operation']=='quote_sizes')
+        self.assertEqual((sizes['data']['basis'],sizes['data']['gaps']),('illustrative_USD_equivalents_floor_to_atomic_units',[]),'the size policy is judged as of the first captured quote, not the newest mint read')
+        ladder=next(f for f in facts if f['operation']=='quote_ladder');self.assertEqual((ladder['usable'],ladder['data']['sizes_quoted'],ladder['data']['largest_impact_vs_smallest_percent']),(True,3,'9.9099'))
+
+    def test_a_refused_quote_still_anchors_the_size_policy_time(self):
+        from solana_broad_collect import capture,refresh
+        from solana_quotes import quote_url
+        root,target,opts=self.setup_run();opts={**opts,'deadline_at':time.time()+3000};original=Web.open
+        def refusing(self_,request,timeout):
+            if 'lite-api.jup.ag' in request.full_url:return Response(b'rate limited',429,{'Content-Type':'text/plain'})
+            return original(self_,request,timeout)
+        with unittest.mock.patch.object(Web,'open',refusing):start(root,target,**opts)
+        facts=json.loads((root/'draft/facts.json').read_text())['facts'];self.assertFalse([f for f in facts if f['operation']=='quote_ladder'])
+        self.assertEqual([x['input_atomic'] for x in next(f for f in facts if f['operation']=='quote_sizes')['data']['sizes']],['50000000','500000000','5000000000'])
+        # The coordinator quotes the smallest policy size itself 330 s later: the refused captures at start still mark when the sizes were quoted.
+        real=time.time
+        with unittest.mock.patch.object(time,'time',lambda:real()+330):capture(root,[quote_url('jupiter_v1_lite',target,key(3),'50000000',slippage_bps=100)],'ordinary',opener_factory=Web);refresh(root)
+        facts=json.loads((root/'draft/facts.json').read_text())['facts'];after=next(f for f in facts if f['operation']=='quote_sizes')['data']
+        self.assertEqual((after['basis'],after['gaps']),('illustrative_USD_equivalents_floor_to_atomic_units',[]))
+        ladder=next(f for f in facts if f['operation']=='quote_ladder');self.assertEqual((ladder['data']['sizes_quoted'],ladder['data']['sizes_requested']),(1,3))
+
+    def test_the_policy_price_is_the_earliest_captured_not_the_first_by_hash(self):
+        root,target,opts=self.setup_run();original=Web.open
+        def priced_alternate(self_,request,timeout):  # the planned GeckoTerminal alternate also carries a price and completes after Dexscreener's capture
+            url=request.full_url
+            if 'geckoterminal' in url and url.endswith('/pools?page=1'):
+                row={'id':'solana_'+RichRpc.pool['pool'],'type':'pool','attributes':{'address':RichRpc.pool['pool'],'reserve_in_usd':'1000','base_token_price_usd':'3','volume_usd':{'h24':'10'}},
+                     'relationships':{'base_token':{'data':{'type':'token','id':'solana_'+target['mint']}},'quote_token':{'data':{'type':'token','id':'solana_'+key(3)}},'dex':{'data':{'id':'raydium'}}}}
+                time.sleep(0.2);return Response(json.dumps({'data':[row]}).encode(),200,{'Content-Type':'application/json'})
+            return original(self_,request,timeout)
+        with unittest.mock.patch.object(Web,'open',priced_alternate):start(root,target,**opts)
+        facts=json.loads((root/'draft/facts.json').read_text())['facts'];by_source={f['data'].get('source'):f for f in facts if f['operation']=='discovery_pools'}
+        self.assertEqual([c['price_usd'] for c in by_source['geckoterminal']['data']['candidates'] if c.get('price_usd')],['3'])
+        self.assertLess(by_source['dexscreener']['data']['candidates'][0]['captured_at'],by_source['geckoterminal']['data']['candidates'][0]['captured_at'])
+        m=json.loads((root/'draft/manifest.json').read_text());d=next(x for x in m['derivations'] if x['id']=='auto-sizes')
+        self.assertEqual(d['parameters']['price_discovery'],by_source['dexscreener']['evidence_id'],'Dexscreener was captured first; its $2 price sizes the policy whatever the capture ids hash to')
+        self.assertEqual([x['input_atomic'] for x in next(f for f in facts if f['operation']=='quote_sizes')['data']['sizes']],['50000000','500000000','5000000000'])
+        self.assertEqual(next(f for f in facts if f['operation']=='quote_ladder')['data']['sizes_quoted'],3)
+
     def test_start_captures_a_three_size_jupiter_quote_ladder_under_sellability(self):
         root,target,opts=self.setup_run();result=start(root,target,**opts);self.assertFalse(result['diagnostics'],result['diagnostics'])
         quotes=[u for u in Web.calls if 'lite-api.jup.ag' in u];self.assertEqual(len(quotes),3)

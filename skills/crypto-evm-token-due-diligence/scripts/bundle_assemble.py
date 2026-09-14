@@ -267,9 +267,34 @@ def handoff(root, lane_path):
     return d
 
 
+def access_route_record(run):
+    """The access route start recorded beside the draft (`provider.json`: endpoint class and basis, never a URL or key), when
+    it is present and well-formed; otherwise nothing, so the report never claims a route it cannot show."""
+    path = Path(run) / "provider.json"
+    if not path.is_file():
+        return None
+    try:
+        record = read_json(path)
+    except (ValueError, OSError):
+        return None
+    if not (isinstance(record, dict) and all(isinstance(record.get(k), str) and record[k] for k in ("provider", "endpoint_source", "text"))):
+        return None
+    # Closed vocabularies and a bounded sentence: a hand-edited record cannot carry an endpoint or credential into the report.
+    if record["provider"] not in ("drpc", "configured_rpc", "public", "fixture", "unrecorded") \
+            or record["endpoint_source"] not in ("configured", "builtin_public", "builtin_public_key_missing", "fixture", "unrecorded") \
+            or len(record["text"]) > 200 or "://" in record["text"] or "@" in record["text"] \
+            or record.get("provider_flag") not in (None, "generic", "auto", "drpc", "public") or record.get("cost_policy") not in (None, "free", "paid"):
+        return None
+    return {k: record.get(k) for k in ("provider", "endpoint_source", "provider_flag", "cost_policy", "text")}
+
+
 def assemble(root, checkpoint=False):
     root = Path(root)
     d = read_draft(root)
+    context = {"collections": d["collections"]}
+    route = access_route_record(root.parent)
+    if route:
+        context["access_route"] = route
     need(d["pins"] and d["chain_id_evidence"], "draft has no verified chain/pins")
     target = d["target"]
     # A later receipt/header import must not move the state snapshot and force
@@ -361,7 +386,7 @@ def assemble(root, checkpoint=False):
     safety = {"no_real_keys": True, "no_real_signing": True, "no_broadcast": True, "simulation": {"used": False}}
     manifest = {"schema_version": 1, "validation_profile": CURRENT_PROFILE, "synthetic": d["synthetic"], "mode": "broad",
                 "question": d["question"], "materiality": d["materiality"], "limitations": ["Collection and assembly do not complete a broad investigation."],
-                "target": {"requested": target, "observed": target, "metadata": metadata}, "context": {"collections": d["collections"]},
+                "target": {"requested": target, "observed": target, "metadata": metadata}, "context": context,
                 "chains": [{"chain_id": target["chain_id"], "label": "RPC-verified chain", "chain_id_evidence": d["chain_id_evidence"], "current_pin": pid, "pins": d["pins"]}],
                 "scope": list(scopes.values()), "evidence": d["evidence"], "discoveries": list(discoveries.values()), "safety": safety}
     report = {"schema_version": 1, "validation_profile": CURRENT_PROFILE, "closure_review_version": 1,

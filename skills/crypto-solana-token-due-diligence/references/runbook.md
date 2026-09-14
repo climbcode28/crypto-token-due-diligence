@@ -232,7 +232,9 @@ the presets the lanes' `leads` added: `creator_history` for a lane-named creator
 `transactions` for a lane-named signature), refreshes again and resyncs the coordinator note,
 printing `presets_run`, the remaining queue and the leads it read. Nothing in it needs a
 judgment; a row it could not afford is printed with its reason, and past the collection
-cutoff `queue_note` says no preset was accepted (an unread lead is then a limitation).
+cutoff `queue_note` says no preset was accepted (an unread lead is then a limitation). The
+quote ladder keeps the sizes that were quoted at start: the size policy is judged as of the
+first captured quote, not the newest mint read.
 
 Presets run sequentially under the same deadline, attempt/byte ceiling and reserved
 final capacity, and each refreshes facts (the draft becomes unjudged; analyst notes and

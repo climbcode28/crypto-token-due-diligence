@@ -2,8 +2,9 @@
 
 `solana_quotes.size_policy` chooses three illustrative exact integer inputs.
 Explicit user quantities take priority. Otherwise use $100/$1,000/$10,000 equivalents
-only with exact mint/genesis-bound captured price, decimals and an explicit fresh
-timestamp; disclose the source and rounding. Without that evidence use disclosed
+only with exact mint/genesis-bound captured price (the earliest captured), decimals and
+an explicit fresh timestamp, fresh as of the first quote capture once quotes were attempted
+(so a later mint re-read never restates the sizes); disclose the source and rounding. Without that evidence use disclosed
 token quantity probes. No schedule establishes affordability or the user's holding.
 
 Local estimates currently support the pinned Raydium CPMM SPL configuration only:

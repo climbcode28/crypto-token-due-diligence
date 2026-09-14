@@ -32,6 +32,28 @@ class OptionalRpcTests(unittest.TestCase):
              patch.object(rpc_collect.HttpTransport, "__init__", side_effect=AssertionError("no client during selection")):
             return rpc_collect.provider_availability(args or self.args())
 
+    def test_access_route_record_names_the_endpoint_class_without_values(self):
+        from broad_collect import access_route
+        env = {"ROBINHOOD_DRPC_URL": "https://lb.drpc.org/robinhood-mainnet", "DRPC_API_KEY": "TEST-SECRET"}
+        with patch.dict(os.environ, env, clear=True):
+            args = self.args(provider="auto", cost_policy=None, allow_paid=False, chain_id=4663)
+            record = access_route(args, rpc_collect.provider_availability(args))
+        self.assertEqual((record["provider"], record["endpoint_source"], record["provider_flag"], record["cost_policy"]), ("drpc", "configured", "auto", None))
+        self.assertIn("dRPC", record["text"])
+        self.assertNotIn("TEST-SECRET", json.dumps(record))
+        self.assertNotIn("drpc.org", json.dumps(record))
+        with patch.dict(os.environ, {"ROBINHOOD_DRPC_URL": "https://lb.drpc.org/robinhood"}, clear=True):
+            args = self.args(provider="auto", cost_policy=None, allow_paid=False, chain_id=4663)
+            record = access_route(args, rpc_collect.provider_availability(args))
+        self.assertEqual((record["provider"], record["endpoint_source"]), ("public", "builtin_public_key_missing"))
+        self.assertIn("has no key", record["text"])
+        with patch.dict(os.environ, {}, clear=True):
+            args = self.args(provider="public", cost_policy="free", allow_paid=False, chain_id=4663)
+            record = access_route(args, rpc_collect.provider_availability(args))
+        self.assertEqual((record["provider"], record["endpoint_source"], record["cost_policy"]), ("public", "builtin_public", "free"))
+        self.assertIn("by request", record["text"])
+        self.assertEqual((access_route(self.args(), None)["provider"], access_route(self.args(), {"status": "ready"})["provider"]), ("fixture", "unrecorded"))
+
     def test_missing_drpc_key_hands_back_to_standard_flow(self):
         result = self.check(env={"ROBINHOOD_DRPC_URL": "https://lb.drpc.org/?network=robinhood-mainnet"})
         self.assertEqual(result["status"], "fallback")

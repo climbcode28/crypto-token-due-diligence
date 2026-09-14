@@ -26,6 +26,15 @@ class AssessmentReportingTests(unittest.TestCase):
         m, r = validate(self.root, True, required_profile=CURRENT_PROFILE)
         return render(m, r, sha((self.root / 'report.json').read_bytes()))
 
+    def test_access_route_in_the_context_renders_as_a_sentence(self):
+        self.m['context']['access_route'] = {'provider': 'drpc', 'endpoint_source': 'configured', 'provider_flag': 'auto', 'cost_policy': None,
+                                             'text': 'dRPC through the configured key in the private env file'}
+        output = self.output()
+        self.assertIn('- access\\_route: dRPC through the configured key in the private env file (provider drpc, endpoint\\_source configured)', output)
+        self.assertNotIn('"text"', output)
+        del self.m['context']['access_route']
+        self.assertNotIn('access', self.output().split('## Investigation context')[1].split('## Target metadata')[0], 'no record, no route line')
+
     def add_finding(self, fid, topic, signal, impact='benefit', inference=False):
         f = copy.deepcopy(self.r['findings'][0])
         f.update(id=fid, proposition='SYNTHETIC: ' + fid,

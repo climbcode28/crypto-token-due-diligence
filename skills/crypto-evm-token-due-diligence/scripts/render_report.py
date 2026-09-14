@@ -239,7 +239,10 @@ def render(m, r, report_sha):
     lines += render_stopping_review(r, evidence)
     lines += ["## Investigation context", ""]
     for key, value in sorted(m["context"].items()):
-        lines += [f"- {safe(key)}: {structured(value)}"]
+        if key == "access_route" and isinstance(value, dict) and isinstance(value.get("text"), str):
+            lines += [f"- {safe(key)}: {safe(value['text'])} (provider {safe(str(value.get('provider')))}, {safe('endpoint_source')} {safe(str(value.get('endpoint_source')))})"]
+        else:
+            lines += [f"- {safe(key)}: {structured(value)}"]
     lines += ["", "## Target metadata", ""]
     for key, item in sorted(r["metadata"].items()):
         value = item["value"] if item["status"] == "resolved" else "Unresolved: " + item["reason"]

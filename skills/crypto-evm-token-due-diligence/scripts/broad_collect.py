@@ -8,6 +8,7 @@ written to facts.json with the evidence alias that supports it.
 """
 import argparse
 import json
+import urllib.parse
 import math
 import re
 import sys
@@ -21,7 +22,7 @@ from backend_common import Cache, Invalid, address, canonical, integer, need, qu
 from evm_decode import classify_clone
 from facts import DEAD, SELECTORS, TRANSFER, account_code_kind, holder_summary, decimal_string, decode_result, summarize_row, transfers
 from keccak import selector, topic
-from rpc_collect import Collector, HttpTransport, add_provider_arguments, configured_transport, provider_availability, seconds
+from rpc_collect import Collector, HttpTransport, add_provider_arguments, configured_transport, is_drpc_host, provider_availability, seconds, selected_endpoint
 
 
 class StartFailure(Invalid):
@@ -1861,6 +1862,34 @@ def provider_note(route):
         print(json.dumps({"provider_note": "the configured dRPC URL has no DRPC_API_KEY, so the chain's built-in public endpoint is used; add the key to the private env file to use dRPC"}))
 
 
+def access_route(args, route):
+    """The run's RPC access route as a small record for the report: which endpoint class served the collection and why,
+    never a URL, header or key value. `route` is the provider availability result (None for a fixture transport)."""
+    flag = getattr(args, "provider", None)
+    policy = getattr(args, "cost_policy", None)
+    if route is None:
+        provider = source = "fixture"
+        text = "synthetic fixture transport; no network endpoint was used"
+    else:
+        source = route.get("endpoint_source") or "unrecorded"
+        if source == "configured":
+            try:
+                url, _ = selected_endpoint(args)
+                provider = "drpc" if flag == "drpc" or is_drpc_host(urllib.parse.urlsplit(url).hostname) else "configured_rpc"
+            except (ValueError, TypeError, AttributeError):
+                provider = "configured_rpc"
+        elif source.startswith("builtin_public"):
+            provider = "public"
+        else:
+            provider = "unrecorded"
+        text = {"drpc": "dRPC through the configured key in the private env file",
+                "configured_rpc": "the configured RPC endpoint named in the private env file",
+                "public": "the chain's built-in public endpoint" + (" (the configured dRPC URL has no key)" if source == "builtin_public_key_missing"
+                                                                  else " by request" if flag == "public" else " (no endpoint configured)"),
+                "unrecorded": "the access route was not recorded (provider availability named no endpoint source)"}[provider]
+    return {"schema_version": 1, "provider": provider, "endpoint_source": source, "provider_flag": flag, "cost_policy": policy, "text": text}
+
+
 def preset_collect(args):
     from investigation import Investigation
     run = Path(args.run)
@@ -1977,6 +2006,7 @@ def main():
             need(args.allow_synthetic, "fixture requires --allow-synthetic")
             from bootstrap import FixtureTransport
             transport = FixtureTransport(args.fixture)
+            route = None
         else:
             route = provider_availability(args)
             if route["status"] != "ready":
@@ -1990,6 +2020,8 @@ def main():
         start_owned = True
         for sub in ("notes", "lanes/liquidity", "lanes/project"):
             (args.run / sub).mkdir(parents=True)
+        # The access route is recorded beside the draft (endpoint class and basis, never a value) so the report can state it.
+        replace_json(args.run / "provider.json", access_route(args, route))
         session = Investigation(args.run / "session.sqlite") if restart and (args.run / "session.sqlite").is_file() else \
             Investigation.create(args.run / "session.sqlite", args.max_requests, args.timeout, request_ceiling=args.request_ceiling,
                                  timeout_ceiling=args.timeout_ceiling, limit_basis="analyst_safety")

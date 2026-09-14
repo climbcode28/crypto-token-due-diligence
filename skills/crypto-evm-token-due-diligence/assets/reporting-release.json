@@ -1,9 +1,10 @@
 {
-  "reporting_engine_version": "2.6.2",
-  "date": "2026-09-11",
+  "reporting_engine_version": "2.6.3",
+  "date": "2026-09-14",
   "bundle_schema_version": 1,
   "summary_extension": "Required for completed strict reports; internal checkpoints may lack analyst-selected summary and decision; historical replay remains frozen",
   "changes": [
+    "Investigation context prints context.access_route as a sentence (the endpoint class that served the run and its basis) when bundle assembly found start's provider.json; a bundle without the record prints nothing about its route.",
     "Per-finding native source links (client-rendered company/product icons where available, no emoji substitutes) reused from existing evidence in the current render/read/answer step; local frozen-evidence fallback. No added network requests, tool calls, agent turns, research steps or budget changes.",
     "Production review: bounded retry/redirect/restart accounting, exact same-pool sale matching, missing-data and authority wording, and reliable internal checkpoints. No added research steps, tool calls or agent turns.",
     "Target completed broad research in 10–15 minutes through early dependency checks, concurrent lanes and incremental report assembly",
@@ -27,7 +28,7 @@
   ],
   "reasoning_scenarios": "references/reporting-scenarios.md",
   "validation_scope": "Offline citation routing and safety regressions; all four README suites and mirrored Claude EVM suite. Research call sequence and budgets unchanged; no live latency guarantee.",
-  "previous_reporting_engine_version": "2.6.1",
+  "previous_reporting_engine_version": "2.6.2",
   "review_record": "../../../docs/reviews/evm-citation-presentation-2026-09-11.md",
   "validation_profile": "evm-evidence-v2",
   "legacy_profile": "legacy-v1",

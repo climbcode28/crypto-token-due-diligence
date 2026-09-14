@@ -89,6 +89,30 @@ class ResearchHelperTests(unittest.TestCase):
             finally:
                 cache.close()
 
+    def test_assemble_carries_the_recorded_access_route_into_the_manifest_context(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            rpc = FakeRpc()
+            rpc.overrides['eth_blockNumber'] = lambda q: '0x65'
+            cache = Cache(root / 'cache.sqlite')
+            try:
+                bootstrap(root / 'boot', {'chain_id': CHAIN, 'address': TOKEN}, cache, rpc)
+                intake(root / 'draft', {'chain_id': CHAIN, 'address': TOKEN}, 'Synthetic scope', 'Synthetic materiality', True)
+                import_collection(root / 'draft', root / 'boot/collection', True)
+                self.assertNotIn('access_route', assemble(root / 'draft', checkpoint=True)[0]['context'], 'no record, no claim')
+                record = {'schema_version': 1, 'provider': 'drpc', 'endpoint_source': 'configured', 'provider_flag': 'auto', 'cost_policy': None,
+                          'text': 'dRPC through the configured key in the private env file'}
+                write_new(root / 'provider.json', record)
+                manifest, _ = assemble(root / 'draft', checkpoint=True)
+                self.assertEqual(manifest['context']['access_route'], {k: record[k] for k in ('provider', 'endpoint_source', 'provider_flag', 'cost_policy', 'text')})
+                (root / 'provider.json').write_text('{not json')
+                self.assertNotIn('access_route', assemble(root / 'draft', checkpoint=True)[0]['context'], 'a malformed record is ignored, never rendered')
+                for bad in ({'provider': 'drpc', 'endpoint_source': 'configured', 'text': 'https://lb.drpc.org/key@host'}, {**record, 'provider': 'custom'}, {**record, 'cost_policy': 'unlimited'}):
+                    (root / 'provider.json').write_text(json.dumps(bad))
+                    self.assertNotIn('access_route', assemble(root / 'draft', checkpoint=True)[0]['context'], 'only the closed vocabularies and a bounded sentence reach the report')
+            finally:
+                cache.close()
+
     def test_clone_parser_exact_and_near_neighbors(self):
         runtime = "0x363d3d373d3d3d363d73" + ALICE[2:] + "5af43d82803e903d91602b57fd5bf3"
         self.assertEqual(classify_clone(runtime)["implementation"], ALICE)

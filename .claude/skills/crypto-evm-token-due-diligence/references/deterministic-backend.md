@@ -48,6 +48,11 @@ python3 "$SKILL_DIR/scripts/rpc_collect.py" --check-availability --provider auto
 `--chain-id` names the target so the check and `start` agree: a credential-free dRPC URL
 left in the file without its key makes both select the chain's built-in public endpoint
 (`endpoint_source: builtin_public_key_missing`, printed by `start` as a `provider_note`).
+`start` records the route it took in `$RUN/provider.json` (`provider` drpc | configured_rpc |
+public | fixture | unrecorded, `endpoint_source`, the provider flag, the cost policy and one
+sentence; never a URL, header or key); `bundle_assemble` copies that record into the
+manifest's `context.access_route` and the report prints it under Investigation context, so
+a delivered report states which endpoint class served it.
 
 Source the documented user configuration in the **same shell invocation** as every
 check and collection; exports in another Terminal or previous tool call do not persist.

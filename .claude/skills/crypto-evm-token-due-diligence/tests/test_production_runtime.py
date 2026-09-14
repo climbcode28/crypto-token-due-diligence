@@ -167,6 +167,8 @@ class RestartBudgetTests(unittest.TestCase):
             self.assertEqual([s["started_attempts"] for s in observed], [1, 2])
             for key in ("investigation_id", "request_ceiling", "deadline_ceiling_unix", "deadline_unix"):
                 self.assertEqual(observed[0][key], observed[1][key])
+            record = json.loads((root / "provider.json").read_text())  # written before collection starts, so a failed start still names its route
+            self.assertEqual((record["provider"], record["endpoint_source"], record["provider_flag"]), ("unrecorded", "unrecorded", "generic"))
 
     def test_archive_preserves_original_session_limits_and_identity(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -16,7 +16,7 @@ DIMENSIONS = (
     "admin_treasury_reward_custody", "reward_accounting_liveness",
     "utility_redemption_rights", "external_dependencies", "development_disclosure",
 )
-REPORTING_ENGINE_VERSION = "2.6.2"
+REPORTING_ENGINE_VERSION = "2.6.3"
 SUMMARY_TOPICS = {
     "token_and_liquidity": "Token and liquidity",
     "real_work_vs_marketing": "Real work vs marketing",

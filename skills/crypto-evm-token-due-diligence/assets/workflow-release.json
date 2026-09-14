@@ -1,9 +1,10 @@
 {
-  "workflow_version": "3.6.0",
-  "backend_engine_version": "3.9.0",
-  "reporting_engine_version": "2.6.2",
+  "workflow_version": "3.6.1",
+  "backend_engine_version": "3.9.1",
+  "reporting_engine_version": "2.6.3",
   "date": "2026-09-14",
   "changes": [
+    "The report states its RPC access route: start records provider.json, bundle assembly copies it into the manifest's context.access_route, and the rendered report prints it under Investigation context (backend 3.9.1, reporting 2.6.3).",
     "Provider policy: a configured dRPC key is the standing authorization; collectors take --provider auto --allow-network with no paid-use flags or consent question; step 1, the runbook's network and denial-recovery sections, the backend reference and docs/provider-setup.md say so; the documented start budget is 360 of the 400 ceiling. Backend 3.9.0.",
     "Runbook: the creation transaction comes from the explorer's address page (retried once on a transient failure) or from Sourcify's deployment record; no step or command changes. Backend 3.8.1.",
     "Step 4: start already ran its recommended queue (preset-run lines); the coordinator runs only a deferred row and adds a preset only for a receipt hash a lane found or a contract the user named. Backend 3.8.0.",
@@ -29,7 +30,7 @@
     "Chat delivery renders the four conclusions (technical exposure, credibility and maturity, token economics, research confidence) as four bullets, never one paragraph"
   ],
   "validation_scope": "Offline public-selection and clean-install tests plus specialist regression suites; live fresh-host acceptance outcomes and limitations are recorded separately in the review record.",
-  "previous_workflow_version": "3.4.0",
+  "previous_workflow_version": "3.6.0",
   "review_record": "../../../docs/reviews/first-run-reliability.md",
   "completion_review_version": 2,
   "decision_review_version": 2,

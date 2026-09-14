@@ -14,6 +14,20 @@ from solana_programs import observed_account
 ADAPTERS=('raydium_cpmm','raydium_amm_v4','raydium_clmm','orca_whirlpool','meteora_dlmm','meteora_damm_v2','pump_curve','pumpswap')
 
 
+def quote_capture_times(obs,mint):
+    """Capture times (epoch seconds) of every public quote capture for the exact mint, any source, size or outcome: a refused
+    quote still marks the moment the sizes were quoted."""
+    from solana_quotes import quote_request
+    from solana_session import epoch
+    out=[]
+    for eid,o in obs.items():
+        if o.get('kind')!='document':continue
+        try:source,request=quote_request(o['source']['capture']['url'])
+        except (ValueError,KeyError,TypeError):continue
+        if request.get('input_mint')==mint:out.append(epoch(o['captured_at']))
+    return out
+
+
 class Importer:
     def __init__(self,session_root):
         self.session=Session(session_root);self.root=self.session.root/'draft';self.root.mkdir(exist_ok=True);s=self.session.meta
@@ -255,7 +269,14 @@ class Importer:
             params={'mint':usable_mint}
             if prices:
                 from solana_session import epoch
-                did,price=prices[0];params.update(price_discovery=did,price_pool=price['pool'],now=max(epoch(self.obs[usable_mint]['captured_at']),price['captured_at']))
+                # The earliest captured price (capture time, then id) is the policy's price at start and at every later refresh,
+                # so a market page a lane captures later can never restate the sizes; observation order alone is hash order.
+                prices.sort(key=lambda item:(item[1]['captured_at'],item[0]));did,price=prices[0]
+                # The size policy is judged as of the first quote capture once quotes were attempted: a mint re-read minutes
+                # later (a follow-up preset) must not restate the sizes and orphan the ladder that was quoted at them.
+                quoted=quote_capture_times(self.obs,target['mint'])
+                now=max(price['captured_at'],min(quoted)) if quoted else max(epoch(self.obs[usable_mint]['captured_at']),price['captured_at'])
+                params.update(price_discovery=did,price_pool=price['pool'],now=now)
             self.derive('auto-sizes','quote_sizes',params)
         def discovers(i):
             req=self.objects[i]['request']

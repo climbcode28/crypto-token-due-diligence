@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "engine_version": "3.9.0",
-  "previous_engine_version": "3.8.1",
+  "engine_version": "3.9.1",
+  "previous_engine_version": "3.9.0",
   "rule_versions": {
     "launch_recipients": "1.0.1",
     "fee_predicate": "1.0.1"
@@ -40,6 +40,7 @@
   "fixture": "tests/backend_fixtures.py",
   "validation_scope": "Offline public-selection and clean-install tests plus specialist regression suites; live fresh-host acceptance outcomes and limitations are recorded separately in the review record.",
   "changes": [
+    "Access route record: start writes provider.json beside the draft (provider drpc | configured_rpc | public | fixture | unrecorded, endpoint_source, provider flag, cost policy and one sentence; never a URL, header or key) before collection begins, so a run names the endpoint class that served it.",
     "Configured means authorized: a dRPC key in the user's private env file is that user's standing authorization for bounded read-only research, so the invocation gate no longer requires --cost-policy paid --allow-paid (accepted for compatibility); only --allow-network and a contradictory free policy on a dRPC endpoint (free_policy_selects_paid_endpoint) block, --provider auto is accepted as the generic selection, and the start default --max-requests is 360 (ceiling 400) so start's own preset queue finishes. Motivated by a Codex run whose host approval review rejected the paid flags for lack of current-conversation consent and degraded to public RPC. A configured dRPC URL without its key selects the chain's built-in public endpoint (endpoint_source builtin_public_key_missing, printed as a provider_note), so removing the key is a complete opt-out.",
     "Creation recovery: the Sourcify request carries the deployment record (transaction hash, block, deployer) and supplies the creation transaction when the explorer's address page fails or names none (creation.tx_source and a printed creation: summary line record which source answered; a conflict between the two is printed and recorded, never resolved silently; the lane briefs name the deployer when only Sourcify answered); a transient failure of the explorer address page (server_error, timeout, throttled) gets one more charged attempt after a two-second pause on top of the fetcher's own quick retry, never on a 404, an access denial or a run whose every capture got no response. Motivated by two live PONS runs where a Blockscout 500 and then a timeout lost the creation receipt, the launch-window scan and the custodian probe.",
     "start runs its recommended queue itself after charging the lanes (positions for GoPlus-listed unread LP ids, the bounded IncreaseLiquidity scans with their printed positions chained, unprobed listed sells) under the session's remaining seconds and requests, sharing one preset executor with `collect`; facts.presets_run and the preset-run summary lines record each outcome and only deferred rows stay in recommended_presets (a Codex STONK run stalled at a checkpoint when its host approval review treated a recommended preset as a new paid action). Phase 4 lists position custodians first, so a receipt-heavy run never pushes one past the ten-actor cap (a live PONS run lost its locker getters that way); the queue re-offers listed position ids a six-id row left unread and never an id already read.",
