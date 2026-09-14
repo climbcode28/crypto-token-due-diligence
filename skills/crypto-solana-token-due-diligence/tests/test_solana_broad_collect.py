@@ -683,6 +683,66 @@ class ImporterBoundaryTests(unittest.TestCase):
         self.assertEqual([(r['id'],r['status'],r.get('reason')) for r in again['presets_run']],[(i,'ran','ran in an earlier attempt of this start') for i in ('rec-activity','rec-history','rec-programs')])
         self.assertEqual(again['recommended_presets'],[]);self.assertIn('rec-activity, rec-history, rec-programs already ran inside start',again['next'])
 
+    def test_lane_leads_become_presets_that_follow_up_runs_mechanically(self):
+        from solana_broad_collect import lane_leads,recommended_presets,follow_up,lane_check
+        from solana_scaffold import scaffold
+        from solana_common import b58encode
+        from solana_compose import ComposeError
+        root,target,opts=self.setup_run();opts={**opts,'received_at':time.time()-400,'deadline_at':time.time()+300};start(root,target,**opts)  # the lane cutoff has passed: follow-up time
+        sig=b58encode(bytes([7])*64);note=scaffold(root/'draft','project',True)
+        note['leads']=[{'kind':'creator_key','value':key(95),'reason':'the platform token page names this creator'},{'kind':'signature','value':sig,'reason':'a burn the docs cite'}]
+        (root/'draft/notes/project.json').write_text(json.dumps(note))
+        self.assertEqual([(l['kind'],l['value'],l['owner']) for l in lane_leads(root)],[('creator_key',key(95),'project'),('signature',sig,'project')])
+        queue={q['id']:q for q in recommended_presets(root)}
+        self.assertEqual((queue['rec-lanekeys']['kind'],queue['rec-lanekeys']['parameters'],queue['rec-lanekeys']['dimension']),('creator_history',{'keys':[key(95)]},'historical_launch_integrity'))
+        self.assertEqual((queue['rec-lanetx']['kind'],queue['rec-lanetx']['parameters']),('transactions',{'signatures':[sig]}));self.assertIn('platform token page',queue['rec-lanekeys']['reason'])
+        # One coordinator command after the lanes returned runs both rows with no lane window owed, refreshes and resyncs the note.
+        before=status(root)['remaining_requests'];result=follow_up(root,opts['config'],factory=RichRpc)
+        # start deferred its own three rows (too close to the lane cutoff); the follow-up owes no lane window, so they run with the lane rows.
+        self.assertEqual({(r['id'],r['status']) for r in result['presets_run']},{('rec-lanekeys','ran'),('rec-lanetx','ran'),('rec-activity','ran'),('rec-history','ran'),('rec-programs','ran')});self.assertEqual(result['recommended_presets'],[]);self.assertIsNone(result['queue_note'])
+        self.assertEqual(result['lane_grants_released'],30,'past the lane cutoff both lanes\' unspent reservations return to the ordinary pool');self.assertGreater(result['session']['started_attempts'],0)
+        facts=json.loads((root/'draft/facts.json').read_text())['facts'];self.assertIn(key(95),{f['data'].get('address') for f in facts if f['operation']=='history'})
+        self.assertEqual(len(result['leads']),2);self.assertTrue((root/'preset-requests/rec-lanekeys.json').exists())
+        # A malformed lead is refused by the lane's own self-check, never silently dropped from the queue.
+        note['leads']=[{'kind':'wallet','value':key(95),'reason':'x'}];(root/'draft/notes/project.json').write_text(json.dumps(note))
+        with self.assertRaises(ComposeError) as ctx:lane_check(root,'project',allow_synthetic=True)
+        self.assertTrue(any(e['path']=='leads' for e in ctx.exception.errors));self.assertEqual(lane_leads(root),[])
+
+    def test_refresh_recomputes_untouched_coverage_rows_and_keeps_edited_ones(self):
+        from solana_broad_collect import collect
+        from solana_coverage import untouched
+        from solana_scaffold import sync_assignments
+        root,target,opts=self.setup_run();opts={**opts,'received_at':time.time()-200,'deadline_at':time.time()+400};result=start(root,target,**opts)  # queue deferred: history not yet read
+        path=root/'draft/notes/coordinator.json';note=json.loads(path.read_text());rows={r['dimension']:r for r in note['coverage']}
+        self.assertEqual((rows['historical_launch_integrity']['closure']['boundary'],rows['historical_launch_integrity']['closure']['next_route']),('pending','creator_history'))
+        edited=rows['token_controls'];edited['status']='partial';edited['decision_impact']='Held open by the coordinator pending a controller review.';edited['closure'].update(boundary='pending',standard_scope_complete=False,next_route='standard')
+        path.write_text(json.dumps(note));kept=json.loads(json.dumps(edited))
+        spec=json.loads(Path(next(q for q in result['recommended_presets'] if q['kind']=='creator_history')['request']).read_text());after=collect(root,spec,opts['config'],factory=RichRpc);self.assertIsNone(after['preset_error'])
+        rows={r['dimension']:r for r in json.loads(path.read_text())['coverage']}
+        self.assertEqual((rows['historical_launch_integrity']['closure']['boundary'],rows['historical_launch_integrity']['closure']['next_route']),('pending','transactions'),'the untouched row followed the new history facts: the receipt route is now the one open')
+        self.assertTrue(untouched(rows['historical_launch_integrity']));self.assertEqual(rows['token_controls'],kept,'the edited row is byte-identical');self.assertFalse(untouched(rows['token_controls']))
+        # A lane finding on a lane-owned surface counts at the sync exactly as it does at compose.
+        project=json.loads((root/'draft/notes/project.json').read_text());project['checklist']={k:{'status':'done','reason':'answered'} for k in project['checklist']}
+        project['findings']=[{'id':'project-econ','dimension':'reward_accounting_liveness','claim':'source_analysis','strength':'bounded','text':'No reward is claimed.','support':[]}]
+        (root/'draft/notes/project.json').write_text(json.dumps(project));sync_assignments(root/'draft');rows={r['dimension']:r for r in json.loads(path.read_text())['coverage']}
+        self.assertEqual((rows['reward_accounting_liveness']['closure']['boundary'],rows['reward_accounting_liveness']['finding_ids']),('resolved',['project-econ']))
+        self.assertIn('no affirmative finding',rows['utility_redemption_rights']['closure']['reason'])
+
+    def test_start_prefills_coverage_closures_from_the_facts(self):
+        root,target,opts=self.setup_run();result=start(root,target,**opts)
+        note=json.loads((root/'draft/notes/coordinator.json').read_text());rows={r['dimension']:r for r in note['coverage']}
+        closed={d for d,r in rows.items() if r['closure']['boundary']=='resolved'};open_={d:r['closure']['next_route'] for d,r in rows.items() if r['closure']['boundary']=='pending'}
+        # Controls, the exact largest-20 holders, the observed leading pool, the single discovered pool, the quote ladder and creator attribution all answered
+        # in start; the pool program stayed unread, and with histories read for both keys the launch row still waits for a sampled receipt.
+        self.assertEqual(closed,{'token_controls','current_concentration','canonical_lp_principal_custody','side_pool_removal_risk','sellability_exit_depth','admin_treasury_reward_custody'},rows)
+        self.assertEqual(open_,{'external_dependencies':'programs','historical_launch_integrity':'transactions','development_disclosure':'standard','utility_redemption_rights':'standard','reward_accounting_liveness':'standard'})
+        self.assertIn('No receipt was sampled',rows['historical_launch_integrity']['closure']['reason'])
+        self.assertTrue(all(rows[d]['closure']['next_route']=='standard' and 'project lane' in rows[d]['closure']['reason'] for d in ('development_disclosure','utility_redemption_rights','reward_accounting_liveness')))
+        self.assertTrue(all(rows[d]['status']=='checked' and rows[d]['pending_work']==[] and rows[d]['closure']['standard_scope_complete'] for d in closed))
+        self.assertTrue(all(r['prefill']['basis']=='mechanical' for r in note['coverage']))
+        pipeline=json.loads((root/'draft/notes/pipeline.json').read_text());side=[f for f in pipeline['findings'] if f['dimension']=='side_pool_removal_risk']
+        self.assertEqual(len(side),1);self.assertIn('no side pool exists to sample',side[0]['text']);self.assertEqual(side[0]['claim'],'source_analysis')
+
     def test_start_captures_a_three_size_jupiter_quote_ladder_under_sellability(self):
         root,target,opts=self.setup_run();result=start(root,target,**opts);self.assertFalse(result['diagnostics'],result['diagnostics'])
         quotes=[u for u in Web.calls if 'lite-api.jup.ag' in u];self.assertEqual(len(quotes),3)

@@ -203,6 +203,14 @@ class Session:
         finally:
             self.db.rollback()
 
+    def release_lane_grants(self):
+        """Return the lanes' unspent reservations to the ordinary pool once the lanes are done or past their cutoff: a lane
+        cannot spend after its cutoff, so what it left is budget the coordinator's follow-up may use."""
+        with self.transaction():
+            released = self.db.execute("SELECT coalesce(sum(remaining),0) FROM grants WHERE owner IN ('liquidity','project')").fetchone()[0]
+            self.db.execute("UPDATE grants SET remaining=0 WHERE owner IN ('liquidity','project')")
+        return int(released)
+
     def reserve(self, owner, count):
         need(owner in OWNERS - {"ordinary"}, "invalid reserved owner")
         integer(count, "grant")

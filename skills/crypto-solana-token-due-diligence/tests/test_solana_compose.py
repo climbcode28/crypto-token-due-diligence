@@ -71,6 +71,19 @@ class ComposeTests(unittest.TestCase):
         self.assertTrue(all(l['note_artifact'].startswith('note-snapshots/') for l in m['lanes']))
         before=(b.root/'report.json').read_bytes();compose(b.root,allow_synthetic=True);self.assertEqual(before,(b.root/'report.json').read_bytes())
 
+    def test_untouched_coverage_rows_follow_the_facts_and_lanes_while_edited_rows_are_kept(self):
+        b=self.fixture();n=note(b);rows={r['dimension']:r for r in n['coverage']}
+        # The coordinator disagrees on one surface: an edit to the prefilled row survives compose exactly.
+        rows['token_controls'].update(status='partial',decision_impact='Held open by the coordinator: a controller path is still being examined.')
+        rows['token_controls']['closure'].update(boundary='pending',standard_scope_complete=False,next_route='standard');save(b,n);lane(b,'liquidity');lane(b,'project')
+        r=compose(b.root,allow_synthetic=True)['report'];got={x['dimension']:x for x in r['coverage']}
+        self.assertEqual((got['token_controls']['status'],got['token_controls']['closure']['boundary'],got['token_controls']['decision_impact']),('partial','pending',rows['token_controls']['decision_impact']))
+        # Lane-owned surfaces: the project lane reported its items done, but nothing affirmative sits on them yet, so they stay pending and say so.
+        self.assertEqual(got['utility_redemption_rights']['closure']['boundary'],'pending');self.assertIn('no affirmative finding',got['utility_redemption_rights']['closure']['reason'])
+        # Untouched rows are recomputed at compose: with the coordinator's edit removed the controls surface closes itself.
+        n=note(b);save(b,n);r=compose(b.root,allow_synthetic=True)['report'];tc=next(x for x in r['coverage'] if x['dimension']=='token_controls')
+        self.assertEqual((tc['status'],tc['closure']['boundary'],tc['closure']['standard_scope_complete']),('checked','resolved',True));self.assertEqual(r['ratings']['token_controls'],'unknown')  # unsigned findings never rate
+
     def test_editing_lane_note_does_not_invalidate_previous_report(self):
         b=self.fixture();save(b,note(b));lane(b,'liquidity');lane(b,'project');compose(b.root,allow_synthetic=True)
         (b.root/'notes/liquidity.json').write_text('{invalid ongoing edit')

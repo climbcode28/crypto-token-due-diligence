@@ -38,7 +38,16 @@ For economics, describe observed supply/control terms, scheduled fees/rewards,
 utility/redemption rights, actual holder claims and dependencies. Distinguish protocol
 fees, creator fees, LP principal, distributions, discretionary buybacks and enforceable
 rights. Do not invent equity-like user requirements or malicious intent from ordinary
-fees. State which dependencies and reward-accounting/liveness checks remain unknown.
+fees. A published discretionary buyback, burn or revenue policy whose execution you could
+not reconcile is a `potential_risk` inference finding on reward_accounting_liveness or
+utility_redemption_rights (the rating rule: discretion is the observed concern), with the
+captured policy page as support; file an unresolved gap only for a policy page you could
+not capture. State which dependencies and liveness checks remain unknown in limitations.
+When an item is done, file at least one finding on each surface it answers
+(development_disclosure, utility_redemption_rights, reward_accounting_liveness), a bounded
+`source_analysis` finding stating what the captured sources say even when no reward,
+redemption right or audit is claimed: a surface with no finding stays pending and keeps
+the report at checkpoint.
 
 Creator/launch work uses specifically attributed keys (a receipt-named creator, a Pump
 curve's recorded creator, or a Metaplex update authority/verified creator; the fact's
@@ -56,8 +65,10 @@ serves one coverage surface (for example `utility_redemption_rights` for terms).
 registers ownership and charges actual sends/retries/redirects under the shared session. Quote every URL
 (an unquoted `?` or `*` is a zsh glob) and do not wrap the helper in `timeout`, which macOS lacks; the helper
 enforces its own cutoff. Reuse existing capture IDs rather than fetching the same URL again. The command needs outbound network: in a sandboxed host (Codex) request network permission for the exact command. If it reports `network_unavailable`, or every capture is `transport_failure` with a `failure` of `dns` or `not_permitted`, the host denied the network; rerun with permission instead of recording the source as unavailable. You cannot overwrite another owner's evidence.
-Return exact repository/audit/program/creator leads with the captured source IDs;
-request coordinator import/targeted presets where needed.
+Return exact repository/audit/program/creator leads with the captured source IDs. Put a
+creator key or a transaction signature you want read on chain in your note's `leads` list
+(at most four rows of `{"kind": "creator_key"|"signature", "value": "…", "reason": "…"}`);
+the coordinator's follow-up runs them mechanically, so never leave such a lead only in prose.
 
 Do not run RPC, read credentials, create scripts, spawn agents, change settings or
 registrations, compose/finalize, buy service access, or mutate another lane. Only the
@@ -71,7 +82,11 @@ Unknowns are unresolved/unverified, not adverse allegations. Material concerns n
 observed basis, mechanism and consequence and must retain contrary evidence.
 
 Set all checklist items to `done`, `external_limit` or `pending` with concrete reasons,
-and list current `evidence_ids`. Answer every assigned original ask or record its
+and list current `evidence_ids`. An item is `done` when its standard question is answered
+from captured sources, even if an optional extra page went unattempted for the capture
+cap or the cutoff (say so in the reason); `pending` is only for a standard question you
+could not answer, and `external_limit` only when the sources you tried refused you. A
+`pending` item keeps the whole report at checkpoint. Answer every assigned original ask or record its
 precise gap. Run installed `solana_broad_collect.py lane-check RUN --owner project`
 (add `--allow-synthetic` only in synthetic rehearsals). The self-check imports your own new
 captures first, so cite them by capture ID; never edit the shared manifest. Your run

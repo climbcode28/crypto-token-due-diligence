@@ -8,7 +8,7 @@ from solana_pipeline_note import build_note
 from solana_profile import (PROFILE,DIMENSIONS,AXES,Evidence,ProfileError,regular,strict_json,check,
     validate_report,findings as validate_findings,coverage as validate_coverage,decision as validate_decision)
 
-VERSION='1.3.0'
+VERSION='1.4.0'
 OWNERS=('coordinator','liquidity','project')
 CHECKLISTS={'liquidity':('discovery','custody','activity','exits','assigned_asks'),
  'project':('identity','delivery','audit_scope','economics','creator_history','contrary_evidence','assigned_asks')}
@@ -115,7 +115,8 @@ def preflight(e,report,digest):
 
 def assemble(root,note,*,lane_notes=None,allow_synthetic=False):
     root=Path(root).resolve();raw=regular(root,'manifest.json').read_bytes();m=strict_json(raw,'manifest.json');e=Evidence(root,m,allow_synthetic)
-    facts=facts_build(root,allow_synthetic);pipeline=build_note(facts);errors=[];note=copy.deepcopy(note)
+    from solana_coverage import leads_for
+    facts=facts_build(root,allow_synthetic);pipeline=build_note(facts,leads_for(root));errors=[];note=copy.deepcopy(note)
     note_header(note,'coordinator',m,errors,'note')
     if note.get('research_status')=='completed':placeholders(note,'note',errors)
     rows=copy.deepcopy(pipeline['findings']);pipeline_rows={f['id']:f for f in rows}
@@ -179,18 +180,23 @@ def assemble(root,note,*,lane_notes=None,allow_synthetic=False):
     # Field-level restatements of one fact inherit that fact's judgment unless assigned explicitly, so a
     # coordinator judges each fact once rather than every typed field; this runs after overrides so a
     # corrected parent judgment reaches its restatements too.
-    from solana_pipeline_note import finding_id
+    from solana_pipeline_note import restatement_parent
     for fid,row in pipeline_rows.items():
-        parent=finding_id(row['support'][0]['evidence_id']) if row.get('support') else None
-        if row.get('signal') is None and parent and parent!=fid and parent in pipeline_rows and pipeline_rows[parent].get('signal') is not None:
+        parent=restatement_parent(row,pipeline_rows)
+        if row.get('signal') is None and parent and pipeline_rows[parent].get('signal') is not None:
             for k in ('signal','confidence','concern'):  # Severity (impact) stays on the parent fact only.
                 if pipeline_rows[parent].get(k) is not None:row[k]=copy.deepcopy(pipeline_rows[parent][k])
     coverage_rows=[];supplied={r.get('dimension'):r for r in note.get('coverage',[]) if isinstance(r,dict)}
     if len(supplied)!=len(note.get('coverage',[])) or not set(supplied)<=set(DIMENSIONS):error(errors,'note.coverage','Unique known coverage dimensions required.')
     ratings={}
+    from solana_coverage import mechanical,untouched,leads_for
+    checklists={owner:n.get('checklist') for owner,n in notes.items() if owner!='coordinator' and isinstance(n.get('checklist'),dict)};leads=leads_for(root)
     for dim in DIMENSIONS:
         found=[f for f in rows if f['dimension']==dim];ids=[f['id'] for f in found];attempts=[a['id'] for a in m['attempts'] if a['dimension']==dim]
-        row=copy.deepcopy(supplied.get(dim,empty_coverage(dim,ids,attempts)));row['finding_ids']=ids;row['attempt_ids']=attempts;coverage_rows.append(row)
+        given=supplied.get(dim)
+        # An untouched prefilled row follows the facts, the lane checklists and every finding now on the surface; an edited row is the coordinator's.
+        row=mechanical(dim,found,facts['facts'],attempts,leads=leads,checklists=checklists) if given is None or untouched(given) else copy.deepcopy(given)
+        row['finding_ids']=ids;row['attempt_ids']=attempts;coverage_rows.append(row)
         ratings[dim]='concern' if any(f['signal'] in ('bad','potential_risk') for f in found) else 'not_applicable' if row['status']=='not_applicable' else 'no_issue_detected' if row['status']=='checked' and found and all(f['signal']=='good' for f in found) else 'unknown'
     summary=list(note.get('summary_ids',[]));decision=copy.deepcopy(note.get('decision'))
     severe=[f['id'] for f in rows if f['signal'] in ('bad','potential_risk') and f['impact'] in ('high','critical')]

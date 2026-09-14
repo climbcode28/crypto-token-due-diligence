@@ -219,6 +219,21 @@ python3 "$S/scripts/solana_broad_collect.py" collect "$RUN" --request "$RUN/pres
   --allow-network --cost-policy free
 ```
 
+When both lanes have returned (their notes are on disk), run the follow-up once with
+the same provider flags, before editing the note:
+
+```sh
+python3 "$S/scripts/solana_broad_collect.py" follow-up "$RUN" --provider auto --allow-network
+```
+
+It refreshes, returns the lanes' unspent reservations to the ordinary grant (a lane cannot
+spend after its cutoff), runs every recommended row still open (the rows start deferred and
+the presets the lanes' `leads` added: `creator_history` for a lane-named creator key,
+`transactions` for a lane-named signature), refreshes again and resyncs the coordinator note,
+printing `presets_run`, the remaining queue and the leads it read. Nothing in it needs a
+judgment; a row it could not afford is printed with its reason, and past the collection
+cutoff `queue_note` says no preset was accepted (an unread lead is then a limitation).
+
 Presets run sequentially under the same deadline, attempt/byte ceiling and reserved
 final capacity, and each refreshes facts (the draft becomes unjudged; analyst notes and
 corrections are preserved). An identical named request resumes; a changed one is
@@ -232,8 +247,12 @@ python3 "$S/scripts/solana_broad_collect.py" refresh "$RUN"
 ## 4. Compose the note and finalize
 
 Edit the scaffolded `$RUN/draft/notes/coordinator.json` per [compose](compose.md):
-signals for pipeline IDs, owned findings, conflict resolutions, eleven coverage rows,
-four axes and the literal original-request requirements. Then:
+signals for pipeline IDs, owned findings, conflict resolutions, four axes and the
+literal original-request requirements. The eleven coverage rows are prefilled from the
+facts and recomputed at compose while untouched (a surface whose route ran and answered
+is `checked`/`resolved`; one whose route never ran, or that carries an open coverage-gap
+finding or a pending lane item, stays `pending` with the closing route named); edit a
+row only to disagree. Then:
 
 ```sh
 python3 "$S/scripts/solana_bundle.py" finalize "$RUN/draft" --out "$RUN/final"

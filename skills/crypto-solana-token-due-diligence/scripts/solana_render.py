@@ -291,10 +291,10 @@ def reading_documents(manifest,report):
     # are that fact's summary and limits) travels inside the fact's entry; the frozen report lists all.
     selected=set(report['summary_ids']);ids={f['id'] for f in report['findings']};facts={d['id']:d for d in manifest['derivations']}
     rows_by_dimension={c['dimension']:c for c in report['coverage']};attempts={a['id']:a for a in manifest.get('attempts',[]) if isinstance(a,dict) and 'id' in a}
+    by_id={f['id']:f for f in report['findings']}
     def parent_of(f):
-        if f.get('owner')!='pipeline' or 'support' not in f or not f['support']:return None
-        parent='pipeline-'+f['support'][0]['evidence_id']
-        return parent if parent!=f['id'] and parent in ids else None
+        from solana_pipeline_note import restatement_parent
+        return restatement_parent(f,by_id)
     restated={};cited=set();judgments={}
     for f in report['findings']:
         parent=parent_of(f)

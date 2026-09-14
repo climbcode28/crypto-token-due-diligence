@@ -103,7 +103,22 @@ unresolved gap; `unavailable` pairs with an `evidenced_external_limit` closure w
 `attempt_ids` (never invented); a `resolved` boundary needs `checked` or
 `not_applicable` status, so a `partial` row can only close as an evidenced external
 limit or stay `pending`; a completed report allows only `resolved` or
-`evidenced_external_limit` boundaries and no `pending_work`. Finding and support
+`evidenced_external_limit` boundaries and no `pending_work`. The scaffold prefills every
+row mechanically from the typed facts (`checked`/`resolved` when the surface's standard
+route ran and answered and every finding on it is affirmative: a usable controls fact, a
+leading pool that is `observed` or sampled with only program-control items open, an
+`observed`/`sampled` holders fact, a verified sale or a quote ladder, a sampled receipt
+(the launch fact) plus a signature history for every attributed key, creator activity,
+pool programs with their ProgramData read, the second pool sampled or a single pool in a
+usable discovery listing; lane-owned surfaces close when the project lane reports their
+items done and a lane finding sits on the surface), and every untouched row (its
+`prefill.digest` still matches) is recomputed at each refresh (with the lane notes'
+findings and checklists on disk) and at compose, so a preset or a lane result closes its
+surface without an edit. Edit a row only to disagree: any change to its status, impact,
+pending work or closure is kept as yours. A row stays `pending` only when a route never
+ran, a coverage-gap finding is open, a lane item is not done, or no creator key could be
+attributed (launch integrity then closes by your judgment on the sampled receipts or as
+an evidenced limit). Finding and support
 subjects are `{genesis_hash, kind, address}` with `kind` one of `mint`, `holding`,
 `program`, `controller`, `pool`, `position`, `wallet` or `document` (a document
 subject's address is the target mint). A surface is `checked` when its standard route ran and answered, even with a stated limit: current_concentration with an `observed` holders fact (exact largest-20, custody exclusions applied), canonical_lp_principal_custody with an `observed` pool fact whose sampled positions name their custodians, utility_redemption_rights with the policy captured and its execution route attempted. Rate such rows by the [rating rules](reporting-scenarios.md#rating-rules); do not leave them `partial` for a limit the text already states.

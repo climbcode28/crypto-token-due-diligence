@@ -100,14 +100,14 @@ analyst arithmetic. Use compact facts and named presets; raw evidence is for dis
 3. **Facts/presets:** judge from the printed summary; run `solana_facts.py --category`
    only for an omitted material detail. Exact holder aggregates, pool reserves,
    position principal, custody controls and execution reconciliation are computed
-   from typed evidence. `start` already ran its recommended presets (`presets_run`);
-   run a printed `recommended_presets` row only when start deferred it, with
-   `collect "$RUN" --request <file>` and the same flags. Add up to four presets of your own
-   only for a hash or address the user or a lane named, never a bare `pool` re-read. Lane self-checks import own captures; `refresh` only after outside captures.
+   from typed evidence. `start` already ran its recommended presets (`presets_run`). When
+   both lanes have returned, run `follow-up "$RUN"` once with the same flags: it runs the
+   rows start deferred and the presets the lanes' `leads` added (a history for a lane-named
+   creator key, a receipt for a lane-named signature), then resyncs the note. Add up to four presets of your own only for a hash or address the user named, never a bare `pool` re-read.
 4. **Note:** edit the scaffolded `$RUN/draft/notes/coordinator.json`: assign a signal
    to each pipeline finding, add your own findings for adverse concerns and lane
-   conclusions, replace every `TODO`, resolve cross-lane conflicts, fill the eleven
-   coverage rows, four axes and the literal original-request requirements
+   conclusions, replace every `TODO`, resolve cross-lane conflicts, review the eleven
+   prefilled coverage rows (edit one only to disagree), four axes and the request requirements
    ([compose](references/compose.md)). Cite the alias keys the scaffold lists, never
    the `fact-` display prefix. Assignments are pre-filled with fact digests: set only
    the signal. Corrections need reason, current evidence and digests.

@@ -17,7 +17,7 @@ from solana_facts import encoded,atomic,build,compact
 from solana_profile import regular,strict_json,PROFILE,DIMENSIONS,Evidence,validate_report
 from solana_compose import CHECKLISTS,empty_coverage,expand_finding,note_header,validate_imports,ComposeError,preflight
 
-VERSION='1.10.0'
+VERSION='1.11.0'
 ASSETS=Path(__file__).resolve().parents[1]/'assets'
 STAGES=('identity_discovery','related_accounts_controllers','pool_transaction_quote_dependencies','final_consistency_checks')
 PRESET_CAP=4  # coordinator-named presets per run beyond the recommended queue; the collection cutoff and request grants gate each one before this count does
@@ -560,6 +560,36 @@ def quote_capture(root,target,leads,*,opener_factory=None):
     return result
 
 
+LEAD_KINDS=('creator_key','signature')
+
+
+def lane_leads(root,*,strict=False):
+    """Exact leads the lanes recorded in their notes (`leads`: at most four rows of kind creator_key or signature with a value
+    and a reason). Read leniently for the queue; `strict` raises on a malformed row (lane-check)."""
+    from solana_common import signature as check_signature
+    out=[]
+    for owner in ('liquidity','project'):
+        path=Path(root)/'draft/notes'/(owner+'.json')
+        if not path.exists():continue
+        try:note=json.loads(path.read_text())
+        except ValueError:
+            if strict:raise ValueError('lane note is not valid JSON')
+            continue
+        rows=note.get('leads') if isinstance(note,dict) else None
+        if rows is None:continue
+        if not isinstance(rows,list) or len(rows)>4:
+            if strict:raise ValueError('leads must be a list of at most four rows')
+            continue
+        for row in rows:
+            try:
+                need(isinstance(row,dict) and row.get('kind') in LEAD_KINDS and isinstance(row.get('reason'),str) and row['reason'].strip(),'lead rows need kind creator_key|signature, value and reason')
+                value=pubkey(row['value']) if row['kind']=='creator_key' else check_signature(row['value'])
+                out.append({'kind':row['kind'],'value':value,'reason':row['reason'].strip()[:300],'owner':owner})
+            except (ValueError,KeyError,TypeError) as exc:
+                if strict:raise ValueError('leads: '+str(exc))
+    return out
+
+
 def recommended_presets(root):
     """Presets derived from the run's facts and leads, run by start itself (run_recommended) and printed for the coordinator
     when one was deferred: sellability when no sale verified, creator history for attributed keys without a history page,
@@ -568,7 +598,7 @@ def recommended_presets(root):
     root=Path(root).resolve();out=[]
     if not (root/'draft/facts.json').exists():return out
     s=Session(root)
-    try:scope=s.meta['scope'];remaining=s.status()['remaining_requests'];seconds=s.remaining_seconds()
+    try:scope=s.meta['scope'];mint=s.meta['target']['mint'];remaining=s.status()['remaining_requests'];seconds=s.remaining_seconds()
     finally:s.close()
     if scope!='broad' or seconds<=0:return out  # a focused run answers its question; past the cutoff no preset is accepted
     try:facts=strict_json((root/'draft/facts.json').read_bytes(),'facts.json')['facts']
@@ -598,6 +628,17 @@ def recommended_presets(root):
     if programs:
         out.append({'id':'rec-programs','kind':'programs','parameters':{'addresses':programs},'dimension':'external_dependencies','sends':6,
                     'reason':'a pool program or its ProgramData was not read, so upgrade authority is unresolved; the preset reads the program and its ProgramData metadata slice'})
+    # Leads the lanes recorded become bounded presets too: a creator key a lane named gets a signature history, a signature a
+    # lane named gets its receipt, so the coordinator's follow-up runs them mechanically instead of judging them.
+    leads=lane_leads(root);sampled={d.get('signature') for d in by_op.get('transaction',[])}
+    lane_keys=list(dict.fromkeys(l['value'] for l in leads if l['kind']=='creator_key' and l['value'] not in seen_history and l['value']!=mint))[:2] if leads else []
+    if lane_keys:
+        out.append({'id':'rec-lanekeys','kind':'creator_history','parameters':{'keys':lane_keys},'dimension':'historical_launch_integrity','sends':6,
+                    'reason':'creator key(s) a lane named without a signature history: '+'; '.join(l['reason'] for l in leads if l['kind']=='creator_key' and l['value'] in lane_keys)[:300]})
+    lane_sigs=list(dict.fromkeys(l['value'] for l in leads if l['kind']=='signature' and l['value'] not in sampled))[:2] if leads else []
+    if lane_sigs:
+        out.append({'id':'rec-lanetx','kind':'transactions','parameters':{'signatures':lane_sigs},'dimension':'sellability_exit_depth','sends':5,
+                    'reason':'transaction signature(s) a lane named without a sampled receipt: '+'; '.join(l['reason'] for l in leads if l['kind']=='signature' and l['value'] in lane_sigs)[:300]})
     # A row whose preset already ran is not repeated: what it left open is the named limit (gap_basis), not a queue item.
     # Rows the leftover grant cannot pay for (two sends stay free) are dropped rather than refused turn by turn. The
     # coordinator's four-preset cap does not bound this queue: its rows are the pipeline's own follow-ups (at most three,
@@ -801,21 +842,22 @@ def recommended_request(root,spec):
     except (ValueError,OSError):return False
 
 
-def run_recommended(root,config,*,factory=HttpTransport,rows=None):
+def run_recommended(root,config,*,factory=HttpTransport,rows=None,headroom=None):
     """Start's own execution of the recommended queue: each row is the same bounded preset a coordinator `collect` would run,
     under this run's provider lock, cutoff, grant and preset ledger, so a derived follow-up never waits for a coordinator
     turn or a second paid-use approval. A row is deferred, and stays in the printed queue, when fewer than LANE_HEADROOM
     seconds remain before the lane cutoff: the lanes are dispatched after start returns and still need their window.
     Every outcome is recorded; a preset that failed is a named limit, never a retry."""
-    root=Path(root).resolve();rows=recommended_presets(root) if rows is None else rows;out=[]
+    root=Path(root).resolve();rows=recommended_presets(root) if rows is None else rows;out=[];floor=LANE_HEADROOM if headroom is None else headroom
     for row in rows:
         s=Session(root)
-        try:headroom=s.remaining_seconds('liquidity');remaining=s.status()['remaining_requests']
+        try:left=s.remaining_seconds('liquidity');remaining=s.status()['remaining_requests']
         finally:s.close()
         entry={'id':row['id'],'kind':row['kind'],'dimension':row.get('dimension'),'sends':row.get('sends'),'error':None};sends=row.get('sends') or 0
         # The row's own sends take wall time too (public pacing is about two seconds a send at worst), and an earlier row may
         # have spent the grant this row was filtered against: both are re-checked here, per row, against the live session.
-        if headroom<LANE_HEADROOM+2*sends:
+        # After the lanes returned (follow-up) no lane window is owed and the floor is zero.
+        if floor and left<floor+2*sends:
             out.append({**entry,'status':'deferred','reason':'fewer than '+str(LANE_HEADROOM)+' s would remain before the lane cutoff after its sends; run it with collect after dispatching the lanes'});continue
         if sends>remaining-2:
             out.append({**entry,'status':'deferred','reason':'the leftover grant ('+str(remaining)+' sends) cannot pay for its '+str(sends)+' sends and keep the two-send margin'});continue
@@ -932,6 +974,32 @@ def _collect(root,spec,config,*,factory=HttpTransport):
     result['assignments_synced']=sync_assignments(root/'draft');return result
 
 
+def follow_up(root,config,*,factory=HttpTransport):
+    """The coordinator's one command after both lanes returned: refresh, run every recommended row (start's deferred rows and the
+    presets the lanes' leads added) under the run's provider lock, cutoff and grant with no lane window owed, refresh again and
+    resync the note. Every outcome is printed; nothing here needs a judgment."""
+    from solana_scaffold import sync_assignments
+    root=Path(root).resolve();refresh(root)
+    def lane_done(owner):
+        path=root/'draft/notes'/(owner+'.json')
+        try:checks=strict_json(path.read_bytes(),owner+' note').get('checklist') if path.exists() else None
+        except (ValueError,OSError,AttributeError):checks=None
+        return bool(checks) and all(isinstance(v,dict) and v.get('status') in ('done','external_limit') for v in checks.values())
+    s=Session(root);released=0
+    try:
+        # The lanes' unspent reservations return to the ordinary pool once both lanes are done or past their cutoff.
+        if s.now()>s.meta['lane_cutoff'] or (lane_done('liquidity') and lane_done('project')):released=s.release_lane_grants()
+        seconds=s.remaining_seconds()
+    finally:s.close()
+    rows=recommended_presets(root)
+    ran=run_recommended(root,config,factory=factory,rows=rows,headroom=0) if rows else []
+    result=refresh(root);result['assignments_synced']=sync_assignments(root/'draft');result['presets_run']=ran;result['recommended_presets']=recommended_presets(root)
+    result['leads']=lane_leads(root);result['lane_grants_released']=released;result['session']=status(root)
+    # Past the collection cutoff no preset is accepted: an unread lead is a limitation the note must carry, not a silent no-op.
+    result['queue_note']=None if seconds>0 else 'past the collection cutoff: no preset is accepted; a lead still unread is cited as a limitation'
+    return result
+
+
 def lane_check(root,owner,*,allow_synthetic=False):
     root=Path(root).resolve();draft=root/'draft';s=Session(root)
     try:meta=s.meta
@@ -946,6 +1014,8 @@ def lane_check(root,owner,*,allow_synthetic=False):
         m=strict_json(regular(draft,'manifest.json').read_bytes(),'manifest.json')
     e=Evidence(draft,m,allow_synthetic);facts=build(draft,allow_synthetic)
     n=strict_json(regular(draft,'notes/'+owner+'.json').read_bytes(),'lane note');errors=[];note_header(n,owner,m,errors,'note');validate_imports(draft,n,owner,e,errors,'note')
+    try:lane_leads(root,strict=True)
+    except ValueError as exc:errors.append({'path':'leads','message':str(exc)+' (rows: {"kind": "creator_key"|"signature", "value": "…", "reason": "…"}, at most four)'})
     rows=[]
     for i,value in enumerate(n.get('findings',[])):
         try:rows.append(expand_finding(value,owner,facts,e,'note.findings['+str(i)+']'))
@@ -969,18 +1039,19 @@ def lane_check(root,owner,*,allow_synthetic=False):
 
 
 def main():
-    p=argparse.ArgumentParser(description=__doc__);p.add_argument('action',choices=('start','collect','brief','capture','lane-check','refresh','status'));p.add_argument('root',type=Path)
+    p=argparse.ArgumentParser(description=__doc__);p.add_argument('action',choices=('start','collect','follow-up','brief','capture','lane-check','refresh','status'));p.add_argument('root',type=Path)
     p.add_argument('--mint');p.add_argument('--genesis-hash',default=MAINNET);p.add_argument('--question');p.add_argument('--received-at');p.add_argument('--deadline-at');p.add_argument('--focus',action='append',default=[]);p.add_argument('--url',action='append',default=[])
     p.add_argument('--scope',choices=('broad','focused'),default='broad');p.add_argument('--surface',action='append');p.add_argument('--owner',choices=('ordinary','liquidity','project'),default='ordinary');p.add_argument('--dimension',choices=DIMENSIONS);p.add_argument('--request',type=Path)
     p.add_argument('--allow-network',action='store_true');p.add_argument('--cost-policy',choices=('free','paid'));p.add_argument('--allow-paid',action='store_true');p.add_argument('--provider',choices=('auto','public','drpc'),default='auto')
     p.add_argument('--rpc-url-env',default='SOLANA_RPC_URL');p.add_argument('--allow-synthetic',action='store_true');a=p.parse_args()
     try:
-        if a.action in ('start','collect'):config=public_config(allow_network=a.allow_network,cost_policy=a.cost_policy,rpc_url_env=a.rpc_url_env,provider=a.provider,allow_paid=a.allow_paid)
+        if a.action in ('start','collect','follow-up'):config=public_config(allow_network=a.allow_network,cost_policy=a.cost_policy,rpc_url_env=a.rpc_url_env,provider=a.provider,allow_paid=a.allow_paid)
         if a.action=='start':
             from solana_session import epoch
             need(a.mint and a.question and a.received_at and a.deadline_at,'Start needs exact mint, original question, received-at and deadline-at.')
             result=start(a.root,{'family':'solana','genesis_hash':a.genesis_hash,'mint':a.mint},question=a.question,received_at=epoch(a.received_at),deadline_at=epoch(a.deadline_at),focus=a.focus,urls=a.url,scope=a.scope,surfaces=a.surface,config=config)
         elif a.action=='collect':need(a.request is not None,'A bounded preset JSON request is required.');result=collect(a.root,strict_json(a.request.read_bytes(),'preset request'),config)
+        elif a.action=='follow-up':result=follow_up(a.root,config)
         elif a.action=='brief':result={'lane_pointers':write_briefs(a.root)}
         elif a.action=='capture':
             need(a.allow_network,'Capture requires --allow-network (web captures cost nothing; --cost-policy is accepted for compatibility).')

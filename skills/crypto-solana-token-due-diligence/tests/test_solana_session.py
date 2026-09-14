@@ -59,6 +59,20 @@ class SessionTests(unittest.TestCase):
                 self.assertEqual(session.status()["started_attempts"], expected)
                 self.assertEqual(session.status()["response_bytes"], expected*5)
 
+    def test_lane_grants_release_to_the_ordinary_pool_once(self):
+        session = self.create(max_requests=40, reservations={"liquidity": 6, "project": 5, "final": 3})
+        spent = self.acquire(session, owner="liquidity")
+        session.finish(spent["id"], "ok", 5, {"result": "synthetic"})  # one lane send already made: only what is left returns
+        before = session.status()["remaining_requests"]
+        self.assertEqual(session.release_lane_grants(), 10)
+        lanes = [g for g in session.status()["grants"] if g["owner"] in ("liquidity", "project")]
+        self.assertEqual([g["remaining"] for g in lanes], [0, 0])
+        self.assertEqual(session.status()["remaining_requests"], before + 10)
+        self.assertEqual(next(g for g in session.status()["grants"] if g["owner"] == "final")["remaining"], 3, "the final reservation is untouched")
+        self.assertEqual(session.release_lane_grants(), 0)
+        with self.assertRaisesRegex(LimitError, "request_budget"):
+            self.acquire(session, "two", owner="project")  # a lane cannot spend after its reservation was released
+
     def test_zero_grant_and_reserved_final_capacity(self):
         session = self.create(max_requests=2, reservations={"liquidity": 0, "final": 1})
         with self.assertRaisesRegex(LimitError, "request_budget"):

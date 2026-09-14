@@ -71,6 +71,17 @@ class CensusFlowTests(unittest.TestCase):
         self.assertTrue(row['usable']);self.assertEqual(row['data']['status'],'observed');self.assertEqual(row['data']['position_census']['positions_counted'],1)
         self.assertNotIn(scan['id'],[i['id'] for d in m['derivations'] if d['id']==row['evidence_id'] for i in d['inputs']])
 
+    def test_second_pool_findings_sit_on_the_side_pool_surface_and_close_it(self):
+        root,target,c,opts=self.setup_run();start(root,target,**opts)
+        pipeline=json.loads((root/'draft/notes/pipeline.json').read_text());by_dim={}
+        for f in pipeline['findings']:
+            if f['id'].startswith('pipeline-pool-'):by_dim.setdefault(f['dimension'],set()).add(f['support'][0]['evidence_id'])
+        leads=[l['pool'] for l in json.loads((root/'automatic-leads.json').read_text())];self.assertEqual(leads[0],c['pool'])  # the CLMM pool leads by indexed liquidity
+        self.assertEqual(len(by_dim['canonical_lp_principal_custody']),1);self.assertEqual(len(by_dim['side_pool_removal_risk']),1)  # one pool fact each
+        note=json.loads((root/'draft/notes/coordinator.json').read_text());row=next(x for x in note['coverage'] if x['dimension']=='side_pool_removal_risk')
+        self.assertEqual((row['status'],row['closure']['boundary']),('checked','resolved'));self.assertIn('Second pool raydium_cpmm sampled',row['closure']['reason'])
+        self.assertFalse([f for f in pipeline['findings'] if f['id'].startswith('pipeline-no-side-pool')],'two discovered pools: no single-pool observation')
+
     def test_recommended_programs_preset_reads_programdata_and_closes_the_upgrade_gap(self):
         from broad_fixture import program_accounts
         from solana_broad_collect import collect

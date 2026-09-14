@@ -30,7 +30,9 @@
 ## Rating rules
 
 Rows with a verified observation are rated; `Unverified` is reserved for a route that was not
-run or whose sources answered nothing (its `gap_basis` says which).
+run or whose sources answered nothing (its `gap_basis` says which). Coverage closes the same
+way: a surface whose standard route ran and answered is prefilled `checked`/`resolved` from
+the facts, so a delivered report needs no judgment on closures the evidence already made.
 
 - **Concentration (current_concentration):** the holders fact is `observed` when the exact
   largest-20 read succeeded; rate it from the custody-adjusted figures. `good` when the top 20

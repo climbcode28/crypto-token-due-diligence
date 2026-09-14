@@ -63,10 +63,17 @@ facts, invent mitigation or assign pipeline signals. All original liquidity-rela
 asks need an answer or a precise gap.
 
 Set every checklist item to `done`, `external_limit` or `pending`, with a concrete
-reason, plus current `evidence_ids`. Check it with installed
+reason, plus current `evidence_ids`. An item is `done` when its standard question is
+answered from the facts and captures, even if an optional extra page went unattempted
+for the capture cap or the cutoff (say so in the reason); `pending` is only for a
+standard question you could not answer, and `external_limit` only when the sources you
+tried refused you. A `pending` item keeps the whole report at checkpoint. Check it with installed
 `solana_broad_collect.py lane-check RUN --owner liquidity`. In synthetic rehearsals
 only add `--allow-synthetic`. The self-check imports your own new captures first, so you
 can cite them by capture ID; lanes never edit the shared draft themselves. Your run
 context carries `note_contract` (header fields, required finding fields, allowed names
 and an example) and `skill_dir`. Self-check failure or missing evidence stays partial. Return the note
-path, self-check result, material observations/limits and targeted preset leads.
+path, self-check result, material observations/limits and targeted preset leads. Put a
+transaction signature or creator key you want read on chain in your note's `leads` list
+(at most four rows of `{"kind": "creator_key"|"signature", "value": "…", "reason": "…"}`);
+the coordinator's follow-up runs them mechanically, so never leave such a lead only in prose.
